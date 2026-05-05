@@ -77,8 +77,17 @@
   autoSquash = true # Auto squash commits with squash! fixup! or amend! prefix
   autoStash = true # Auto stash before rebasing and auto apply after
   updateRefs = true # Auto force-update any branches pointed to rebased commits
-  
+
+# --- URL Shorthands ---
+[url "https://github.com/"]
+  insteadOf = gh:
+
+[url "git@github.com:"]
+  pushInsteadOf = gh:
+
 # --- Git Aliases and Shortcuts ---
+[alias]
+  c = "!f() { repo=\"$1\"; repo=\"${repo#gh:}\"; repo=\"${repo#https://github.com/}\"; repo=\"${repo#git.github.com:}\"; repo=\"${repo%.git}\"; owner=\"${repo%%/*}\"; name=\"${repo##*/}\"; dest=\"$HOME/code/$owner/$name\"; if command -v gh >/dev/null 2>&1; then gh repo clone \"$repo\" \"$dest\"; else git clone \"https://github.com/$repo.git\" \"$dest\"; fi; }; f"
 
 # --- External Configuration Settings ---
 # Global ignore and attributes files
