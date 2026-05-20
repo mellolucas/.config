@@ -1,0 +1,10 @@
+# --- Global defaults ---
+# Normalize auto-detected text (LF in repo; OS EOL on checkout)
+*         text=auto
+
+# --- Cross-platform safe EOL overrides ---
+# Scripts
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+
+*.sh      text eol=lf

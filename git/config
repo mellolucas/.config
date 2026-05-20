@@ -1,0 +1,113 @@
+# --- Authentication and Identity ---
+[user]
+  name = Lucas Mello
+  email = 54722857+mellolucas@users.noreply.github.com
+  signingKey = B03337DD39CDEE4C53ECDA96BEB73956C6F33233
+  # useConfigOnly = true # Prevents git from guessing user identity
+
+[commit]
+  gpgSign = true # Sign all commits by default
+
+# --- Git Core Configuration and Behavior ---
+[core]
+  autocrlf = false # Let .gitattributes or .gitconfig.* handle line endings
+
+# --- Git Housekeeping and Maintenance ---
+# Keep Standardized
+[init]
+  defaultBranch = main # Default branch name for new repositories
+  
+# Keep Git Clean and Organized
+[branch]
+  autoSetupRebase = always # Automatically set up rebase for new branches
+
+[pull]
+  rebase = true # Rebase current branch on top of upstream after fetching
+  ff = only # Only update to new history if there is no divergent local history
+
+# Keep Git Consistent (1=1 mapping for upstream refs)
+[push]
+  default = simple # (default) Push current branch to the same name on remote
+  autoSetupRemote = true # Auto set remote as upstream for current branch
+  followTags = true # Push all local tags to the remote on any push
+
+[fetch]
+  prune = true # Remove remote-tracking branches that no longer exist on remote
+  pruneTags = true # Remove local tags that no longer exist on remote
+  all = true # Update all available remotes, unless --no-all or explicit remote
+
+# --- Quality of Life Improvements ---
+# Inspection and Comparison
+[column]
+  ui = auto # Show
+
+[branch]
+  sort = -committerdate # Sort branches by committer date
+
+[tag]
+  sort = version:refname # Sort tags by version
+
+[diff]
+  algorithm = histogram # Use histogram diff algorithm for clearer diffs
+  colorMoved = plain # Highlight any moved lines in diffs
+  mnemonicPrefix = true # Use i/(index) w/(working dir) and c/(commit) prefixes
+  renames = true # Detect if files have been renamed
+
+[commit]
+  verbose = true # Show diff of changes in commit messages
+
+[merge]
+  conflictStyle = zdiff3 # Add marker with content before either of the changes 
+
+[grep]
+  lineNumber = true # Prefix the line number to matching lines
+  heading = true # Show filename above file matches instead of at each line
+  break = true # Print an empty line between matches from different files
+  patternType = perl # Use Perl-compatible regular expressions for patterns
+
+# Ease of Use
+[help]
+  autoCorrect = prompt # Show suggestion and prompt for confirmation on typos
+
+[rerere]
+  enabled = true # Record before and after states of rebase conflicts
+  autoUpdate = true # Automatically re-apply the recorded resolutions 
+
+[rebase]
+  autoSquash = true # Auto squash commits with squash! fixup! or amend! prefix
+  autoStash = true # Auto stash before rebasing and auto apply after
+  updateRefs = true # Auto force-update any branches pointed to rebased commits
+
+# --- URL Shorthands ---
+[url "https://github.com/"]
+  insteadOf = gh:
+
+[url "git@github.com:"]
+  pushInsteadOf = gh:
+
+# --- Git Aliases and Shortcuts ---
+[alias]
+  c = "!f() { repo=\"$1\"; repo=\"${repo#gh:}\"; repo=\"${repo#https://github.com/}\"; repo=\"${repo#git.github.com:}\"; repo=\"${repo%.git}\"; owner=\"${repo%%/*}\"; name=\"${repo##*/}\"; dest=\"$HOME/code/$owner/$name\"; if command -v gh >/dev/null 2>&1; then gh repo clone \"$repo\" \"$dest\"; else git clone \"https://github.com/$repo.git\" \"$dest\"; fi; }; f"
+
+# --- External Configuration Settings ---
+[core]
+# OS-specific configurations
+[includeIf "gitdir/i:*:/"] # Include for Windows git directories
+  path = config.d/windows
+  path = ~/.gitconfig.windows
+
+[includeIf "gitdir/i:/"] # Include for Unix-like git directories
+  path = config.d/unix
+  path = ~/.gitconfig.unix
+
+# Context-specific configurations
+[include]
+  path = config.d/personal
+  path = ~/.gitconfig.personal # Should only exist on personal machine
+  path = config.d/work
+  path = ~/.gitconfig.work # Should only exist on work machine
+  
+
+# Local overrides
+[include]
+  path = ~/.gitconfig.local
