@@ -1,0 +1,4 @@
+# Local machine overrides and setup backups for this dotfiles repo only
+.local*
+*.local
+*.backup.*
