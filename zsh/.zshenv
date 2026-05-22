@@ -7,7 +7,7 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export ZDOTDIR="${ZDOTDIR:-$XDG_CONFIG_HOME/zsh}"
 
 export EDITOR="${EDITOR:-nvim}"
-export VISUAL="${VISUAL:-EDITOR}"
+export VISUAL="${VISUAL:-$EDITOR}"
 export PAGER="${PAGER:-less}"
 export LESS="${LESS:--FRX}"
 
