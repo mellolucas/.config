@@ -46,6 +46,19 @@ alias vi='$EDITOR'
 alias vim='$EDITOR'
 
 # Functions
+dotfiles-help() {
+  command dotfiles help "$@"
+}
+alias dots='dotfiles-help'
+
+dotfiles-uninstall() {
+  command dotfiles uninstall "$@"
+}
+
+dotfiles-update() {
+  command dotfiles update "$@"
+}
+alias dotsup='dotfiles-update'
 
 # Local
 local local_config="$XDG_CONFIG_HOME/zsh/local.zsh"
