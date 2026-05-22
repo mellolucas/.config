@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo_dir=$(CDPATH= cd -P "$(dirame "$0")" && pwd)
+repo_dir=$(CDPATH= cd -P "$(dirname "$0")" && pwd)
 
 xdg_config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 xdg_data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
@@ -23,7 +23,7 @@ abs_path() {
       printf '%s/%s\n' "$PWD" "$base"
     )
   else
-    printf '$s\n' "$path"
+    printf '%s\n' "$path"
   fi
 }
 
@@ -104,7 +104,7 @@ fi
 zshenv_target="$xdg_config_home/zsh/.zshenv"
 
 if [ -f "$zshenv_target" ]; then
-  link_path= "$zshenv_target" "$HOME/.zshenv"
+  link_path "$zshenv_target" "$HOME/.zshenv"
 else
   printf 'skip: no zsh entrypoint found at %s\n' "$zshenv_target"
 fi
