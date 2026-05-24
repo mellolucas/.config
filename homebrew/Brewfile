@@ -1,3 +1,9 @@
 brew "git"
 brew "neovim"
 cask "ghostty"
+
+brew "ripgrep"
+brew "container"
+
+brew "gh"
+tap "anomalyco/tap"
