@@ -145,6 +145,83 @@ managed_dirs() {
   done
 }
 
+brew_bin() {
+  if command -v brew >/dev/null 2>&1; then
+    command -v brew
+    return 0
+  fi
+
+  for candidate in \
+    /opt/homebrew/bin/brew \
+    /usr/local/bin/brew \
+    /home/linuxbrew/.linuxbrew/bin/brew
+  do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+ensure_macos_command_line_tools() {
+  [ "$(uname -s)" = Darwin ] || return 0
+
+  if xcode-select -p >/dev/null 2>&1; then
+    return 0
+  fi
+
+  printf 'macOS Command Line Tools are missing.\n'
+  printf 'Starting installer with: xcode-select --install\n'
+
+  xcode-select --install >/dev/null 2>&1 || true
+
+  printf '\nAfter the installer finishes, rerun:\n'
+  printf '  dotfiles bootstrap\n'
+  exit 1
+}
+
+ensure_homebrew_cask_appdir() {
+  [ "$(uname -s)" = Darwin ] || return 0
+
+  if id -Gn | grep -qw admin; then
+    return 0
+  fi
+
+  mkdir -p "$HOME/Applications"
+
+  case " ${HOMEBREW_CASK_OPTS:-} " in
+    *" --appdir="* | *" --appdir "*)
+      ;;
+    *)
+      export HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications${HOMEBREW_CASK_OPTS:+ $HOMEBREW_CASK_OPTS}"
+      ;;
+  esac
+}
+
+ensure_homebrew() {
+  if brew_bin >/dev/null 2>&1; then
+    printf 'ok: Homebrew already installed\n'
+    return 0
+  fi
+
+  ensure_macos_command_line_tools
+
+  if ! command -v curl >/dev/null 2>&1; then
+    printf 'error: curl is required to install Homebrew\n' >&2
+    exit 1
+  fi
+
+  if ! command -v bash >/dev/null 2>&1; then
+    printf 'error: bash is required to install Homebrew\n' >&2
+    exit 1
+  fi
+
+  printf 'installing Homebrew...\n'
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+}
+
 install_dotfiles() {
   mkdir -p \
     "$xdg_config_home" \
@@ -155,12 +232,9 @@ install_dotfiles() {
     "$xdg_state_home/zsh" \
     "$xdg_cache_home/zsh"
 
-  count=0
-
   managed_dirs | while IFS= read -r src; do
     name=${src##*/}
     link_path "$src" "$xdg_config_home/$name"
-    count=$((count + 1))
   done
 
   if [ -f "$xdg_config_home/zsh/.zshenv" ]; then
@@ -174,6 +248,120 @@ install_dotfiles() {
 
   printf '\ndone.\n'
   printf 'restart your shell or run: exec zsh\n'
+}
+
+bundle_dotfiles() {
+  brew=$(brew_bin) || {
+    printf 'error: Homebrew is not installed. Run: dotfiles bootstrap\n' >&2
+    exit 1
+  }
+
+  if [ ! -f "$xdg_config_home/homebrew/Brewfile" ]; then
+    printf 'skip: no Brewfile found at %s\n' "$xdg_config_home/homebrew/Brewfile"
+    return 0
+  fi
+
+  ensure_homebrew_cask_appdir
+
+  printf 'running brew bundle --global\n'
+  "$brew" bundle --global
+}
+
+bootstrap_dotfiles() {
+  install_dotfiles
+  ensure_homebrew
+  bundle_dotfiles
+
+  printf '\nbootstrap complete.\n'
+  printf 'restart your terminal, then open Ghostty.\n'
+}
+
+doctor_dotfiles() {
+  printf 'dotfiles repo: %s\n' "$repo_dir"
+  printf 'XDG_CONFIG_HOME: %s\n' "$xdg_config_home"
+
+  printf 'dotfiles command: '
+  if command -v dotfiles >/dev/null 2>&1; then
+    command -v dotfiles
+  else
+    printf 'missing\n'
+  fi
+
+  printf 'Homebrew: '
+  if brew=$(brew_bin 2>/dev/null); then
+    printf '%s\n' "$brew"
+  else
+    printf 'missing\n'
+  fi
+
+  printf 'Brewfile: '
+  if [ -f "$xdg_config_home/homebrew/Brewfile" ]; then
+    printf '%s\n' "$xdg_config_home/homebrew/Brewfile"
+  else
+    printf 'missing\n'
+  fi
+
+  if [ "$(uname -s)" = Darwin ]; then
+    printf 'Xcode CLT: '
+
+    if xcode-select -p >/dev/null 2>&1; then
+      xcode-select -p
+    else
+      printf 'missing; run: xcode-select --install\n'
+    fi
+
+    printf 'macOS admin user: '
+
+    if id -Gn | grep -qw admin; then
+      printf 'yes\n'
+    else
+      printf 'no; Homebrew casks will use %s\n' "$HOME/Applications"
+    fi
+  fi
+}
+
+cleanup_dotfiles() {
+  printf 'checking for safe home cleanup candidates...\n'
+
+  for path in \
+    "$HOME/.zcompdump" \
+    "$HOME/.viminfo" \
+    "$HOME/.lesshst"
+  do
+    if [ -f "$path" ]; then
+      if [ ! -s "$path" ]; then
+        rm "$path"
+        printf 'removed empty %s\n' "$path"
+      else
+        printf 'keep: non-empty %s\n' "$path"
+      fi
+    fi
+  done
+
+  for dir in \
+    "$HOME/.vim" \
+    "$HOME/.zsh_sessions"
+  do
+    if [ -d "$dir" ]; then
+      if rmdir "$dir" 2>/dev/null; then
+        printf 'removed empty %s\n' "$dir"
+      else
+        printf 'keep: non-empty %s\n' "$dir"
+      fi
+    fi
+  done
+
+  if [ -f "$HOME/.zsh_history" ]; then
+    if [ ! -s "$HOME/.zsh_history" ]; then
+      rm "$HOME/.zsh_history"
+      printf 'removed empty %s\n' "$HOME/.zsh_history"
+    else
+      printf 'keep: non-empty %s\n' "$HOME/.zsh_history"
+      printf 'hint: manually review before merging into %s\n' "$xdg_state_home/zsh/history"
+    fi
+  fi
+
+  printf 'cleanup complete.\n'
 }
 
 uninstall_dotfiles() {
@@ -226,11 +414,15 @@ update_dotfiles() {
 
 usage() {
   cat <<EOF
-usage: dotfiles [install|update|uninstall|help]
+usage: dotfiles [install|update|bootstrap|bundle|doctor|cleanup|uninstall|help]
 
 commands:
   install     link repo config directories into XDG_CONFIG_HOME
   update      pull latest changes, then install
+  bootstrap   install links, ensure Homebrew, then run brew bundle
+  bundle      run brew bundle --global
+  doctor      show environment status and next steps
+  cleanup     remove only safe empty legacy home files
   uninstall   remove symlinks owned by this repo
   help        show this usage help message
 
@@ -247,6 +439,18 @@ case "$cmd" in
     ;;
   update)
     update_dotfiles
+    ;;
+  bootstrap)
+    bootstrap_dotfiles
+    ;;
+  bundle)
+    bundle_dotfiles
+    ;;
+  doctor)
+    doctor_dotfiles
+    ;;
+  cleanup)
+    cleanup_dotfiles
     ;;
   uninstall)
     uninstall_dotfiles
