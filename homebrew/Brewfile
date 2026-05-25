@@ -1,9 +1,14 @@
 brew "git"
 brew "neovim"
 cask "ghostty"
-
-brew "ripgrep"
 brew "container"
+brew "ripgrep"
+
+brew "lua-language-server"
+brew "bash-language-server"
+brew "typescript-language-server"
+brew "basedpyright"
+brew "gopls"
 
 brew "gh"
 tap "anomalyco/tap"
