@@ -5,7 +5,7 @@
     "leader": "ctrl+x,ctrl+space"
   },
   "scroll_acceleration": {
-    "enabed": true
+    "enabled": true
   },
   "mouse": false
 }

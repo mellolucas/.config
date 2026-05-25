@@ -1,6 +1,6 @@
 # --- Global defaults ---
 # Normalize auto-detected text (LF in repo; OS EOL on checkout)
-*         text=auto
+*         text=auto eol=lf
 
 # --- Cross-platform safe EOL overrides ---
 # Scripts

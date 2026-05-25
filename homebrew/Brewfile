@@ -1,6 +1,6 @@
 brew "git"
 brew "neovim"
-cask "ghostty"
+cask "ghostty" if OS.mac?
 brew "container"
 brew "ripgrep"
 
@@ -11,4 +11,4 @@ brew "basedpyright"
 brew "gopls"
 
 brew "gh"
-tap "anomalyco/tap"
+brew "opencode"

@@ -1,0 +1,7 @@
+[user]
+  name = Your Profile Name
+  email = your.login.username@example.com
+  signingKey = YOUR_SIGNING_KEY
+
+[commit]
+  gpgSign = true # Sign all commits by default

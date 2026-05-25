@@ -9,7 +9,6 @@ SAVEHIST=50000
 mkdir -p "${HISTFILE:h}" "$XDG_CACHE_HOME/zsh"
 
 setopt append_history
-setopt inc_append_history
 setopt inc_append_history_time
 setopt hist_ignore_dups
 setopt hist_ignore_space

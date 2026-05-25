@@ -2,6 +2,7 @@
 # dotfiles-installer
 set -eu
 
+invocation_name=${0##*/}
 script_path=$0
 
 case "$script_path" in
@@ -427,11 +428,23 @@ commands:
   help        show this usage help message
 
 default:
-  install
+  install     when executed directly as install.sh
+  help        when called as dotfiles, dots, or another command name
 EOF
 }
 
-cmd=${1:-install}
+default_command() {
+  case "$invocation_name" in
+    install.sh)
+      printf 'install\n'
+      ;;
+    *)
+      printf 'help\n'
+      ;;
+  esac
+}
+
+cmd=${1:-$(default_command)}
 
 case "$cmd" in
   install)

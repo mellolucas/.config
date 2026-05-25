@@ -30,4 +30,4 @@ opt.hlsearch = false -- Don't highlight search results
 opt.incsearch = true -- Show matches as you type
 
 -- Set native colorscheme
-vim.cmd.colorscheme "catppuccin"
+pcall(vim.cmd.colorscheme, "catppuccin")

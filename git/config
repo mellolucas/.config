@@ -1,12 +1,6 @@
 # --- Authentication and Identity ---
 [user]
-  name = Lucas Mello
-  email = 54722857+mellolucas@users.noreply.github.com
-  signingKey = B03337DD39CDEE4C53ECDA96BEB73956C6F33233
-  # useConfigOnly = true # Prevents git from guessing user identity
-
-[commit]
-  gpgSign = true # Sign all commits by default
+  useConfigOnly = true # Prevents git from guessing user identity
 
 # --- Git Core Configuration and Behavior ---
 [core]
@@ -87,7 +81,7 @@
 
 # --- Git Aliases and Shortcuts ---
 [alias]
-  c = "!f() { repo=\"$1\"; repo=\"${repo#gh:}\"; repo=\"${repo#https://github.com/}\"; repo=\"${repo#git.github.com:}\"; repo=\"${repo%.git}\"; owner=\"${repo%%/*}\"; name=\"${repo##*/}\"; dest=\"$HOME/code/$owner/$name\"; if command -v gh >/dev/null 2>&1; then gh repo clone \"$repo\" \"$dest\"; else git clone \"https://github.com/$repo.git\" \"$dest\"; fi; }; f"
+  c = "!f() { repo=\"$1\"; repo=\"${repo#gh:}\"; repo=\"${repo#https://github.com/}\"; repo=\"${repo#git@github.com:}\"; repo=\"${repo%.git}\"; owner=\"${repo%%/*}\"; name=\"${repo##*/}\"; dest=\"$HOME/code/$owner/$name\"; if command -v gh >/dev/null 2>&1; then gh repo clone \"$repo\" \"$dest\"; else git clone \"https://github.com/$repo.git\" \"$dest\"; fi; }; f"
 
 # --- External Configuration Settings ---
 [core]
@@ -102,12 +96,12 @@
 
 # Context-specific configurations
 [include]
-  path = config.d/personal
-  path = ~/.gitconfig.personal # Should only exist on personal machine
-  path = config.d/work
-  path = ~/.gitconfig.work # Should only exist on work machine
-  
+  path = config.d/personal # Should only exist on personal machine
+  path = ~/.gitconfig.personal
+  path = config.d/work # Should only exist on work machine
+  path = ~/.gitconfig.work
 
 # Local overrides
 [include]
+  path = config.d/local
   path = ~/.gitconfig.local
