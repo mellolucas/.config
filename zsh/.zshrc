@@ -38,6 +38,7 @@ if ls -G -d . >/dev/null 2>&1; then
 fi
 
 # Aliases
+alias dots='dotfiles'
 alias ll='ls -plhA'
 alias li='ls -pilhA'
 alias v='$EDITOR'
