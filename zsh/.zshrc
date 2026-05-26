@@ -46,15 +46,6 @@ alias vi='$EDITOR'
 alias vim='$EDITOR'
 
 # Functions
-dotfiles-help() {
-  command dotfiles help "$@"
-}
-alias dots='dotfiles-help'
-
-dotfiles-uninstall() {
-  command dotfiles uninstall "$@"
-}
-
 dotfiles-update() {
   command dotfiles update "$@"
 }
