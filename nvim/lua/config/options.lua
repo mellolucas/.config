@@ -1,33 +1,52 @@
--- Native settings only (editor defaults and colorscheme command at the end)
+-- Native settings only
 local opt = vim.opt
 
 -- UI
 opt.number = true -- Line numbers
-opt.relativenumber = true -- Relative line numbers
-opt.cursorline = true -- Highlight current line
-opt.wrap = false -- Don't wrap lines
-opt.scrolloff = 10 -- Keep 10 lines above/below cursor
-opt.sidescrolloff = 8 -- Keep 8 columns left/right of cursor
-opt.termguicolors = true -- Enable 24-bit colors
-opt.signcolumn = "yes" -- Always show sign column
-opt.showmatch = true -- Highlight matching brackets
-opt.matchtime = 2 -- How long to show matching bracket
-opt.cmdheight = 1 -- Command line height
-opt.showmode = false -- Don't show mode in command line
+opt.relativenumber = true -- Relative numbers
+opt.cursorline = true -- Highlight line
+opt.wrap = false -- No wrap
+opt.scrolloff = 10 -- Vertical context
+opt.sidescrolloff = 8 -- Horizontal context
+opt.termguicolors = true -- True color
+opt.signcolumn = "yes" -- Stable signs
+opt.showmatch = true -- Match brackets
+opt.matchtime = 2 -- Match delay
+-- opt.laststatus = 3 -- Global statusline
 
 -- Indentation
 opt.tabstop = 2 -- Tab width
 opt.shiftwidth = 2 -- Indent width
-opt.softtabstop = 2 -- Soft tab stop
-opt.expandtab = true -- Use spaces instead of tabs
-opt.smartindent = true -- Smart auto-indenting
-opt.autoindent = true -- Copy indent from current line
+opt.softtabstop = 2 -- Soft tab
+opt.expandtab = true -- Spaces
+opt.smartindent = true -- Smart indent
+opt.autoindent = true -- Copy indent
 
--- Search settings
-opt.ignorecase = true -- Case insensitive search
-opt.smartcase = true -- Case sensitive if uppercase in search
-opt.hlsearch = false -- Don't highlight search results
-opt.incsearch = true -- Show matches as you type
+-- Search
+opt.ignorecase = true -- Ignore case
+opt.smartcase = true -- Smart case
+opt.hlsearch = false -- No highlight
+opt.incsearch = true -- Live search
 
--- Set native colorscheme
-pcall(vim.cmd.colorscheme, "catppuccin")
+-- Completion / popups
+-- opt.completeopt = "menu,popup,noselect" -- Native completion UI
+
+-- File handling
+opt.undofile = true -- Persistent undo
+opt.confirm = true -- Confirm unsaved
+opt.updatetime = 300 -- Faster events
+
+-- Behavior
+opt.mouse = "a" -- Mouse support
+opt.clipboard = vim.env.SSH_TTY and "" or "unnamedplus" -- Safe clipboard
+
+-- Splits
+opt.splitbelow = true -- Split below
+opt.splitright = true -- Split right
+
+-- Command-line completion
+
+-- Diff
+-- opt.diffopt:append("linematch:60") -- Better diffs
+
+-- Filetypes

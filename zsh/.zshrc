@@ -27,6 +27,18 @@ setopt no_beep
 # setopt auto_cd
 
 # Prompt
+autoload -Uz vcs_info
+
+zstyle ':vcs_info:*' enable git
+zstyle ':vcs_info:git:*' formats ' %F{magenta}%b%f'
+zstyle ':vcs_info:git:*' actionformats ' %F{magenta}%b|%a%f'
+
+precmd() {
+  vcs_info
+}
+
+PROMPT='%F{blue}%~%f${vcs_info_msg_0_}
+%(?.%F{green}.%F{red})❯%f '
 
 # Aesthetics
 if ls --color=auto -d . >/dev/null 2>&1; then
