@@ -45,6 +45,11 @@ xdg_state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
 xdg_cache_home="${XDG_CACHE_HOME:-$HOME/.cache}"
 user_bin_home="$HOME/.local/bin"
 
+export XDG_CONFIG_HOME="$xdg_config_home"
+export XDG_DATA_HOME="$xdg_data_home"
+export XDG_STATE_HOME="$xdg_state_home"
+export XDG_CACHE_HOME="$xdg_cache_home"
+
 timestamp() {
   date +%Y%m%d%H%M%S
 }
@@ -257,15 +262,17 @@ bundle_dotfiles() {
     exit 1
   }
 
-  if [ ! -f "$xdg_config_home/homebrew/Brewfile" ]; then
-    printf 'skip: no Brewfile found at %s\n' "$xdg_config_home/homebrew/Brewfile"
+  brewfile="$xdg_config_home/homebrew/Brewfile"
+
+  if [ ! -f "$brewfile" ]; then
+    printf 'skip: no Brewfile found at %s\n' "$brewfile"
     return 0
   fi
 
   ensure_homebrew_cask_appdir
 
-  printf 'running brew bundle --global\n'
-  "$brew" bundle --global
+  printf 'running brew bundle --file %s\n' "$brewfile"
+  "$brew" bundle --file "$brewfile"
 }
 
 bootstrap_dotfiles() {
@@ -298,6 +305,16 @@ doctor_dotfiles() {
   printf 'Brewfile: '
   if [ -f "$xdg_config_home/homebrew/Brewfile" ]; then
     printf '%s\n' "$xdg_config_home/homebrew/Brewfile"
+  else
+    printf 'missing\n'
+  fi
+
+  printf 'zsh entrypoint: '
+  if [ -L "$HOME/.zshenv" ]; then
+    target=$(resolve_script "$HOME/.zshenv")
+    printf '%s\n' "$target"
+  elif [ -e "$HOME/.zshenv" ]; then
+    printf 'exists but is not a symlink\n'
   else
     printf 'missing\n'
   fi
@@ -396,15 +413,305 @@ uninstall_dotfiles() {
   printf '\ndone.\n'
 }
 
-update_dotfiles() {
+git_require_repo() {
+  if ! command -v git >/dev/null 2>&1; then
+    printf 'error: git is required\n' >&2
+    exit 1
+  fi
+
   if [ ! -d "$repo_dir/.git" ]; then
     printf 'error: not a git repo: %s\n' "$repo_dir" >&2
     exit 1
   fi
+}
 
-  printf 'updating %s\n' "$repo_dir"
-  git -C "$repo_dir" pull --ff-only
+git_current_branch() {
+  git -C "$repo_dir" symbolic-ref --quiet --short HEAD
+}
 
+git_upstream() {
+  git -C "$repo_dir" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null
+}
+
+git_upstream_remote() {
+  branch=$1
+  git -C "$repo_dir" config --get "branch.$branch.remote"
+}
+
+git_is_dirty() {
+  [ -n "$(git -C "$repo_dir" status --porcelain)" ]
+}
+
+git_has_unmerged_paths() {
+  [ -n "$(git -C "$repo_dir" diff --name-only --diff-filter=U)" ]
+}
+
+git_status_summary() {
+  printf '\nlocal changes:\n'
+
+  if git_is_dirty; then
+    git -C "$repo_dir" status --short | sed 's/^/  /'
+  else
+    printf '  none\n'
+  fi
+}
+
+git_log_summary() {
+  upstream=$1
+
+  incoming_count=$(git -C "$repo_dir" rev-list --count "HEAD..$upstream" 2>/dev/null || printf '0')
+  local_count=$(git -C "$repo_dir" rev-list --count "$upstream..HEAD" 2>/dev/null || printf '0')
+
+  printf '\nrepository state:\n'
+  printf '  upstream: %s\n' "$upstream"
+  printf '  incoming commits: %s\n' "$incoming_count"
+  printf '  local-only commits: %s\n' "$local_count"
+
+  if [ "$incoming_count" -gt 0 ] 2>/dev/null; then
+    printf '\nincoming commits:\n'
+    git -C "$repo_dir" log --oneline --decorate --max-count=10 "HEAD..$upstream" | sed 's/^/  /'
+  fi
+
+  if [ "$local_count" -gt 0 ] 2>/dev/null; then
+    printf '\nlocal-only commits:\n'
+    git -C "$repo_dir" log --oneline --decorate --max-count=10 "$upstream..HEAD" | sed 's/^/  /'
+  fi
+}
+
+status_dotfiles() {
+  printf 'dotfiles repo: %s\n' "$repo_dir"
+
+  if [ ! -d "$repo_dir/.git" ]; then
+    printf 'not a git repo\n'
+    return 0
+  fi
+
+  if ! command -v git >/dev/null 2>&1; then
+    printf 'git is not available\n'
+    return 0
+  fi
+
+  printf '\n'
+  git -C "$repo_dir" status --short --branch
+
+  stashes=$(git -C "$repo_dir" stash list 2>/dev/null | sed -n '1,5p' || true)
+
+  if [ -n "$stashes" ]; then
+    printf '\nstashes:\n'
+    printf '%s\n' "$stashes" | sed 's/^/  /'
+  fi
+}
+
+update_help() {
+  cat <<EOF
+usage: dotfiles update [--stash|--discard] [--yes]
+
+Safely update this dotfiles repository, then reinstall symlinks.
+
+Default behavior:
+  dotfiles update
+    Fetches upstream and updates when clean.
+    If local changes exist, shows what changed and asks what to do.
+    If unresolved conflicts exist, refuses stash and explains safe routes.
+
+Conflict-friendly options:
+  dotfiles update --stash
+    Save local changes in git stash, update the repo, and leave the stash saved.
+    This is unavailable while Git has unresolved merge conflicts.
+
+  dotfiles update --discard
+    Show local changes, ask for confirmation, then discard local repo changes
+    and reset to upstream.
+
+  dotfiles update --discard --yes
+    Discard local repo changes without prompting.
+    Use this for the easiest seamless update when you do not care about local edits.
+
+Manual escape hatches:
+  dotfiles status
+    Inspect repo status.
+
+  git -C "$repo_dir" stash list
+    See saved stashes.
+
+  git -C "$repo_dir" merge --abort
+  git -C "$repo_dir" rebase --abort
+    Abort an in-progress Git operation when available.
+
+  git -C "$repo_dir" reset --hard @{upstream}
+  git -C "$repo_dir" clean -fd
+    Manually discard local changes and untracked files.
+EOF
+}
+
+print_dirty_update_guidance() {
+  cat >&2 <<EOF
+
+Local changes exist in this dotfiles repo.
+
+Choose one of these routes:
+
+  dotfiles update --stash
+    Save local edits in git stash, update, and leave the stash saved.
+
+  dotfiles update --discard
+    Review and discard local edits, then update to the remote state.
+
+  dotfiles update --discard --yes
+    Seamlessly discard local edits and update without prompting.
+
+  dotfiles status
+    Inspect the current repo state.
+
+Default update asks what to do in an interactive shell and refuses to continue
+in non-interactive use, so it does not leave conflict markers in active config
+files.
+
+EOF
+}
+
+print_unmerged_update_guidance() {
+  cat >&2 <<EOF
+
+This dotfiles repo has unresolved merge conflicts.
+
+Stashing is not available while Git has unmerged paths.
+
+Choose one of these routes:
+
+  dotfiles status
+    Inspect conflicted files.
+
+  git -C "$repo_dir" merge --abort
+  git -C "$repo_dir" rebase --abort
+    Abort the in-progress Git operation when available.
+
+  dotfiles update --discard
+    Review and discard the conflicted local state, then reset to upstream.
+
+  dotfiles update --discard --yes
+    Seamlessly discard the conflicted local state and reset to upstream.
+
+EOF
+}
+
+print_diverged_update_guidance() {
+  upstream=$1
+
+  cat >&2 <<EOF
+
+Local and upstream histories have diverged.
+
+Automatic update is not safe because this repo has local commits that are not
+in upstream, while upstream also has commits that are not local.
+
+Recommended routes:
+
+  git -C "$repo_dir" rebase "$upstream"
+    Preserve local commits by rebasing them on top of upstream.
+
+  dotfiles update --discard
+    Review and discard local commits/changes, then reset to upstream.
+
+  dotfiles update --discard --yes
+    Seamlessly discard local commits/changes and reset to upstream.
+
+EOF
+}
+
+confirm_discard() {
+  assume_yes=$1
+
+  if [ "$assume_yes" = 1 ]; then
+    return 0
+  fi
+
+  if [ ! -t 0 ]; then
+    printf 'error: refusing to discard local work without --yes in non-interactive mode\n' >&2
+    printf 'hint: rerun with: dotfiles update --discard --yes\n' >&2
+    exit 1
+  fi
+
+  printf '\nThis will permanently discard local repo changes in:\n'
+  printf '  %s\n' "$repo_dir"
+  printf '\nType "discard" to continue: '
+
+  IFS= read -r answer
+
+  if [ "$answer" != discard ]; then
+    printf 'aborted.\n'
+    exit 1
+  fi
+}
+
+choose_update_mode() {
+  if [ ! -t 0 ]; then
+    print_dirty_update_guidance
+    return 1
+  fi
+
+  {
+    printf '\nLocal changes exist. Choose how to continue:\n'
+    printf '  s) stash local changes, update, and leave them stashed\n'
+    printf '  d) discard local changes and update\n'
+    printf '  a) abort\n'
+  } >&2
+
+  while :; do
+    printf 'choice [s/d/a]: ' >&2
+    IFS= read -r choice
+
+    case "$choice" in
+      s|S|stash)
+        printf 'stash\n'
+        return 0
+        ;;
+      d|D|discard)
+        printf 'discard\n'
+        return 0
+        ;;
+      a|A|abort|'')
+        return 1
+        ;;
+      *)
+        printf 'please choose s, d, or a.\n' >&2
+        ;;
+    esac
+  done
+}
+
+choose_unmerged_mode() {
+  if [ ! -t 0 ]; then
+    print_unmerged_update_guidance
+    return 1
+  fi
+
+  {
+    printf '\nUnresolved merge conflicts exist. Choose how to continue:\n'
+    printf '  d) discard conflicted local state and update\n'
+    printf '  a) abort\n'
+  } >&2
+
+  while :; do
+    printf 'choice [d/a]: ' >&2
+    IFS= read -r choice
+
+    case "$choice" in
+      d|D|discard)
+        printf 'discard\n'
+        return 0
+        ;;
+      a|A|abort|'')
+        return 1
+        ;;
+      *)
+        printf 'please choose d or a.\n' >&2
+        ;;
+    esac
+  done
+}
+
+reinstall_after_update() {
   installer=$(find_installer) || {
     printf 'error: could not find dotfiles installer after update\n' >&2
     exit 1
@@ -413,19 +720,296 @@ update_dotfiles() {
   exec sh "$installer" install
 }
 
+fast_forward_update() {
+  upstream=$1
+
+  printf '\nupdating %s\n' "$repo_dir"
+  printf 'fast-forwarding to %s\n' "$upstream"
+
+  if ! git -C "$repo_dir" merge --ff-only "$upstream"; then
+    printf '\nerror: fast-forward update failed.\n' >&2
+    print_dirty_update_guidance
+    exit 1
+  fi
+
+  reinstall_after_update
+}
+
+stash_update() {
+  upstream=$1
+  stash_name="dotfiles update $(timestamp)"
+  did_stash=0
+
+  if git_has_unmerged_paths; then
+    print_unmerged_update_guidance
+    exit 1
+  fi
+
+  if git_is_dirty; then
+    printf '\nstashing local changes...\n'
+    git -C "$repo_dir" stash push --include-untracked -m "$stash_name"
+    did_stash=1
+
+    printf '\nlocal changes saved in git stash:\n'
+    git -C "$repo_dir" stash list | sed -n '1p'
+  fi
+
+  if [ "$(git -C "$repo_dir" rev-parse HEAD)" != "$(git -C "$repo_dir" rev-parse "$upstream")" ]; then
+    printf '\nfast-forwarding to %s\n' "$upstream"
+
+    if ! git -C "$repo_dir" merge --ff-only "$upstream"; then
+      printf '\nerror: update failed after stashing local changes.\n' >&2
+      printf 'Your local changes are preserved in git stash.\n' >&2
+      printf '\nUseful commands:\n' >&2
+      printf '  dotfiles status\n' >&2
+      printf '  git -C "%s" stash list\n' "$repo_dir" >&2
+      printf '  git -C "%s" stash show --stat\n' "$repo_dir" >&2
+      printf '  dotfiles update --discard\n' >&2
+      exit 1
+    fi
+  fi
+
+  if [ "$did_stash" = 1 ]; then
+    cat <<EOF
+
+Your local changes were preserved in git stash and were not reapplied
+automatically, to avoid conflict markers in active config files.
+
+Useful commands:
+  dotfiles status
+  git -C "$repo_dir" stash list
+  git -C "$repo_dir" stash show --stat
+  git -C "$repo_dir" stash pop
+
+EOF
+  fi
+
+  reinstall_after_update
+}
+
+discard_update() {
+  upstream=$1
+  assume_yes=$2
+
+  git_status_summary
+  git_log_summary "$upstream"
+  confirm_discard "$assume_yes"
+
+  printf '\ndiscarding local repo state and resetting to %s\n' "$upstream"
+  git -C "$repo_dir" reset --hard "$upstream"
+  git -C "$repo_dir" clean -fd
+
+  reinstall_after_update
+}
+
+handle_unmerged_update() {
+  upstream=$1
+  update_mode=$2
+  assume_yes=$3
+
+  case "$update_mode" in
+    discard)
+      discard_update "$upstream" "$assume_yes"
+      ;;
+    ask)
+      chosen_mode=$(choose_unmerged_mode) || {
+        printf 'aborted.\n'
+        exit 1
+      }
+
+      case "$chosen_mode" in
+        discard)
+          discard_update "$upstream" "$assume_yes"
+          ;;
+      esac
+      ;;
+    stash)
+      print_unmerged_update_guidance
+      exit 1
+      ;;
+  esac
+}
+
+handle_dirty_update() {
+  upstream=$1
+  update_mode=$2
+  assume_yes=$3
+
+  git_status_summary
+  git_log_summary "$upstream"
+
+  if git_has_unmerged_paths; then
+    handle_unmerged_update "$upstream" "$update_mode" "$assume_yes"
+  fi
+
+  case "$update_mode" in
+    stash)
+      stash_update "$upstream"
+      ;;
+    discard)
+      discard_update "$upstream" "$assume_yes"
+      ;;
+    ask)
+      chosen_mode=$(choose_update_mode) || {
+        printf 'aborted.\n'
+        exit 1
+      }
+
+      case "$chosen_mode" in
+        stash)
+          stash_update "$upstream"
+          ;;
+        discard)
+          discard_update "$upstream" "$assume_yes"
+          ;;
+      esac
+      ;;
+  esac
+}
+
+update_dotfiles() {
+  update_mode=ask
+  assume_yes=0
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --stash)
+        update_mode=stash
+        ;;
+      --discard)
+        update_mode=discard
+        ;;
+      -y|--yes)
+        assume_yes=1
+        ;;
+      -h|--help)
+        update_help
+        return 0
+        ;;
+      *)
+        printf 'error: unknown update option: %s\n\n' "$1" >&2
+        update_help >&2
+        exit 1
+        ;;
+    esac
+
+    shift
+  done
+
+  git_require_repo
+
+  branch=$(git_current_branch || true)
+
+  if [ -z "$branch" ]; then
+    printf 'error: dotfiles repo is in detached HEAD state\n' >&2
+    printf 'hint: checkout a branch before updating.\n' >&2
+    exit 1
+  fi
+
+  upstream=$(git_upstream || true)
+
+  if [ -z "$upstream" ]; then
+    printf 'error: current branch has no upstream configured\n' >&2
+    printf 'hint: set one with:\n' >&2
+    printf '  git -C "%s" branch --set-upstream-to <remote>/<branch>\n' "$repo_dir" >&2
+    exit 1
+  fi
+
+  remote=$(git_upstream_remote "$branch" || true)
+
+  if [ -z "$remote" ]; then
+    printf 'error: could not determine upstream remote for branch %s\n' "$branch" >&2
+    printf 'hint: inspect with:\n' >&2
+    printf '  git -C "%s" branch -vv\n' "$repo_dir" >&2
+    exit 1
+  fi
+
+  printf 'fetching %s for %s\n' "$remote" "$upstream"
+  git -C "$repo_dir" fetch --prune "$remote"
+
+  local_rev=$(git -C "$repo_dir" rev-parse HEAD)
+  upstream_rev=$(git -C "$repo_dir" rev-parse "$upstream")
+  base_rev=$(git -C "$repo_dir" merge-base HEAD "$upstream")
+
+  if [ "$local_rev" = "$upstream_rev" ]; then
+    if git_is_dirty; then
+      handle_dirty_update "$upstream" "$update_mode" "$assume_yes"
+    fi
+
+    printf 'ok: dotfiles repo already up to date\n'
+    reinstall_after_update
+  fi
+
+  if [ "$base_rev" = "$upstream_rev" ]; then
+    git_log_summary "$upstream"
+
+    case "$update_mode" in
+      discard)
+        discard_update "$upstream" "$assume_yes"
+        ;;
+      *)
+        if git_is_dirty; then
+          handle_dirty_update "$upstream" "$update_mode" "$assume_yes"
+        fi
+
+        printf '\nlocal branch is ahead of upstream; no remote update is needed.\n'
+        printf 'hint: publish local commits with: git -C "%s" push\n' "$repo_dir"
+        printf 'hint: discard local commits with: dotfiles update --discard\n'
+
+        reinstall_after_update
+        ;;
+    esac
+  fi
+
+  if [ "$base_rev" != "$local_rev" ]; then
+    git_status_summary
+    git_log_summary "$upstream"
+
+    case "$update_mode" in
+      discard)
+        discard_update "$upstream" "$assume_yes"
+        ;;
+      *)
+        print_diverged_update_guidance "$upstream"
+        exit 1
+        ;;
+    esac
+  fi
+
+  if git_is_dirty; then
+    handle_dirty_update "$upstream" "$update_mode" "$assume_yes"
+  fi
+
+  fast_forward_update "$upstream"
+}
+
 usage() {
   cat <<EOF
-usage: dotfiles [install|update|bootstrap|bundle|doctor|cleanup|uninstall|help]
+usage: dotfiles [install|update|bootstrap|bundle|status|doctor|cleanup|uninstall|help]
 
 commands:
   install     link repo config directories into XDG_CONFIG_HOME
-  update      pull latest changes, then install
+  update      fetch upstream, safely update repo, then install
   bootstrap   install links, ensure Homebrew, then run brew bundle
-  bundle      run brew bundle --global
+  bundle      run brew bundle for this dotfiles Brewfile
+  status      show dotfiles repo status
   doctor      show environment status and next steps
   cleanup     remove only safe empty legacy home files
   uninstall   remove symlinks owned by this repo
   help        show this usage help message
+
+update examples:
+  dotfiles update
+    Safe default. Updates when clean; prompts when local changes exist.
+
+  dotfiles update --stash
+    Preserve local edits by saving them in git stash.
+
+  dotfiles update --discard
+    Review and discard local edits/commits, then reset to upstream.
+
+  dotfiles update --discard --yes
+    Seamlessly discard local repo changes and update without prompting.
 
 default:
   install     when executed directly as install.sh
@@ -446,27 +1030,34 @@ default_command() {
 
 cmd=${1:-$(default_command)}
 
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
 case "$cmd" in
   install)
-    install_dotfiles
+    install_dotfiles "$@"
     ;;
   update)
-    update_dotfiles
+    update_dotfiles "$@"
     ;;
   bootstrap)
-    bootstrap_dotfiles
+    bootstrap_dotfiles "$@"
     ;;
   bundle)
-    bundle_dotfiles
+    bundle_dotfiles "$@"
+    ;;
+  status)
+    status_dotfiles "$@"
     ;;
   doctor)
-    doctor_dotfiles
+    doctor_dotfiles "$@"
     ;;
   cleanup)
-    cleanup_dotfiles
+    cleanup_dotfiles "$@"
     ;;
   uninstall)
-    uninstall_dotfiles
+    uninstall_dotfiles "$@"
     ;;
   -h|--help|help|--usage|usage)
     usage
