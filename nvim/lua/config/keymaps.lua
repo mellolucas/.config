@@ -9,6 +9,6 @@ end, { desc = "Format buffer" })
 
 map("n", "<leader>q", vim.diagnostic.setqflist, { desc = "Diagnostics to quickfix" })
 
-nap("n", "<leader>h", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
+map("n", "<leader>h", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
 
 map("t", "<Esc><Esc>", [[<C-\><C-n>]], { desc = "Exit terminal mode" })

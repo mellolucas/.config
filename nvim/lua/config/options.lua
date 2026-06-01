@@ -47,6 +47,21 @@ opt.splitright = true -- Split right
 -- Command-line completion
 
 -- Diff
--- opt.diffopt:append("linematch:60") -- Better diffs
+opt.diffopt:append("vertical")
+
+do
+  local has_linematch = false
+
+  for _, value in ipairs(opt.diffopt:get()) do
+    if value:match("^linematch:") then
+      has_linematch = true
+      break
+    end
+  end
+
+  if not has_linematch then
+    opt.diffopt:append("linematch:60")
+  end
+end
 
 -- Filetypes

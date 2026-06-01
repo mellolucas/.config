@@ -1,4 +1,4 @@
--- Map leader key before loading config lua modules
+-- Map leader keys before loading config modules
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 -- vim.g.maplocalleader = ","
