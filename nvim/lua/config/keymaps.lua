@@ -1,14 +1,53 @@
--- Minimal native keymaps
+-- Minimal native-first keymaps
 local map = vim.keymap.set
 
-map("n", "<leader>e", vim.cmd.Explore, { desc = "Explore files" })
+-- Explore files: <leader>e
+map("n", "<leader>e", vim.cmd.Explore, {
+  desc = "Explore files",
+})
 
+-- Format: <leader>f
 map("n", "<leader>f", function()
   vim.lsp.buf.format({ async = true })
-end, { desc = "Format buffer" })
+end, {
+  desc = "Format buffer",
+})
 
-map("n", "<leader>q", vim.diagnostic.setqflist, { desc = "Diagnostics to quickfix" })
+-- Quickfix diagnostics: <leader>q
+map("n", "<leader>q", function()
+  vim.diagnostic.setqflist()
+  vim.cmd("copen")
+end, {
+  desc = "Diagnostics to quickfix",
+})
 
-map("n", "<leader>h", "<cmd>nohlsearch<CR>", { desc = "Clear search highlight" })
+-- Clear highlighting: <leader>h
+map("n", "<leader>h", "<cmd>nohlsearch<CR>", {
+  desc = "Clear search highlight",
+})
 
-map("t", "<Esc><Esc>", [[<C-\><C-n>]], { desc = "Exit terminal mode" })
+-- Diff commands: <leader>d*
+map("n", "<leader>dc", "<cmd>DiffClipboard<CR>", {
+  desc = "Diff clipboard",
+})
+
+map("n", "<leader>ds", "<cmd>DiffSaved<CR>", {
+  desc = "Diff saved file",
+})
+
+map("n", "<leader>dr", "<cmd>DiffRemote<CR>", {
+  desc = "Diff remote file",
+})
+
+-- Git commands: <leader>g*
+
+-- Buffers: <leader>b*
+
+-- Windows: <leader>w*
+
+-- Search: <leader>s*
+
+-- Exit terminal
+map("t", "<Esc><Esc>", [[<C-\><C-n>]], {
+  desc = "Exit terminal mode",
+})

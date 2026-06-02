@@ -38,7 +38,7 @@ opt.updatetime = 300 -- Faster events
 
 -- Behavior
 opt.mouse = "a" -- Mouse support
-opt.clipboard = vim.env.SSH_TTY and "" or "unnamedplus" -- Safe clipboard
+-- opt.clipboard = vim.env.SSH_TTY and "" or "unnamedplus" -- Safe clipboard integration
 
 -- Splits
 opt.splitbelow = true -- Split below
