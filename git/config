@@ -101,20 +101,15 @@
 # OS-specific configurations
 [includeIf "gitdir/i:*:/"] # Include for Windows git directories
   path = config.d/windows
-  path = ~/.gitconfig.windows
 
 [includeIf "gitdir/i:/"] # Include for Unix-like git directories
   path = config.d/unix
-  path = ~/.gitconfig.unix
 
 # Context-specific configurations
 [include]
   path = config.d/personal # Should only exist on personal machine
-  path = ~/.gitconfig.personal
   path = config.d/work # Should only exist on work machine
-  path = ~/.gitconfig.work
 
 # Local overrides
 [include]
   path = config.d/local
-  path = ~/.gitconfig.local
