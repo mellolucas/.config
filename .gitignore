@@ -1,7 +1,15 @@
 # Local machine overrides and setup backups for this dotfiles repo only
-local
-work
-personal
-.local*
-*.local
-*.backup.*
+**/work
+**/personal
+
+**/local
+**/local.*
+**/*.local
+**/*.local.*
+
+**/backup
+**/backup.*
+**/*.backup
+**/*.backup.*
+
+!**/*.example
