@@ -1,7 +1,7 @@
 # Interactive shell only: history, completion, aliases, functions, prompt
 [[ -o interactive ]] || return
 
-# History
+# ---- History ----
 HISTFILE="$XDG_STATE_HOME/zsh/history"
 HISTSIZE=50000
 SAVEHIST=50000
@@ -16,17 +16,17 @@ setopt hist_reduce_blanks
 setopt hist_verify
 setopt extended_history
 
-# Completion
+# ---- Completion ----
 autoload -Uz compinit
 compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
 
-# Behavior
+# ---- Behavior ----
 setopt interactive_comments
 setopt prompt_subst
 setopt no_beep
 # setopt auto_cd
 
-# Prompt
+# ---- Prompt ----
 autoload -Uz vcs_info
 
 zstyle ':vcs_info:*' enable git
@@ -49,13 +49,35 @@ if ls -G -d . >/dev/null 2>&1; then
   export CLICOLOR=1
 fi
 
-# Aliases
+# ---- Aliases ----
 alias dots='dotfiles'
-alias ll='ls -plhA'
-alias li='ls -pilhA'
+
 alias v='$EDITOR'
 alias vi='$EDITOR'
 alias vim='$EDITOR'
+
+alias ll='ls -plhA' # List long
+alias lli='ll -i'   # List long with inodes
+
+alias g='git' 
+alias gcl='git smart-clone' # Clone in ~/code/<owner>/<repo>
+alias gf='git fetch --jobs=4'
+alias gft='gf --tags'
+alias gp='git pull'
+
+alias ga='git add'
+alias gc='git commit'
+
+alias gs='git status'
+alias gd='git diff'           # Diff unstaged changes
+alias gds='git diff --staged' # Diff changes staged for commit
+alias gl='git log'                 # Flat linear audit (searches, filtering, pipelines)
+alias gls='gl --compact-summary'   # Flat audit + file modification stats
+alias glg='gl --graph'             # Local branch topology (visualize merges/divergence)
+alias glga='glg --all'             # Whole repository map (see all active workstreams)
+alias glgs='glg --compact-summary' # Topology + file modification stats
+alias glgsa='glgs --all'           # Whole repository map + file modification stats
+alias glc='glg --boundary'         # Relational delta (strict use: branch...branch)
 
 # Functions
 dotfiles-update() {
