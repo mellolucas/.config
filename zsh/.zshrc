@@ -60,7 +60,7 @@ alias ll='ls -plhA' # List long
 alias lli='ll -i'   # List long with inodes
 
 alias g='git' 
-alias gcl='git smart-clone' # Clone in ~/code/<owner>/<repo>
+alias gcl='git clone-smart' # Clone in ~/code/<owner>/<repo>
 alias gf='git fetch --jobs=4'
 alias gft='gf --tags'
 alias gp='git pull'
