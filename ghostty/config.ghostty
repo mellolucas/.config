@@ -1,1 +1,4 @@
 theme = dark:Catppuccin Mocha,light:Catppuccin Latte
+
+config-file = vim.ghostty
+
