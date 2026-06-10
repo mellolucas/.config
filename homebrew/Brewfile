@@ -1,6 +1,8 @@
+brew "mas" if OS.mac?
+
 brew "git"
 brew "neovim"
-cask "ghostty" if OS.mac?
+cask "ghostty" unless OS.wsl?
 brew "container"
 brew "ripgrep"
 
@@ -12,3 +14,6 @@ brew "gopls"
 
 brew "gh"
 brew "opencode"
+
+cask "obsidian" unless OS.wsl?
+
