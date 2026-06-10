@@ -21,10 +21,13 @@ autoload -Uz compinit
 compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
 
 # ---- Behavior ----
+bindkey -v
+KEYTIMEOUT=1
+
 setopt interactive_comments
 setopt prompt_subst
 setopt no_beep
-# setopt auto_cd
+setopt auto_cd
 
 # ---- Prompt ----
 autoload -Uz vcs_info
