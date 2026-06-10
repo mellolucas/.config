@@ -59,6 +59,7 @@ alias v='$EDITOR'
 alias vi='$EDITOR'
 alias vim='$EDITOR'
 
+alias ls='ls -D "%Y-%m-%dT%H:%M:%S%z"'
 alias ll='ls -plhA' # List long
 alias lli='ll -i'   # List long with inodes
 
