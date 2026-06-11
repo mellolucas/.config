@@ -63,14 +63,18 @@ alias ls='ls -D "%Y-%m-%dT%H:%M:%S%z"'
 alias ll='ls -plhA' # List long
 alias lli='ll -i'   # List long with inodes
 
+alias whiches='type -a' # `which` but all
+
 alias g='git' 
-alias gcl='git clone-smart' # Clone in ~/code/<owner>/<repo>
+alias gcl='git clone-smart' # Clone in `~/code/<owner>/<repo>`
 alias gf='git fetch --jobs=4'
 alias gft='gf --tags'
 alias gp='git pull'
 
 alias ga='git add'
 alias gc='git commit'
+alias gcm='git commit -m'
+alias gca='git commit --amend'
 
 alias gs='git status'
 alias gd='git diff'           # Diff unstaged changes
@@ -81,7 +85,9 @@ alias glg='gl --graph'             # Local branch topology (visualize merges/div
 alias glga='glg --all'             # Whole repository map (see all active workstreams)
 alias glgs='glg --compact-summary' # Topology + file modification stats
 alias glgsa='glgs --all'           # Whole repository map + file modification stats
-alias glc='glg --boundary'         # Relational delta (strict use: branch...branch)
+alias glc='glg --boundary'         # Relational delta (strict use: `branch...branch`)
+
+alias ocode='opencode'
 
 # Functions
 dotfiles-update() {
