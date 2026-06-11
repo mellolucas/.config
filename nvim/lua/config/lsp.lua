@@ -20,5 +20,7 @@ vim.lsp.enable({
   "bashls",
   "ts_ls",
   "basedpyright",
-  "gopls"
+  "gopls",
+  "biome"
 })
+
