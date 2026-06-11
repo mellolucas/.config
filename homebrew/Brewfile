@@ -1,9 +1,9 @@
-brew "mas" if OS.mac?
+brew "mas" if system "defaults read MobileMeAccounts Accounts &>/dev/null"
 
 brew "git"
 brew "neovim"
 cask "ghostty" unless OS.wsl?
-brew "container"
+brew "container" if OS.mac?
 brew "ripgrep"
 
 brew "lua-language-server"
@@ -11,6 +11,7 @@ brew "bash-language-server"
 brew "typescript-language-server"
 brew "basedpyright"
 brew "gopls"
+brew "biome"
 
 brew "gh"
 brew "opencode"
