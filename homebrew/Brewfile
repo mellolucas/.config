@@ -7,11 +7,12 @@ brew "container" if OS.mac?
 brew "ripgrep"
 
 brew "lua-language-server"
+brew "biome"
+brew "yaml-language-server"
 brew "bash-language-server"
 brew "typescript-language-server"
 brew "basedpyright"
 brew "gopls"
-brew "biome"
 
 brew "gh"
 brew "opencode"

@@ -17,10 +17,11 @@ vim.lsp.config("lua_ls", {
 -- Enable installed language servers
 vim.lsp.enable({
   "lua_ls",
+  "biome",
+  "yamlls",
   "bashls",
   "ts_ls",
   "basedpyright",
-  "gopls",
-  "biome"
+  "gopls"
 })
 

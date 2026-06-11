@@ -1,0 +1,8 @@
+TODOS
+
+- install
+  - helper set of utility scoped functions (utils::?) with things usually done when start a new machine
+    - add something to register ssh commit signing key
+
+
+- something to set zsh as shell even when not zsh default. Prob also, in this case, also install zsh
