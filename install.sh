@@ -502,6 +502,123 @@ status_dotfiles() {
   fi
 }
 
+setup_signing_key() {
+  email=${1:-}
+  context=${2:-}
+  name=${3:-}
+
+  # Interactive prompt if arguments are missing
+  if [ -z "$email" ]; then
+    printf 'Enter the email to use for the SSH key: '
+    read -r email
+  fi
+
+  if [ -z "$name" ]; then
+    printf 'Enter the Git author name (e.g., Trillian Astra): '
+    read -r name
+  fi
+
+  if [ -z "$context" ]; then
+    printf 'Select context [local/personal/work] (default: local): '
+    read -r context
+    context=${context:-local}
+  fi
+
+  # Validate inputs
+  if [ -z "$email" ]; then
+    printf 'error: email cannot be empty.\n' >&2
+    exit 1
+  fi
+
+  if [ -z "$name" ]; then
+    printf 'error: Git profile name cannot be empty.\n' >&2
+    exit 1
+  fi
+
+  # Validate strict context taxonomy
+  case "$context" in
+    local|personal|work) ;;
+    *)
+      printf 'error: context must be "local", "personal", or "work"\n' >&2
+      exit 1
+      ;;
+  esac
+
+  # Map context to file structure
+  if [ "$context" = "local" ]; then
+    key_name="id_ed25519"
+  else
+    key_name="id_ed25519_${context}"
+  fi
+
+  key_path="$HOME/.ssh/$key_name"
+  git_config_target="config.d/${context}"
+
+  mkdir -p "$HOME/.ssh"
+  chmod 700 "$HOME/.ssh"
+
+  # 1. Validation & Key Generation
+  if [ -f "$key_path" ]; then
+    printf 'notice: SSH key %s already exists.\n' "$key_path"
+    printf 'Do you want to (r)euse, (o)verwrite, or (c)ancel? [r/o/c]: '
+    read -r action
+    case "$action" in
+      [oO]*)
+        rm -f "$key_path" "${key_path}.pub"
+        ssh-keygen -t ed25519 -C "$email" -f "$key_path"
+        ;;
+      [rR]*) ;; # reuse
+      *) exit 0 ;;
+    esac
+  else
+    ssh-keygen -t ed25519 -C "$email" -f "$key_path"
+  fi
+
+  # 2. Local Verification (allowed_signers)
+  allowed_signers="$HOME/.ssh/allowed_signers"
+  touch "$allowed_signers"
+  chmod 600 "$allowed_signers"
+  
+  if grep -v "^$email " "$allowed_signers" > "${allowed_signers}.tmp" 2>/dev/null; then
+    mv "${allowed_signers}.tmp" "$allowed_signers"
+  else
+    > "$allowed_signers"
+  fi
+  printf '%s %s\n' "$email" "$(cat "${key_path}.pub")" >> "$allowed_signers"
+
+  # 3. Contextual Git Configuration
+  local_git_config="$XDG_CONFIG_HOME/git/$git_config_target"
+  mkdir -p "$(dirname "$local_git_config")"
+  
+  git config --file "$local_git_config" user.name "$name"
+  git config --file "$local_git_config" user.email "$email"
+  git config --file "$local_git_config" user.signingkey "${key_path}.pub"
+  git config --file "$local_git_config" commit.gpgsign true
+  git config --file "$local_git_config" tag.gpgsign true
+  git config --file "$local_git_config" gpg.format ssh
+  git config --file "$local_git_config" gpg.ssh.allowedSignersFile "$allowed_signers"
+
+  # 4. Persistent Agent Integration
+  ssh_config="$HOME/.ssh/config"
+  touch "$ssh_config"
+  chmod 600 "$ssh_config"
+
+  if [ "$(uname -s)" = Darwin ]; then
+    if ! grep -q "UseKeychain" "$ssh_config"; then
+      printf 'Host *\n  AddKeysToAgent yes\n  UseKeychain yes\n\n' | cat - "$ssh_config" > "${ssh_config}.tmp" && mv "${ssh_config}.tmp" "$ssh_config"
+    fi
+    ssh-add --apple-use-keychain "$key_path"
+  else
+    if ! grep -q "AddKeysToAgent" "$ssh_config"; then
+      printf 'Host *\n  AddKeysToAgent yes\n\n' | cat - "$ssh_config" > "${ssh_config}.tmp" && mv "${ssh_config}.tmp" "$ssh_config"
+    fi
+    [ -z "${SSH_AUTH_SOCK:-}" ] && eval "$(ssh-agent -s)" >/dev/null 2>&1
+    ssh-add "$key_path"
+  fi
+
+  printf '\nSetup complete. Public key:\n%s\n' "$(cat "${key_path}.pub")"
+}
+
 update_help() {
   cat <<EOF
 usage: dotfiles update [--stash|--discard] [--yes]
@@ -996,6 +1113,7 @@ commands:
   doctor      show environment status and next steps
   cleanup     remove only safe empty legacy home files
   uninstall   remove symlinks owned by this repo
+  signkey     generate and configure an SSH commit signing key
   help        show this usage help message
 
 update examples:
@@ -1058,6 +1176,9 @@ case "$cmd" in
     ;;
   uninstall)
     uninstall_dotfiles "$@"
+    ;;
+  signkey)
+    setup_signing_key "$@"
     ;;
   -h|--help|help|--usage|usage)
     usage

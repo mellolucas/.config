@@ -1,7 +1,7 @@
 [user]
-  name = Lucas Mello
-  email = 54722857+mellolucas@users.noreply.github.com
-  signingkey = ~/.ssh/id_ed25519_github.pub
+  name = Trillian Astra
+  email = 54722857+tricia-mcmillan@users.noreply.github.com
+  signingkey = ~/.ssh/id_ed25519_personal.pub
 
 [commit]
   gpgSign = true # Sign all commits by default
@@ -11,4 +11,7 @@
 
 [gpg]
   format = ssh
+
+[gpg "ssh"]
+	allowedSignersFile = ~/.ssh/allowed_signers
 
