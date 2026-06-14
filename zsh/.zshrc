@@ -29,6 +29,14 @@ setopt prompt_subst
 setopt no_beep
 setopt auto_cd
 
+# Local
+local ghostty_config="$XDG_CONFIG_HOME/zsh/ghostty.zsh"
+if [[ -r "$ghostty_config" &&
+      "${(L)TERM_PROGRAM}" == "ghostty" && 
+      "$OSTYPE" == darwin* ]]; then
+  source "$ghostty_config"
+fi
+
 # ---- Prompt ----
 autoload -Uz vcs_info
 
@@ -77,15 +85,15 @@ alias gcm='git commit -m'
 alias gca='git commit --amend'
 
 alias gs='git status'
-alias gd='git diff'           # Diff unstaged changes
-alias gds='git diff --staged' # Diff changes staged for commit
-alias gl='git log'                 # Flat linear audit (searches, filtering, pipelines)
-alias gls='gl --compact-summary'   # Flat audit + file modification stats
-alias glg='gl --graph'             # Local branch topology (visualize merges/divergence)
-alias glga='glg --all'             # Whole repository map (see all active workstreams)
-alias glgs='glg --compact-summary' # Topology + file modification stats
-alias glgsa='glgs --all'           # Whole repository map + file modification stats
-alias glc='glg --boundary'         # Relational delta (strict use: `branch...branch`)
+alias gd='git diff'                                # Diff unstaged changes
+alias gds='git diff --staged'                      # Diff changes staged for commit
+alias gl='git log'                                 # Flat linear audit (searches, filtering, pipelines)
+alias gls='gl --compact-summary'                   # Flat audit + file modification stats
+alias glg='gl --graph'                             # Local branch topology (visualize merges/divergence)
+alias glga='glg --all --pretty=compare'            # Whole repository map (see all active workstreams)
+alias glgs='glg --compact-summary'                 # Topology + file modification stats
+alias glgsa='glgs --all --pretty=compare'          # Whole repository map + file modification stats
+alias glc='gl --graph --boundary --pretty=compare' # Relational delta (strict use: `branch...branch`)
 
 alias ocode='opencode'
 
