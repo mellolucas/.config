@@ -43,6 +43,7 @@
 
 [pretty]
   compact = %C(auto)%m %h%d %s %C(dim black)·%C(reset dim italic) %ar by %an%C(auto)
+  compare = %C(auto)%m %h%C(dim yellow)%p%C(auto)%d %s %C(dim black)·%C(reset dim italic) %ar by %an%C(auto)
   audit = %C(auto)%m %h%d %s %C(dim black)·%C(reset dim italic) at %ad by [%an](%ae)%C(auto)
   expanded = tbd
   verbose = tbd
