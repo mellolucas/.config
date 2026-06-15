@@ -85,15 +85,24 @@ alias gcm='git commit -m'
 alias gca='git commit --amend'
 
 alias gs='git status'
-alias gd='git diff'                                # Diff unstaged changes
-alias gds='git diff --staged'                      # Diff changes staged for commit
+alias gd='git diff'            # Diff unstaged changes
+alias gds='gd --staged'          # Diff changes staged for commit
+alias gdo='gd @{upstream}..@'    # Diff changes outgoing (here not there)
+alias gdi='gd @..@{upstream}'    # Diff changes incoming (there not here)
+alias gdm='gd origin/HEAD..@'    # Diff changes on merge to upstream default branch
+alias gdf='gd --name-status'     # Diff unstaged files
+alias gdfs='gdf --staged'          # Diff files staged for commit
+alias gdfo='gdf @{upstream}..@'    # Diff files outgoing (here not there)
+alias gdfi='gdf @..@{upstream}'    # Diff files incoming (there not here)
+alias gdfm='gdf origin/HEAD..@'    # Diff files on merge to upstream default branch
+
 alias gl='git log'                                 # Flat linear audit (searches, filtering, pipelines)
-alias gls='gl --compact-summary'                   # Flat audit + file modification stats
-alias glg='gl --graph'                             # Local branch topology (visualize merges/divergence)
-alias glga='glg --all --pretty=compare'            # Whole repository map (see all active workstreams)
-alias glgs='glg --compact-summary'                 # Topology + file modification stats
-alias glgsa='glgs --all --pretty=compare'          # Whole repository map + file modification stats
-alias glc='gl --graph --boundary --pretty=compare' # Relational delta (strict use: `branch...branch`)
+alias gls='gl --compact-summary'                     # Flat audit + file modification stats
+alias glg='gl --graph'                               # Local branch topology (visualize merges/divergence)
+alias glga='glg --all --pretty=compare'                # Whole repository map (see all active workstreams)
+alias glgs='glg --compact-summary'                     # Topology + file modification stats
+alias glgsa='glgs --all --pretty=compare'                # Whole repository map + file modification stats
+alias glc='gl --graph --boundary --pretty=compare'   # Relational delta (strict use: `branch...branch`)
 
 alias ocode='opencode'
 
