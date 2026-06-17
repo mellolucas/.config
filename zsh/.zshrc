@@ -66,6 +66,7 @@ alias dots='dotfiles'
 alias v='$EDITOR'
 alias vi='$EDITOR'
 alias vim='$EDITOR'
+alias view='$EDITOR -R -M'
 
 alias ls='ls -D "%Y-%m-%dT%H:%M:%S%z"'
 alias ll='ls -plhA' # List long
