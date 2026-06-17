@@ -29,7 +29,7 @@ opt.hlsearch = false -- no highlight
 opt.incsearch = true -- live search
 
 -- Completion / popups
--- opt.completeopt = "menu,popup,noselect" -- native completion UI
+opt.completeopt = "menu,popup,noselect" -- native completion UI
 
 -- File handling
 opt.undofile = true -- persistent undo
