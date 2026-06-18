@@ -7,6 +7,9 @@ map("n", "<leader>cf", function()
 end, {
   desc = "Format buffer",
 })
+map("n", "<leader>cww", "<cmd>w<CR>", { desc = "Save buffer" })
+map("n", "<leader>cwq", "<cmd>wq<CR>", { desc = "Save and quit" })
+map("n", "<leader>cqq", "<cmd>q!<CR>", { desc = "Force quit" })
 
 -- Diagnostics: <leader>d*
 map("n", "<leader>dq", function()
