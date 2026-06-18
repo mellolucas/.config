@@ -6,34 +6,42 @@ keybind = alt+v=activate_key_table:vim
 # Key table definition
 keybind = vim/
 
-# Window split
-keybind = vim/ctrl+w>d=new_split:down # Split down (vertical)
+# Window navigation
+# Split down (vertical)
+keybind = vim/ctrl+w>d=new_split:down
 keybind = vim/space>w>d=new_split:down
 keybind = vim/ctrl+w>v=new_split:down
 keybind = vim/space>w>v=new_split:down
-keybind = vim/ctrl+w>r=new_split:right # Split right
+# Split right
+keybind = vim/ctrl+w>r=new_split:right
 keybind = vim/space>w>r=new_split:right
 keybind = vim/ctrl+w>s=new_split:right
 keybind = vim/space>w>s=new_split:right
-keybind = vim/ctrl+w>h=goto_split:left # Goto left split
+# Goto left split
+keybind = vim/ctrl+w>h=goto_split:left
 keybind = vim/space>w>h=goto_split:left
 keybind = vim/ctrl+w>left=goto_split:left
 keybind = vim/space>w>left=goto_split:left
-keybind = vim/ctrl+w>j=goto_split:down # Goto down split
+# Goto down split
+keybind = vim/ctrl+w>j=goto_split:down
 keybind = vim/space>w>j=goto_split:down
 keybind = vim/ctrl+w>down=goto_split:down
 keybind = vim/space>w>down=goto_split:down
-keybind = vim/ctrl+w>k=goto_split:up # Goto up split
+# Goto up split
+keybind = vim/ctrl+w>k=goto_split:up
 keybind = vim/space>w>k=goto_split:up
 keybind = vim/ctrl+w>up=goto_split:up
 keybind = vim/space>w>up=goto_split:up
-keybind = vim/ctrl+w>l=goto_split:right # Goto right split
+# Goto right split
+keybind = vim/ctrl+w>l=goto_split:right
 keybind = vim/space>w>l=goto_split:right
 keybind = vim/ctrl+w>right=goto_split:right
 keybind = vim/space>w>right=goto_split:right
-keybind = vim/ctrl+w>q=close_surface # Close split
+# Close split
+keybind = vim/ctrl+w>q=close_surface
 keybind = vim/space>w>q=close_surface
-keybind = vim/ctrl+w>z=toggle_split_zoom # Toggle split zoom
+# Toggle split zoom
+keybind = vim/ctrl+w>z=toggle_split_zoom
 keybind = vim/space>w>z=toggle_split_zoom
 
 # Line movement
