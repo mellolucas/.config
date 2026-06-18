@@ -107,6 +107,8 @@ alias glgs='glg --compact-summary'                     # Topology + file modific
 alias glgsa='glgs --all --pretty=compare'                # Whole repository map + file modification stats
 alias glc='gl --graph --boundary --pretty=compare'   # Relational delta (strict use: `branch...branch`)
 
+alias rg='rg --hidden --follow'
+
 alias ocode='opencode'
 
 # Functions
