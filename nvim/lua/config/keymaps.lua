@@ -1,9 +1,11 @@
 -- Minimal native-first keymaps
 local map = vim.keymap.set
 
--- Explore: <leader>e
-map("n", "<leader>ee", vim.cmd.Explore, {
-  desc = "Explore files",
+-- Content edit: <leader>c*
+map("n", "<leader>cf", function()
+  vim.lsp.buf.format({ async = true })
+end, {
+  desc = "Format buffer",
 })
 
 -- Diagnostics: <leader>d*
@@ -14,21 +16,24 @@ end, {
   desc = "Diagnostics to quickfix",
 })
 
--- Buffers: <leader>b*
-map("n", "<leader>bl", "<cmd>ls<CR>", { desc = "List active buffers" })
-map("n", "<leader>b-", "<C-^>", { desc = "Switch to alternative buffer" })
-map("n", "<leader>bf", function()
-  vim.lsp.buf.format({ async = true })
-end, {
-  desc = "Format buffer",
-})
-
 -- Search: <leader>s*
+
+-- Toggle: <leader>t*
+map("n", "<leader>th", "<cmd>set hlsearch!<CR>", { desc = "Toggle search highlighting" })
+map("n", "<leader>tw", "<cmd>set wrap!<CR>", { desc = "Toggle line wrap" })
 
 -- Git commands: <leader>g*
 
--- Window navigation: <leader>w*
+-- Buffers: <leader>b*
+map("n", "<leader>bl", "<cmd>ls<CR>", { desc = "List active buffers" })
+map("n", "<leader>b-", "<C-^>", { desc = "Switch to alternative buffer" })
 
+-- Explore: <leader>e
+map("n", "<leader>ee", vim.cmd.Explore, {
+  desc = "Explore files",
+})
+
+-- Window navigation: <leader>w*
 -- ghostty integrated split navigation
 local is_mac = vim.fn.has("macunix") == 1
 local is_ghostty = string.lower(vim.env.TERM_PROGRAM or "") == "ghostty"
