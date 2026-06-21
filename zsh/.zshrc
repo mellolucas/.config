@@ -28,8 +28,9 @@ setopt interactive_comments
 setopt prompt_subst
 setopt no_beep
 setopt auto_cd
+setopt ignoreeof
 
-# Local
+# Integrate vim-mode with ghostty multiplexer
 local ghostty_config="$XDG_CONFIG_HOME/zsh/ghostty.zsh"
 if [[ -r "$ghostty_config" &&
       "${(L)TERM_PROGRAM}" == "ghostty" && 
