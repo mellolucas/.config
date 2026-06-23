@@ -79,7 +79,7 @@ keybind = vim/g>g=scroll_to_top
 
 keybind = vim/shift+g=scroll_to_bottom
 
-# Search (if you want vim-style search entry)
+# Search
 keybind = vim/slash=start_search
 keybind = vim/n=navigate_search:next
 
