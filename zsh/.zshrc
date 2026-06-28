@@ -86,7 +86,7 @@ alias gc='git commit'
 alias gcm='git commit -m'
 alias gca='git commit --amend'
 
-alias gs='git status'
+alias gs='git status --ignored'
 alias gd='git diff'            # Show unstaged changes (tree vs staging)
 alias gds='gd --staged'          # Show staged changes to commit (staging vs HEAD/last commit)
 alias gda='gd @'                 # Show all local tracked changes since last commit (tree vs HEAD/last commit)
