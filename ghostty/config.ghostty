@@ -2,3 +2,5 @@ theme = dark:Catppuccin Mocha,light:Catppuccin Latte
 
 config-file = vim.ghostty
 
+scroll-to-bottom = no-keystroke, output
+

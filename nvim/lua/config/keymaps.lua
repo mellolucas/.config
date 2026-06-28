@@ -11,9 +11,6 @@ map("n", "<leader>cf", function()
 end, {
   desc = "Format buffer",
 })
-map("n", "<leader>cww", "<cmd>w<CR>", { desc = "Save buffer" })
-map("n", "<leader>cwq", "<cmd>wq<CR>", { desc = "Save and quit" })
-map("n", "<leader>cqq", "<cmd>q!<CR>", { desc = "Force quit" })
 
 -- Diagnostics: <leader>d*
 map("n", "<leader>dq", function()
@@ -34,11 +31,17 @@ map("n", "<leader>tw", "<cmd>set wrap!<CR>", { desc = "Toggle line wrap" })
 -- Buffers: <leader>b*
 map("n", "<leader>bl", "<cmd>ls<CR>", { desc = "List active buffers" })
 map("n", "<leader>b-", "<C-^>", { desc = "Switch to alternative buffer" })
+map("n", "<leader>bww", "<cmd>w<CR>", { desc = "Save buffer" })
+map("n", "<leader>bwq", "<cmd>wq<CR>", { desc = "Save and quit" })
+map("n", "<leader>bqq", "<cmd>q!<CR>", { desc = "Force quit" })
 
 -- Explore: <leader>e
 map("n", "<leader>ee", vim.cmd.Explore, {
   desc = "Explore files",
 })
+
+-- Quit: <leader>q*
+map("n", "<leader>qq", "<cmd>q!<CR>", { desc = "Force quit" })
 
 -- Window navigation: <leader>w*
 -- ghostty integrated split navigation

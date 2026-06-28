@@ -59,8 +59,7 @@ keybind = vim/space>w>l=goto_split:right
 keybind = vim/ctrl+w>right=goto_split:right
 keybind = vim/space>w>right=goto_split:right
 
-keybind = vim/ctrl+w>q=close_surface
-keybind = vim/space>w>q=close_surface
+keybind = vim/space>q>q=close_surface
 
 # Window navigation: page scrolling 
 keybind = vim/k=scroll_page_lines:-1

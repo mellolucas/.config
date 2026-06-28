@@ -76,11 +76,9 @@ bindkey -M vicmd " wl" _ghostty_goto_right
 
 function _ghostty_surface_close() { osascript -e 'tell application "Ghostty" to perform action "close_surface" on focused terminal of selected tab of front window' 1> /dev/null }
 zle -N _ghostty_surface_close
-bindkey -M vicmd "^wq" _ghostty_surface_close
-bindkey -M vicmd " wq" _ghostty_surface_close
+bindkey -M vicmd " qq" _ghostty_surface_close
 
 # Window navigation: page scrolling 
-# TODO - except for g and GG, scrolling keymaps arent working, likely because of ghostty's setting `scroll-to-bottom: keystroke` combined with the fact that ghostty sees everything as keystroke unless its a keybind processed by ghostty itself
 function _ghostty_scroll_page_lineup() { osascript -e 'tell application "Ghostty" to perform action "scroll_page_lines:-1" on focused terminal of selected tab of front window' 1> /dev/null }
 zle -N _ghostty_scroll_page_lineup
 bindkey -M vicmd "j" _ghostty_scroll_page_lineup
