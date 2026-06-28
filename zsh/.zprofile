@@ -10,6 +10,13 @@ do
   fi
 done
 
+# Set global bundle location as the default Brewfile
+_brewfile_path="${XDG_CONFIG_HOME:+$XDG_CONFIG_HOME/homebrew/Brewfile}"
+_brewfile_path="${_brewfile_path:-$HOME/.homebrew/Brewfile}"
+_brewfile_path="${HOMEBREW_BUNDLE_FILE_GLOBAL:-$_brewfile_path}"
+export HOMEBREW_BUNDLE_FILE="${HOMEBREW_BUNDLE_FILE:-$_brewfile_path}"
+unset _brewfile_path
+
 # Non-admin macOS users install casks into their user Applications dir.
 if [[ "$OSTYPE" == darwin* ]] && ! id -Gn | grep -qw admin; then
   mkdir -p "$HOME/Applications"

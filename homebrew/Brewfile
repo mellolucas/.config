@@ -19,3 +19,5 @@ brew "opencode"
 
 cask "obsidian" unless OS.wsl?
 
+local_brewfile = File.expand_path("local.Brewfile", __dir__)
+instance_eval(File.read(local_brewfile)) if File.exist?(local_brewfile)
