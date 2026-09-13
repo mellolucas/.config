@@ -4,11 +4,10 @@
   "keybinds": {
     "leader": {
       "key": "ctrl+space"
-      "command_list": "<leader>:"
-    }
+    },
+    "command_list": "<leader>:"
   },
   "scroll_acceleration": {
     "enabled": true
-  },
-  "mouse": true
+  }
 }
