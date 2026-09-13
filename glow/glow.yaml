@@ -1,14 +1,9 @@
-# style name or JSON path (default "auto")
+# style: takes literal paths only (no ~/env expansion); theme.json is applied
+# via the zsh glow alias instead
 style: "auto"
-# mouse support (TUI-mode only)
 mouse: true
-# use pager to display markdown
 pager: false
-# word-wrap at width
 width: 120
-# show all files, including hidden and ignored.
-all: true
-# show line numbers (TUI-mode only)
+all: true # TUI browser lists hidden and gitignored markdown too
 showLineNumbers: false
-# preserve newlines in the output
 preserveNewLines: false

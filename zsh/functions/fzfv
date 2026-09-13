@@ -1,0 +1,20 @@
+# vim: ft=zsh
+
+emulate -L zsh
+
+command -v fzf >/dev/null 2>&1 || {
+  print -u2 -- "fzfv: fzf not found"
+  return 1
+}
+
+local file_preview='command -v bat >/dev/null && bat --color=always --style=numbers --line-range=:500 {} || cat {}'
+local preview=$file_preview
+
+if command -v glow >/dev/null 2>&1; then
+  local md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width ${FZF_PREVIEW_COLUMNS:-80} {}'
+  # script allocates a pty: glow only colors a tty; tmux TERM skips glow's blocking tty queries, COLORTERM keeps truecolor, tail drops the pty's ^D echo line
+  [[ $OSTYPE == darwin* ]] && md_preview="TERM=tmux-256color COLORTERM=truecolor script -q /dev/null $md_preview < /dev/null | tail -n +2"
+  preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
+fi
+
+fzfe --preview "$preview" "$@"

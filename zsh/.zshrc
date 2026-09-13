@@ -106,26 +106,22 @@ alias vi='$EDITOR'
 alias vim='$EDITOR'
 alias view='$EDITOR -R -M'
 
-alias glow='glow --style "${XDG_CONFIG_HOME:-$HOME}/glow/theme.json"'
-alias mdv='glow -p'
+if command -v glow >/dev/null 2>&1; then
+  alias glow='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json"'
+  alias mdv='glow -p'
+fi
 
 if command -v bat >/dev/null 2>&1; then
   alias cat='bat --paging=never --style=plain'
   alias b='bat'
   alias bh='bat --plain --language=help'
-  help() {
-    bat --plain --language=help <<<$("$@" --help 2>&1)
-  }
-
-  alias fzfv='fzf --preview "bat --color=always --style=numbers --line-range=:500 {}" --bind "enter:become(nvim {})"'
 fi
-
 
 alias ll='ls -plhA' # List long
 alias lli='ll -i'   # List long with inodes
 
 alias rg='rg --hidden --follow --smart-case --glob="!.git/*" --max-columns=120 --max-columns-preview'
-alias rga='--no-ignore --glob="!.git/*"' 
+alias rga='rg --no-ignore --glob="!.git/*"'
 alias rgf='rg --files-with-matches'
 alias rgfa='rga --files-with-matches'
 alias rgc='rg --count'

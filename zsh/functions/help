@@ -1,0 +1,21 @@
+# vim: ft=zsh
+
+emulate -L zsh
+zmodload -F zsh/parameter p:aliases
+
+(( $# )) || { print -u2 'usage: help <command> [args...]'; return 1 }
+
+# Aliases never expand from "$@"; resolve $1 recursively through $aliases.
+# Expand deferred variables before tokenizing; remove quotes after splitting.
+local -a cmd=("$1")
+local -A seen
+while (( ${+aliases[$cmd[1]]} && ! ${+seen[$cmd[1]]} )); do
+  seen[$cmd[1]]=1
+  cmd=("${(@Q)${(z)${(e)aliases[$cmd[1]]}}}" "${(@)cmd[2,-1]}")
+done
+
+if command -v bat >/dev/null 2>&1; then
+  bat --plain --language=help <<<$("${cmd[@]}" "${@[2,-1]}" --help 2>&1)
+else
+  "${cmd[@]}" "${@[2,-1]}" --help 2>&1
+fi

@@ -1,0 +1,10 @@
+# vim: ft=zsh
+
+emulate -L zsh
+
+command -v fzf >/dev/null 2>&1 || {
+  print -u2 -- "fzfe: fzf not found"
+  return 1
+}
+
+fzf --bind "enter:become($EDITOR -- {})" "$@"
