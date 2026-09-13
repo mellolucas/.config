@@ -45,79 +45,16 @@ map("n", "<leader>ee", vim.cmd.Explore, {
 
 -- Quit: <leader>q*
 map("n", "<leader>qq", "<cmd>q<CR>", { desc = "Quit" })
-map("n", "<leader>qqq", "<cmd>q!<CR>", { desc = "Force quit" })
+map("n", "<leader>q!", "<cmd>q!<CR>", { desc = "Force quit" })
 
--- Window navigation: <leader>w*
--- ghostty integrated split navigation
-local is_mac = vim.fn.has("macunix") == 1
-local is_ghostty = string.lower(vim.env.TERM_PROGRAM or "") == "ghostty"
-if is_mac and is_ghostty then
-  local function ghostty_action(action)
-    return function()
-      local cmd = string.format(
-        "osascript -e 'tell application \"Ghostty\" to perform action \"%s\" on focused terminal of selected tab of front window'", 
-        action
-      )
-      vim.fn.jobstart(cmd, { detach = true })
-    end
-  end
-
-  -- Window navigation: splits using your 'map' alias
-  map("n", "<C-w>s", ghostty_action("new_split:down"), { desc = "Ghostty: split down" })
-  map("n", "<leader>ws", ghostty_action("new_split:down"), { desc = "Ghostty: split down" })
-
-  map("n", "<C-w>v", ghostty_action("new_split:right"), { desc = "Ghostty: split right (vertical)" })
-  map("n", "<leader>wv", ghostty_action("new_split:right"), { desc = "Ghostty: split right (vertical)" })
-
-  map("n", "<C-w>+", ghostty_action("resize_split:up,10"), { desc = "Ghostty: resize up" })
-  map("n", "<leader>w+", ghostty_action("resize_split:up,10"), { desc = "Ghostty: resize up" })
-
-  map("n", "<C-w>-", ghostty_action("resize_split:down,10"), { desc = "Ghostty: resize down" })
-  map("n", "<leader>w-", ghostty_action("resize_split:down,10"), { desc = "Ghostty: resize down" })
-
-  map("n", "<C-w><lt>", ghostty_action("resize_split:left,10"), { desc = "Ghostty: resize left" })
-  map("n", "<leader>w<lt>", ghostty_action("resize_split:left,10"), { desc = "Ghostty: resize left" })
-
-  map("n", "<C-w>>", ghostty_action("resize_split:right,10"), { desc = "Ghostty: resize right" })
-  map("n", "<leader>w>", ghostty_action("resize_split:right,10"), { desc = "Ghostty: resize right" })
-
-  map("n", "<C-w>_", ghostty_action("toggle_split_zoom"), { desc = "Ghostty: toggle zoom" })
-  map("n", "<leader>w_", ghostty_action("toggle_split_zoom"), { desc = "Ghostty: toggle zoom" })
-  map("n", "<C-w><Bar>", ghostty_action("toggle_split_zoom"), { desc = "Ghostty: toggle zoom" })
-  map("n", "<leader>w<Bar>", ghostty_action("toggle_split_zoom"), { desc = "Ghostty: toggle zoom" })
-
-  map("n", "<C-w>=", ghostty_action("equalize_splits"), { desc = "Ghostty: equalize splits" })
-  map("n", "<leader>w=", ghostty_action("equalize_splits"), { desc = "Ghostty: equalize splits" })
-
-  map("n", "<C-w>w", ghostty_action("goto_split:next"), { desc = "Ghostty: focus next" })
-  map("n", "<leader>ww", ghostty_action("goto_split:next"), { desc = "Ghostty: focus next" })
-
-  map("n", "<C-w>W", ghostty_action("goto_split:previous"), { desc = "Ghostty: focus previous" })
-  map("n", "<leader>wW", ghostty_action("goto_split:previous"), { desc = "Ghostty: focus previous" })
-
-  map("n", "<C-w>k", ghostty_action("goto_split:up"), { desc = "Ghostty: focus up" })
-  map("n", "<leader>wk", ghostty_action("goto_split:up"), { desc = "Ghostty: focus up" })
-  map("n", "<C-w><Up>", ghostty_action("goto_split:up"), { desc = "Ghostty: focus up" })
-  map("n", "<leader>w<Up>", ghostty_action("goto_split:up"), { desc = "Ghostty: focus up" })
-
-  map("n", "<C-w>j", ghostty_action("goto_split:down"), { desc = "Ghostty: focus down" })
-  map("n", "<leader>wj", ghostty_action("goto_split:down"), { desc = "Ghostty: focus down" })
-  map("n", "<C-w><Down>", ghostty_action("goto_split:down"), { desc = "Ghostty: focus down" })
-  map("n", "<leader>w<Down>", ghostty_action("goto_split:down"), { desc = "Ghostty: focus down" })
-
-  map("n", "<C-w>h", ghostty_action("goto_split:left"), { desc = "Ghostty: focus left" })
-  map("n", "<leader>wh", ghostty_action("goto_split:left"), { desc = "Ghostty: focus left" })
-  map("n", "<C-w><Left>", ghostty_action("goto_split:left"), { desc = "Ghostty: focus left" })
-  map("n", "<leader>w<Left>", ghostty_action("goto_split:left"), { desc = "Ghostty: focus left" })
-
-  map("n", "<C-w>l", ghostty_action("goto_split:right"), { desc = "Ghostty: focus right" })
-  map("n", "<leader>wl", ghostty_action("goto_split:right"), { desc = "Ghostty: focus right" })
-  map("n", "<C-w><Right>", ghostty_action("goto_split:right"), { desc = "Ghostty: focus right" })
-  map("n", "<leader>w<Right>", ghostty_action("goto_split:right"), { desc = "Ghostty: focus right" })
-end
+-- Windows: <A-hjkl>
+-- Inside Ghostty these are the pass-through layer of the performable alt+hjkl split navigation; standalone, plain window nav.
+map("n", "<A-h>", "<C-w>h", { desc = "Go to left window" })
+map("n", "<A-j>", "<C-w>j", { desc = "Go to lower window" })
+map("n", "<A-k>", "<C-w>k", { desc = "Go to upper window" })
+map("n", "<A-l>", "<C-w>l", { desc = "Go to right window" })
 
 -- ---- Terminal Mode ----
 map("t", "<Esc><Esc>", [[<C-\><C-n>]], {
   desc = "Exit terminal mode",
 })
-

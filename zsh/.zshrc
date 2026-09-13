@@ -48,12 +48,15 @@ setopt prompt_subst
 setopt no_beep
 setopt auto_cd
 setopt ignoreeof
+setopt complete_in_word # Complete at the cursor, not the end of the word
 
 # ---- Integrations ----
-# Window navigation on vicmd maps to ghostty
-if [[ "${(L)TERM_PROGRAM}" == "ghostty" && "$OSTYPE" == darwin* &&
-      -r "$XDG_CONFIG_HOME/zsh/ghostty-vicmd-keymaps.zsh" ]]; then
-  source "$XDG_CONFIG_HOME/zsh/ghostty-vicmd-keymaps.zsh"
+# Single-split alt+hjkl passes through Ghostty; without these no-ops, insert mode would drop into vicmd via the ESC fallback
+if [[ "${(L)TERM_PROGRAM}" == "ghostty" ]]; then
+  bindkey -M viins -s '^[h' ''
+  bindkey -M viins -s '^[j' ''
+  bindkey -M viins -s '^[k' ''
+  bindkey -M viins -s '^[l' ''
 fi
 
 # Fuzzy finding (ctrl-r history, ctrl-t files, alt-c dirs)
