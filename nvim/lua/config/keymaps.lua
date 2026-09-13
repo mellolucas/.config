@@ -1,13 +1,15 @@
 -- Minimal native-first keymaps
 -- Usage: <leader-key><scope-key>*
 --        scope-key: groups related actions by the scope on which the action will take place;
---        *: the key under the scope represents the action to be taken (eg `<leader>eve` opens explorer on vertical split)
+--        *: the key under the scope represents the action to be taken (eg `<leader>cf` formats the buffer)
 --          double pressing the scope key triggers the most obvious action under a given scope (eg `<leader>ee` opens explorer)
 local map = vim.keymap.set
 
 -- Content edit: <leader>c*
 map("n", "<leader>cf", function()
-  vim.lsp.buf.format({ async = true })
+  -- Pin biome when attached: ts_ls also advertises formatting
+  local biome = vim.lsp.get_clients({ bufnr = 0, name = "biome", method = "textDocument/formatting" })
+  vim.lsp.buf.format({ async = true, name = #biome > 0 and "biome" or nil })
 end, {
   desc = "Format buffer",
 })
@@ -19,8 +21,6 @@ map("n", "<leader>dq", function()
 end, {
   desc = "Diagnostics to quickfix",
 })
-
--- Search: <leader>s*
 
 -- Toggle: <leader>t*
 map("n", "<leader>th", "<cmd>set hlsearch!<CR>", { desc = "Toggle search highlighting" })

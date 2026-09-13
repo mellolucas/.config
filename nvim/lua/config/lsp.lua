@@ -8,8 +8,7 @@ vim.lsp.config("lua_ls", {
   settings = {
     Lua = {
       runtime = { version = "LuaJIT" }, -- Neovim uses LuaJIT
-      diagnostics = { globals = { "vim" } }, -- Recognize 'vim' global
-      telemetry = { enable = false }
+      diagnostics = { globals = { "vim" } } -- Recognize 'vim' global
     }
   }
 })
