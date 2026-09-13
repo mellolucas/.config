@@ -6,13 +6,13 @@
 
 # --- Git Core Configuration and Behavior ---
 [core]
-  autocrlf = false # Line endings are per-project (.gitattributes); also guards against Git-for-Windows system config
+  autocrlf = false # Defense-in-depth; the config.d/unix|windows includes own the effective per-OS value
 
 # --- Git Housekeeping and Maintenance ---
 # Keep Standardized
 [init]
   defaultBranch = main # Default branch name for new repositories
-  
+
 # Keep Git Clean and Organized
 [branch]
   autoSetupRebase = always # Automatically set up rebase for new branches
@@ -23,7 +23,6 @@
 
 # Keep Git Consistent (1=1 mapping for upstream refs)
 [push]
-  default = simple # (default) Push current branch to the same name on remote
   autoSetupRemote = true # Auto set remote as upstream for current branch
   followTags = true # Push all local tags to the remote on any push
   useForceIfIncludes = true # Make --force-with-lease also require local awareness of remote tip
@@ -36,7 +35,7 @@
 # --- Quality of Life Improvements ---
 # Inspection and Comparison
 [column]
-  ui = auto # Show
+  ui = auto # Show list output (branch/tag/status) in columns on a terminal
 
 [branch]
   sort = -committerdate # Sort branches by committer date
@@ -46,7 +45,7 @@
 
 [pretty]
   compact = %C(auto)%m% h%d% s %C(dim black)·%C(reset dim italic)% ar by% aN%C(auto)
-  truncated = %C(auto)%m%h%<(48,trunc)% s%C(dim black)·%C(reset dim italic)%ar by%<(8,trunc)% aN%C(auto)%+d
+  truncated = %C(auto)%m%h%<(40,trunc)% s%C(dim black)·%C(reset dim italic)%<(14,trunc)% ar by%<(8,trunc)% aN%C(auto) # 80-col budget for git-glance
   compare = %C(auto)%m% h %C(dim yellow)^%p%C(auto)%d% s %C(dim black)·%C(reset dim italic)% ar by% aN%C(auto)
   audit = %C(auto)%m% h%d% s %C(dim black)·%C(reset dim italic) at% ad by [%an](%ae)%C(auto)
 
@@ -58,7 +57,7 @@
   date = iso-strict
 
 [core]
-  pager = delta # Use delta as text viewer for git commands
+  pager = "command -v delta >/dev/null && delta || less" # delta when present, less otherwise (fresh install, pre-bundle)
 
 [delta]
   syntax-theme = Catppuccin Mocha
@@ -67,7 +66,7 @@
   line-numbers-right-format = "│{nm:<2}┊{np:>2}│"
 
 [interactive]
-  diffFilter = delta --color-only # Pipe colorized diffs through delta
+  diffFilter = "command -v delta >/dev/null && delta --color-only || cat" # Pipe colorized diffs through delta when available
 
 [diff]
   algorithm = histogram # Use histogram diff algorithm for clearer diffs
@@ -79,7 +78,7 @@
   verbose = true # Show diff of changes in commit messages
 
 [merge]
-  conflictStyle = zdiff3 # Add marker with content before either of the changes 
+  conflictStyle = zdiff3 # Add marker with content before either of the changes
   autoStash = true # Auto stash before merging and auto apply after
 
 [grep]
@@ -94,7 +93,7 @@
 
 [rerere]
   enabled = true # Record before and after states of rebase conflicts
-  autoUpdate = true # Automatically re-apply the recorded resolutions 
+  autoUpdate = true # Automatically re-apply the recorded resolutions
 
 [rebase]
   autoSquash = true # Auto squash commits with squash! fixup! or amend! prefix
@@ -105,8 +104,11 @@
 [url "https://github.com/"]
   insteadOf = gh:
 
-[url "git@github.com:"]
-  pushInsteadOf = gh:
+# --- GitHub Authentication ---
+# gh's token handles https reads and pushes; without gh, git falls back to prompting
+[credential "https://github.com"]
+  helper = # Reset inherited helpers (e.g. Homebrew's system osxkeychain) for GitHub
+  helper = !gh auth git-credential
 
 # --- Git Aliases and Shortcuts ---
 [alias]
@@ -128,7 +130,6 @@
   }; f"
 
 # --- External Configuration Settings ---
-[core]
 # OS-specific configurations
 [includeIf "gitdir/i:*:/"] # Include for Windows git directories
   path = config.d/windows

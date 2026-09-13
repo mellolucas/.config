@@ -57,6 +57,7 @@ if command -v git-glance >/dev/null 2>&1; then
     top=$(git rev-parse --show-toplevel 2>/dev/null) || { _git_glance_last=''; return 0 }
     [[ $top == $_git_glance_last ]] && return 0
     _git_glance_last=$top
+    # Soft clear: push the current screen into scrollback instead of erasing it
     printf '\n%.0s' {1..$(tput lines)}
     tput cup 0 0
     git-glance
@@ -162,12 +163,18 @@ alias gda='gd @'                 # Show all local tracked changes since last com
 alias gdo='gd @{upstream}...@'   # Show outgoing changes to upstream
 alias gdi='gd @...@{upstream}'   # Show incoming changes from upstream
 alias gdm='gd origin/HEAD...@'   # Show changes that would be merged to upstream default branch
+alias gdot='gd @{upstream}..@'   # Show tip-to-tip delta to upstream (what a force-push would change)
+alias gdit='gd @..@{upstream}'   # Show tip-to-tip delta from upstream (what a reset to upstream would change)
+alias gdmt='gd origin/HEAD..@'   # Show tip-to-tip delta to upstream default branch
 alias gdf='gd --name-status'     # List unstaged files
 alias gdfs='gdf --staged'          # List staged files to commit
 alias gdfa='gdf @'                 # List all local tracked files modified since last commit
 alias gdfo='gdf @{upstream}...@'   # List outgoing files to upstream
-alias gdfi='gdf @...@{upstream}'   # List incoming file from upstream
+alias gdfi='gdf @...@{upstream}'   # List incoming files from upstream
 alias gdfm='gdf origin/HEAD...@'   # List files that would be merged to upstream default branch
+alias gdfot='gdf @{upstream}..@'   # List files in tip-to-tip delta to upstream
+alias gdfit='gdf @..@{upstream}'   # List files in tip-to-tip delta from upstream
+alias gdfmt='gdf origin/HEAD..@'   # List files in tip-to-tip delta to upstream default branch
 
 alias gl='git log'                                 # Flat linear audit (searches, filtering, pipelines)
 alias gls='gl --compact-summary'                     # Flat audit + file modification stats

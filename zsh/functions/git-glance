@@ -20,7 +20,8 @@ local track upstream
 local -a lr
 if upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null); then
   lr=($(git rev-list --left-right --count '@{upstream}...@' 2>/dev/null))
-  track="→ $upstream"
+  (( ${#upstream} > 26 )) && upstream="${upstream[1,25]}…"
+  track="→ ${upstream//\%/%%}"
   (( ${lr[2]:-0} )) && track+=" %F{green}↑${lr[2]}%f" # Outgoing commits
   (( ${lr[1]:-0} )) && track+=" %F{red}↓${lr[1]}%f"   # Incoming commits
 else
@@ -68,13 +69,34 @@ local -a stashes others
 stashes=(${(f)"$(git stash list --format='%gs')"})
 others=(${(f)"$(git for-each-ref refs/heads --count=6 --sort=-committerdate --format='%(refname:short)')"})
 others=(${others:#$branch})
-others=($others[1,4])
 
-print -P -- "\n%F{blue}${toplevel:h:t}/${toplevel:t}%f · %F{magenta}${branch}%f $track %F{8}· $fetched%f"
+# 80-column card: truncate visible text first, %-escape after, so prompt
+# escapes stay zero-width and no printed line exceeds the budget
+local repo=${toplevel:h:t}/${toplevel:t}
+(( ${#repo} > 60 ))   && repo="${repo[1,59]}…"
+(( ${#branch} > 26 )) && branch="${branch[1,25]}…"
+
+local stash=${stashes[1]:-} nstash=$#stashes
+(( ${#stash} > 67 - $#nstash )) && stash="${stash[1,66 - $#nstash]}…"
+
+local name
+local -a shown
+local -i used=0
+for name in $others[1,4]; do
+  (( ${#name} > 30 )) && name="${name[1,29]}…"
+  (( used += ${#name} + (used ? 3 : 0) ))
+  (( used > 70 )) && break
+  shown+=("${name//\%/%%}")
+done
+
+local -i pad=$(( 80 - ${#repo} - ${#fetched} ))
+print -P -- "\n%F{blue}${repo//\%/%%}%f${(l:pad:):-}%F{8}${fetched}%f"
+print -P -- "%F{8}${(l:80::─:):-}%f"
 [[ -n $op ]] && print -P -- "%F{red}⚠ $op in progress%f"
+print -P -- "%F{8}branch%f    %F{magenta}${branch//\%/%%}%f $track"
 print -P -- "%F{8}worktree%f  ${(j: · :)wt}"
-(( $#stashes )) && print -P -- "%F{8}stash%f     $#stashes · ${stashes[1]//\%/%%}"
-(( $#others ))  && print -P -- "%F{8}branches%f  ${(j: · :)others}"
+(( nstash ))    && print -P -- "%F{8}stash%f     $nstash · ${stash//\%/%%}"
+(( $#shown ))   && print -P -- "%F{8}branches%f  ${(j: · :)shown}"
 if git rev-parse -q --verify HEAD >/dev/null 2>&1; then
   print
   git --no-pager log -3 --pretty=truncated
