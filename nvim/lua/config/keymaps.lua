@@ -29,8 +29,119 @@ map("n", "<leader>td", function()
   local config = vim.diagnostic.config()
   vim.diagnostic.config({ virtual_text = not config.virtual_text })
 end, { desc = "Toggle inline diagnostics" })
-
--- Git commands: <leader>g*
+-- Markdown preview: swaps the current window between markdown source and a glow
+-- render of the file on disk. term=true: a real pty, since glow only colors a tty.
+-- Explicit --style (aliases don't reach jobs); --width = min(window, glow.yaml's 120).
+map("n", "<leader>tm", function()
+  local paired = vim.b.tm_source
+  if paired then
+    if not vim.api.nvim_buf_is_valid(paired) then
+      vim.b.tm_source = nil
+      vim.b.tm_view = nil
+      vim.notify("Markdown preview: source buffer gone, render unpaired", vim.log.levels.WARN)
+      return
+    end
+    local view = vim.b.tm_view
+    vim.api.nvim_win_set_buf(0, paired)
+    vim.fn.winrestview(view)
+    return
+  end
+  if vim.bo.filetype ~= "markdown" then
+    vim.notify("Markdown preview: not a markdown buffer", vim.log.levels.WARN)
+    return
+  end
+  if vim.fn.executable("glow") ~= 1 then
+    vim.notify("Markdown preview: glow not found", vim.log.levels.WARN)
+    return
+  end
+  local path = vim.api.nvim_buf_get_name(0)
+  if path == "" then
+    vim.notify("Markdown preview: buffer has no file on disk", vim.log.levels.WARN)
+    return
+  end
+  if vim.fn.filereadable(path) ~= 1 then
+    vim.notify("Markdown preview: file missing or unreadable", vim.log.levels.WARN)
+    return
+  end
+  if vim.bo.modified then
+    vim.notify("Markdown preview: buffer modified, rendering saved state", vim.log.levels.INFO)
+  end
+  local theme = (vim.env.XDG_CONFIG_HOME or vim.env.HOME .. "/.config") .. "/glow/theme.json"
+  local width = tostring(math.min(vim.api.nvim_win_get_width(0), 120))
+  local source = vim.api.nvim_get_current_buf()
+  local win = vim.api.nvim_get_current_win()
+  local view = vim.fn.winsaveview()
+  local ratio = view.lnum / vim.api.nvim_buf_line_count(source)
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.bo[buf].bufhidden = "wipe"
+  vim.b[buf].tm_source = source
+  vim.b[buf].tm_view = view
+  vim.api.nvim_win_set_buf(0, buf)
+  local job
+  local exited = false
+  local finished = false
+  local function finish(message)
+    if finished then
+      return
+    end
+    finished = true
+    if job and not exited then
+      vim.fn.jobstop(job)
+    end
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf
+      and vim.b[buf].tm_source == source then
+      if message then
+        if vim.api.nvim_buf_is_valid(source) then
+          vim.api.nvim_win_set_buf(win, source)
+          vim.api.nvim_win_call(win, function()
+            vim.fn.winrestview(view)
+          end)
+        end
+        vim.notify("Markdown preview: " .. message, vim.log.levels.WARN)
+      else
+        local total = vim.api.nvim_buf_line_count(buf)
+        local target = math.max(1, math.min(total, math.floor(ratio * total + 0.5)))
+        vim.api.nvim_win_set_cursor(win, { target, 0 })
+      end
+    end
+    if message and vim.api.nvim_buf_is_valid(buf) then
+      vim.api.nvim_buf_delete(buf, { force = true })
+    end
+  end
+  vim.api.nvim_create_autocmd("BufWipeout", {
+    buffer = buf,
+    once = true,
+    callback = function()
+      if not finished then
+        finished = true
+        if job and not exited then
+          vim.fn.jobstop(job)
+        end
+      end
+    end,
+  })
+  local started
+  started, job = pcall(vim.fn.jobstart, { "glow", "--style", theme, "--width", width, path }, {
+    term = true,
+    on_exit = function(_, code)
+      exited = true
+      vim.schedule(function()
+        finish(code ~= 0 and ("glow exited with code " .. code) or nil)
+      end)
+    end,
+  })
+  if not started or job <= 0 then
+    job = nil
+    finish("glow failed to start")
+    return
+  end
+  vim.defer_fn(function()
+    if exited then
+      return
+    end
+    finish("glow timed out")
+  end, 5000)
+end, { desc = "Toggle markdown preview" })
 
 -- Buffers: <leader>b*
 map("n", "<leader>bl", "<cmd>ls<CR>", { desc = "List active buffers" })
