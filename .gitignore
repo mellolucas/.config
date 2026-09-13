@@ -21,3 +21,9 @@ opencode/package-lock.json
 opencode/bun.lock
 opencode/node_modules/
 
+# Homebrew-generated third-party tap trust store; never tracked
+homebrew/trust.json*
+
+# opencode session artifacts (plans, scratch); never tracked
+/.opencode/
+
