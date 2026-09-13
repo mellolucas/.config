@@ -1,4 +1,4 @@
-brew "mas" if system "defaults read MobileMeAccounts Accounts &>/dev/null"
+brew "mas" if OS.mac? && system("defaults read MobileMeAccounts Accounts >/dev/null 2>&1")
 
 brew "git"
 brew "neovim"
