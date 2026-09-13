@@ -2,8 +2,12 @@
 [[ -o interactive ]] || return
 
 # ---- Environment ----
-fpath=("$XDG_CONFIG_HOME/zsh/functions" $fpath)
-autoload -Uz "$XDG_CONFIG_HOME/zsh/functions"/*(.N:t)
+[[ -o login ]] || source "$ZDOTDIR/homebrew.zsh"
+
+fpath=("$ZDOTDIR/functions" $fpath)
+fns=("$ZDOTDIR/functions"/*(.N:t))
+(( $#fns )) && autoload -Uz $fns
+unset fns
 autoload -Uz add-zsh-hook
 
 # ---- History ----
@@ -21,14 +25,22 @@ setopt hist_verify
 setopt extended_history
 
 # ---- Completion ----
+# Demote brew site-functions so zsh's native _git (with descriptions) beats brew's bash-completion wrapper
+_brew_site_functions=${HOMEBREW_PREFIX:-/opt/homebrew}/share/zsh/site-functions
+fpath=(${fpath:#$_brew_site_functions})
+[[ -d $_brew_site_functions ]] && fpath+=("$_brew_site_functions")
+unset _brew_site_functions
+
 autoload -Uz compinit
 compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
 
-zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+# Exact first, then case-insensitive, then partial-word
+zstyle ':completion:*' matcher-list '' 'm:{a-zA-Z}={A-Za-z}' 'm:{a-zA-Z}={A-Za-z} r:|[._-]=* r:|=*'
 zstyle ':completion:*' menu select
 
 # ---- Behavior ----
 bindkey -v
+# 10ms for snappy insert/vicmd switching; no multi-key vicmd sequences exist
 KEYTIMEOUT=1
 
 setopt interactive_comments
@@ -132,10 +144,7 @@ alias rgwa='rga --word-regexp'
 alias rgwc='rgw --count'
 alias rgwca='rgwa --count'
 
-alias cmdv='command -v' 
-if ! command -v where >/dev/null 2>&1; then
-  alias where='type -a'
-fi
+alias cmdv='command -v'
 alias cmdvs='where'
 
 if command -v git-glance >/dev/null 2>&1; then
@@ -184,5 +193,4 @@ alias glc='gl --graph --boundary --pretty=compare'   # Relational delta (strict 
 alias ocode='opencode'
 
 # Local
-[[ -r "$XDG_CONFIG_HOME/zsh/local.zsh" ]] && source "$XDG_CONFIG_HOME/zsh/local.zsh"
-
+[[ -r "$ZDOTDIR/local.zsh" ]] && source "$ZDOTDIR/local.zsh"

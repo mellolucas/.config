@@ -1,0 +1,11 @@
+# Machine-local zsh overrides (copy to `local.zsh`; sourced last by .zshrc).
+# Untracked by design — env exports, XDG redirections, aliases, functions.
+
+# export SOME_TOOL_HOME="$XDG_CONFIG_HOME/some-tool"
+# export AWS_CONFIG_FILE="$XDG_CONFIG_HOME/aws/config"
+
+# alias vpn-status='scutil --nc list'
+
+# work-login() {
+#   command some-cli login --profile "work" "$@"
+# }

@@ -6,10 +6,15 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 
 export ZDOTDIR="${ZDOTDIR:-$XDG_CONFIG_HOME/zsh}"
 
+# Apple Terminal session restore writes .zsh_sessions into ZDOTDIR (= this repo)
+[[ "$OSTYPE" == darwin* ]] && export SHELL_SESSIONS_DISABLE=1
+
 export EDITOR="${EDITOR:-nvim}"
 export VISUAL="${VISUAL:-$EDITOR}"
 export PAGER="${PAGER:-less}"
-export LESS="${LESS:--FRX}"
+# -X keeps pager output in terminal scrollback; --mouse makes the wheel scroll
+# less itself (shift+wheel still scrolls the terminal)
+export LESS="${LESS:--FRX --mouse}"
 export LESSHISTFILE="${LESSHISTFILE:--}"
 
 path=(
@@ -17,6 +22,6 @@ path=(
   $path
 )
 
-typeset -U path PATH
+typeset -U path PATH fpath FPATH
 export PATH
 
