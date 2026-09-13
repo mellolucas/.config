@@ -91,10 +91,11 @@ fi
 # ---- Aliases ----
 alias dots='dotfiles'
 alias dotsup='dotfiles update'
-alias dotsws='dotfiles workspace'
-alias dotscode='dotfiles workspace'
 
-if command -v github-open>/dev/null 2>&1; then
+if command -v workspace >/dev/null 2>&1; then
+  alias dotscode='workspace'
+fi
+if command -v github-open >/dev/null 2>&1; then
   alias ghopen='github-open'
 fi
 if command -v github-view >/dev/null 2>&1; then

@@ -1,23 +1,27 @@
 -- Ghostty workspace layout.
 --
 -- Usage:
---   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD MIDDLE_TOP_CMD MIDDLE_BOTTOM_CMD
+--   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD MIDDLE_TOP_CMD MIDDLE_BOTTOM_CMD CONTENT_WIDTH CONTENT_HEIGHT
 --
--- Layout:
+-- Opens as a new tab in the frontmost Ghostty window (new window when none).
+-- CONTENT_WIDTH/CONTENT_HEIGHT are the window text area in pixels (CSI 14 t);
+-- when missing or 0 the splits are equalized instead of ratio-sized.
 --
---   ┌───────────────┬───────────────┬───────────────┐
---   │               │               │               │
---   │   editor      │   shell       │   agent       │
---   │               │               │               │
---   │               ├───────────────┤               │
---   │               │               │               │
---   │               │   shell       │               │
---   │               │               │               │
---   └───────────────┴───────────────┴───────────────┘
+-- Layout (columns 20% / 40% / 40%, middle column rows 30% / 70%):
+--
+--   ┌────────┬───────────────┬───────────────┐
+--   │        │               │               │
+--   │        │   shell       │               │
+--   │        │               │               │
+--   │ editor ├───────────────┤   agent       │
+--   │        │               │               │
+--   │        │   shell       │               │
+--   │        │               │               │
+--   └────────┴───────────────┴───────────────┘
 
 on run argv
 	if (count of argv) < 3 then
-		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [MIDDLE_TOP_CMD] [MIDDLE_BOTTOM_CMD]"
+		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [MIDDLE_TOP_CMD] [MIDDLE_BOTTOM_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT]"
 	end if
 	
 	set workspaceDir to item 1 of argv
@@ -26,29 +30,44 @@ on run argv
 	
 	set middleTopCmd to ""
 	set middleBottomCmd to ""
+	set contentWidth to 0
+	set contentHeight to 0
 	
-	if (count of argv) ≥ 4 then
-		set middleTopCmd to item 4 of argv
-	end if
+	if (count of argv) ≥ 4 then set middleTopCmd to item 4 of argv
+	if (count of argv) ≥ 5 then set middleBottomCmd to item 5 of argv
+	if (count of argv) ≥ 6 then set contentWidth to (item 6 of argv) as integer
+	if (count of argv) ≥ 7 then set contentHeight to (item 7 of argv) as integer
 	
-	if (count of argv) ≥ 5 then
-		set middleBottomCmd to item 5 of argv
-	end if
+	-- One divider move per axis reaches the target ratios: resize_split moves
+	-- the divider of the pane's nearest ancestor split, and nested splits
+	-- redistribute proportionally, so 50/25/25 -> 20/40/40 and 50/50 -> 30/70.
+	set widthDelta to round (contentWidth * 0.3)
+	set heightDelta to round (contentHeight * 0.2)
 	
 	tell application "Ghostty"
 		activate
-		
+
 		set cfg to new surface configuration
 		set initial working directory of cfg to workspaceDir
 		
-		set workspaceWindow to new window with configuration cfg
-		set workspaceTab to selected tab of workspaceWindow
+		try
+			set workspaceTab to new tab in front window with configuration cfg
+		on error
+			set workspaceTab to selected tab of (new window with configuration cfg)
+		end try
 		
 		set middleTop to focused terminal of workspaceTab
 		set leftEditor to split middleTop direction left with configuration cfg
 		set rightAgent to split middleTop direction right with configuration cfg
 		set middleBottom to split middleTop direction down with configuration cfg
 		
+		if widthDelta > 0 and heightDelta > 0 then
+			perform action ("resize_split:left," & widthDelta) on leftEditor
+			perform action ("resize_split:up," & heightDelta) on middleBottom
+		else
+			perform action "equalize_splits" on middleTop
+		end if
+
 		input text editorCmd to leftEditor
 		send key "enter" to leftEditor
 		
@@ -65,8 +84,6 @@ on run argv
 			send key "enter" to middleBottom
 		end if
 		
-		perform action "equalize_splits" on middleTop
 		focus middleTop
 	end tell
 end run
-

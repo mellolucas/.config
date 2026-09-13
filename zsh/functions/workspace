@@ -1,0 +1,99 @@
+# vim: ft=zsh
+
+emulate -L zsh
+
+if [[ ${1:-} == (-h|--help) ]]; then
+  cat <<'EOF'
+usage: workspace [DIR]
+
+Launch a Ghostty coding workspace layout as a new tab in the frontmost
+window (macOS only).
+
+Arguments:
+  DIR   Workspace directory. Defaults to the current directory.
+
+Layout:
+  left           editor  (20% width)
+  middle top     shell   (40% width, 30% height)
+  middle bottom  shell   (40% width, 70% height)
+  right          agent   (40% width)
+
+Environment:
+  DOTFILES_WORKSPACE_SCRIPT=/path/to/workspace.applescript
+      Override the AppleScript implementation path.
+
+  DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
+      Command started in the left pane.
+
+  DOTFILES_WORKSPACE_AGENT_CMD='ocode'
+      Command started in the right pane.
+
+  DOTFILES_WORKSPACE_MIDDLE_TOP_CMD='gg'
+      Command started in the middle-top pane. Empty skips. Defaults to gg.
+
+  DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD=''
+      Command started in the middle-bottom pane. Empty skips.
+EOF
+  return 0
+fi
+
+[[ $OSTYPE == darwin* ]] || {
+  print -u2 -- 'workspace: Ghostty AppleScript automation requires macOS'
+  return 1
+}
+
+[[ -x /usr/bin/osascript ]] || {
+  print -u2 -- 'workspace: /usr/bin/osascript not found'
+  return 1
+}
+
+local script=${DOTFILES_WORKSPACE_SCRIPT:-${XDG_CONFIG_HOME:-$HOME/.config}/ghostty/workspace.applescript}
+[[ -r $script ]] || {
+  print -r -u2 -- "workspace: missing script: $script"
+  print -u2 -- 'hint: run: dotfiles install'
+  return 1
+}
+
+local dir=${1:-$PWD}
+[[ -d $dir ]] || {
+  print -r -u2 -- "workspace: not a directory: $dir"
+  return 1
+}
+dir=${dir:A}
+
+# Window text area in pixels (CSI 14 t) for the ratio-based split sizing.
+# Measured from the invoking pane: exact from an unsplit tab, undersized from
+# a split pane; on 0 the AppleScript falls back to equalized splits.
+local width=0 height=0
+if [[ -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
+  local reply='' char=''
+  printf '\e[14t' > /dev/tty
+  while read -s -k 1 -t 1 char < /dev/tty; do
+    reply+=$char
+    [[ $char == t ]] && break
+  done
+  local -a fields=(${(s.;.)${reply//[^0-9;]/}})
+  if (( $#fields == 3 )); then
+    height=$fields[2]
+    width=$fields[3]
+  fi
+fi
+
+local output
+local -i rc=0
+output=$(
+  # MIDDLE_TOP uses ${var-} not ${var:-}: empty (unlike unset) skips the command
+  /usr/bin/osascript "$script" "$dir" \
+    "${DOTFILES_WORKSPACE_EDITOR_CMD:-nvim .}" \
+    "${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}" \
+    "${DOTFILES_WORKSPACE_MIDDLE_TOP_CMD-gg}" \
+    "${DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD:-}" \
+    "$width" "$height" \
+    2>&1
+) || {
+  rc=$?
+  output=${output//$'\n'/ }
+  [[ -n $output ]] || output="osascript exited with status $rc"
+  print -r -u2 -- "workspace: $output"
+  return $rc
+}
