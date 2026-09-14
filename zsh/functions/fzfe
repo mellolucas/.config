@@ -7,4 +7,7 @@ command -v fzf >/dev/null 2>&1 || {
   return 1
 }
 
-fzf --bind "enter:become($EDITOR -- {})" "$@"
+local -a editor=("${(@Q)${(z)EDITOR}}")
+[[ -n $editor[1] ]] || { print -u2 'fzfe: EDITOR must name a command'; return 1 }
+# fzf executes a shell string; quote every literal editor token before joining.
+fzf --bind "enter:become(${(j: :)${(@q)editor}} -- {})" "$@"

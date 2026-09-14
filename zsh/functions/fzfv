@@ -7,11 +7,11 @@ command -v fzf >/dev/null 2>&1 || {
   return 1
 }
 
-local file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 {} || cat {}'
+local file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 -- {} || cat -- {}'
 local preview=$file_preview
 
 if command -v glow >/dev/null 2>&1; then
-  local md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 {}'
+  local md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 -- {}'
   # PTY color rendering: tmux TERM skips terminal queries; tail removes the EOF echo.
   [[ $OSTYPE == darwin* ]] && md_preview="TERM=tmux-256color COLORTERM=truecolor script -q /dev/null $md_preview < /dev/null | tail -n +2"
   preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"

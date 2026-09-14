@@ -114,10 +114,11 @@ if command -v github-view >/dev/null 2>&1; then
   alias ghview='github-view'
 fi
 
-alias v='$EDITOR'
-alias vi='$EDITOR'
-alias vim='$EDITOR'
-alias view='$EDITOR -R -M'
+# EDITOR is a quoted command/argument list, not a shell expression.
+alias v='"${(@Q)${(z)EDITOR}}"'
+alias vi='"${(@Q)${(z)EDITOR}}"'
+alias vim='"${(@Q)${(z)EDITOR}}"'
+alias view='"${(@Q)${(z)EDITOR}}" -R -M'
 
 if command -v glow >/dev/null 2>&1; then
   alias glow='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json"'

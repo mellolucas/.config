@@ -1,21 +1,71 @@
 # vim: ft=zsh
 
 emulate -L zsh
-zmodload -F zsh/parameter p:aliases
+zmodload -F zsh/parameter p:aliases p:builtins
 
 (( $# )) || { print -u2 'usage: help <command> [args...]'; return 1 }
 
-# Aliases never expand from "$@"; resolve $1 recursively through $aliases.
-# Expand deferred variables before tokenizing; remove quotes after splitting.
+# Accept literal words, quotes and escaped characters, not shell expressions.
 local -a cmd=("$1")
 local -A seen
-while (( ${+aliases[$cmd[1]]} && ! ${+seen[$cmd[1]]} )); do
+local expression token previous
+local -i editor_alias=0
+local literal_word='^([a-zA-Z0-9_./:@%+,=!-]+|\\.|'"'[^']*'"'|"[^"$`\\]*")+$'
+local -a words
+while (( ${+aliases[$cmd[1]]} )); do
+  if (( ${+seen[$cmd[1]]} )); then
+    print -u2 -- "help: alias cycle; ask for help on the underlying command"
+    return 1
+  fi
   seen[$cmd[1]]=1
-  cmd=("${(@Q)${(z)${(e)aliases[$cmd[1]]}}}" "${(@)cmd[2,-1]}")
+  expression=$aliases[$cmd[1]]
+  previous=$cmd[1]
+  case $expression in
+    '"${(@Q)${(z)EDITOR}}"'|'"${(@Q)${(z)EDITOR}}" -R -M')
+      editor_alias=1
+      words=("${(@Q)${(z)EDITOR}}")
+      [[ -n $words[1] ]] || { print -u2 'help: EDITOR must name a command; ask for help on the underlying command'; return 1 }
+      [[ $expression != *' -R -M' ]] || words+=(-R -M)
+      ;;
+    *)
+      words=("${(@z)expression}")
+      for token in "${words[@]}"; do
+        if ! [[ $token =~ $literal_word ]]; then
+          print -u2 -- "help: unsupported alias '$previous'; ask for help on the underlying command"
+          return 1
+        fi
+      done
+      words=("${(@Q)words}")
+      ;;
+  esac
+  if [[ -z $words[1] || $words[1] == *=* ]]; then
+    print -u2 -- "help: unsupported alias '$previous'; ask for help on the underlying command"
+    return 1
+  fi
+  cmd=("${words[@]}" "${(@)cmd[2,-1]}")
+  (( ! editor_alias )) || break
+  [[ $cmd[1] != $previous ]] || break
 done
 
+if (( ${+builtins[$cmd[1]]} )); then
+  if [[ ! -o interactive ]]; then
+    man zshbuiltins
+    return $?
+  fi
+  # Native run-help inspects aliases too; give it only the resolved command.
+  (
+    unalias -m '*'
+    autoload -Uz run-help
+    run-help "$cmd[1]"
+  )
+  return $?
+fi
+
 if command -v bat >/dev/null 2>&1; then
-  bat --plain --language=help <<<$("${cmd[@]}" "${@[2,-1]}" --help 2>&1)
+  local output result=0
+  output=$("${cmd[@]}" "${@[2,-1]}" --help 2>&1) || result=$?
+  bat --plain --language=help <<< "$output" || :
+  return $result
 else
-  "${cmd[@]}" "${@[2,-1]}" --help 2>&1
+  ( "${cmd[@]}" "${@[2,-1]}" --help 2>&1 )
 fi

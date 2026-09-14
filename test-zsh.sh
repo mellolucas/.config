@@ -25,6 +25,8 @@ rel=$'nested dir/file #&%\xc3\xa9.md'
 : > "$root/$rel"
 print -r -- 'local README' > "$root/README.md"
 
+autoload -Uz run-help
+autoload +X run-help
 fpath=("$repo/zsh/functions")
 autoload -Uz fzfe fzfv github-open github-view help keys
 # No unstubbed executable can run after setup.
@@ -58,11 +60,11 @@ for private_path in /Users/ /home/ /private/var/ /var/folders/ "$repo" "$HOME" "
   [[ $keys_output != *"$private_path"* ]] || fail 'keys exposes a private machine path'
 done
 
-# Source only the renderer and listing alias blocks, never startup or local config.
+# Source only the editor, renderer and listing aliases, never startup or local config.
 alias_block=''
 collect_aliases=0
 while IFS= read -r line; do
-  [[ $line != 'if command -v glow >/dev/null 2>&1; then' ]] || collect_aliases=1
+  [[ $line != 'alias v='* ]] || collect_aliases=1
   [[ $line != 'alias rg='* ]] || break
   (( ! collect_aliases )) || alias_block+="$line"$'\n'
 done < "$repo/zsh/.zshrc"
@@ -311,10 +313,29 @@ editor() { record editor "$@"; }
   help help-first 'user argument'
   expect $'editor\n--second\n--first\nuser argument\n--help' "$(recorded)" 'plain alias chain'
 
+  source /dev/stdin <<< "$alias_block"
+  man() { record man "$@"; }
+  HELPDIR="$test_root/no-help-files"
+  output=$(help exit >/dev/null; print -r -- survived) || fail 'help exit exited caller'
+  expect survived "$output" 'help exit must not exit caller'
+  expect $'man\nzshbuiltins' "$(recorded)" 'exit uses builtin documentation without exiting caller'
+  help printf >/dev/null
+  expect $'man\nzshbuiltins' "$(recorded)" 'noninteractive builtin help never prompts for external matches'
+  alias help-exit=exit
+  help help-exit >/dev/null
+  expect $'man\nzshbuiltins' "$(recorded)" 'builtin alias uses native documentation'
+  alias exit='exit --ignored'
+  help exit >/dev/null
+  expect $'man\nzshbuiltins' "$(recorded)" 'native documentation ignores resolved self alias'
+  unalias exit
+
   EDITOR='editor --clean'
-  alias vi='$EDITOR'
   help vi
   expect $'editor\n--clean\n--help' "$(recorded)" 'deferred multiword editor'
+  alias editor='editor --alias-only'
+  help vi
+  expect $'editor\n--clean\n--help' "$(recorded)" 'editor expansion does not recursively expand aliases'
+  unalias editor
 
   alias help-quoted="editor \"double quoted\" 'single quoted' escaped\\ space \"\""
   help help-quoted 'user argument'
@@ -326,20 +347,82 @@ editor() { record editor "$@"; }
   help vi
   expect $'editor with spaces\n--clean\nprofile name\n--help' "$(recorded)" 'quotes within deferred editor'
 
-  EDITOR='editor with spaces'
-  alias help-editor='"$EDITOR" "alias argument"'
-  help help-editor
-  expect $'editor with spaces\nalias argument\n--help' "$(recorded)" 'quoted editor variable preserves executable spaces'
+  for name in v vi vim view; do
+    expected=$'editor with spaces\n--clean\nprofile name'
+    [[ $name != view ]] || expected+=$'\n-R\n-M'
+    eval "$name"' "file name"'
+    expect "$expected"$'\nfile name' "$(recorded)" "$name uses the same editor tokenization"
+    help "$name"
+    expect "$expected"$'\n--help' "$(recorded)" "help $name matches the editor alias"
+  done
+
+  EDITOR='editor "$HOME" "$(print injected > $test_root/injected)" ; literal'
+  eval 'vi "file name"'
+  expect $'editor\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\nfile name' "$(recorded)" 'editor tokens are literal, not shell expressions'
+  help vi
+  expect $'editor\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\n--help' "$(recorded)" 'help editor tokens remain literal'
+  [[ ! -e "$test_root/injected" ]] || fail 'editor command substitution executed'
+  EDITOR=''
+  for name in v view; do
+    if help "$name" >"$test_root/refusal" 2>&1; then fail "help $name rejects empty editor"; fi
+    [[ $(recorded refusal) == *'underlying command'* ]] || fail 'empty editor refusal guidance'
+  done
+
+  alias help-literal="editor '\$HOME' '\$(print injected > \$test_root/injected)'"
+  help help-literal
+  expect $'editor\n$HOME\n$(print injected > $test_root/injected)\n--help' "$(recorded)" 'single-quoted alias arguments stay literal'
+  [[ ! -e "$test_root/injected" ]] || fail 'alias command substitution executed'
+
+  eza() { record eza "$@"; }
+  source /dev/stdin <<< "$alias_block"
+  help ll 'directory name'
+  expect $'eza\n--all\n--group-directories-first\n--icons=auto\n--long\n--binary\n--time-style=relative\ndirectory name\n--help' "$(recorded)" 'help listing alias chain'
+  alias gs='git status --ignored'
+  git() { record git "$@"; }
+  help gs
+  expect $'git\nstatus\n--ignored\n--help' "$(recorded)" 'help git subcommand alias'
 
   functions[help-cycle]='record help-cycle "$@"'
   alias help-cycle='editor --outer' editor='help-cycle --inner'
-  help help-cycle
-  expect $'help-cycle\n--inner\n--outer\n--help' "$(recorded)" 'recursive alias cycle terminates'
+  if help help-cycle >"$test_root/refusal" 2>&1; then
+    fail 'recursive alias cycle must be refused'
+  fi
+  [[ $(recorded refusal) == *'underlying command'* ]] || fail 'cycle refusal guidance'
   unalias editor
 
-  alias help-syntax='editor ; fail unexpected | fail unexpected > output'
-  help help-syntax
-  expect $'editor\n;\nfail\nunexpected\n|\nfail\nunexpected\n>\noutput\n--help' "$(recorded)" 'shell operators remain arguments'
+  for expression in 'editor ; fail unexpected' 'editor | fail unexpected' \
+    'editor > output' 'EDITOR=editor editor' 'editor $HOME' \
+    'editor $(print injected > $test_root/injected)' 'editor `print injected`' \
+    'editor *.md' ''; do
+    alias help-syntax="$expression"
+    if help help-syntax >"$test_root/refusal" 2>&1; then
+      fail "complex alias must be refused: $expression"
+    fi
+    [[ $(recorded refusal) == *'underlying command'* ]] || fail "complex alias refusal guidance: $expression"
+    [[ ! -e "$test_root/injected" ]] || fail 'complex alias executed a substitution'
+  done
+
+  docs() { print -r -- 'documentation output'; return $docs_status; }
+  docs-exit() { exit 19; }
+  for has_bat in 0 1 2; do
+    (( ! has_bat )) || bat() {
+      record bat "$@"
+      while IFS= read -r line; do print -r -- "$line"; done
+      (( has_bat == 1 ))
+    }
+    for docs_status in 0 23; do
+      result=0
+      output=$(help docs) || result=$?
+      expect "$docs_status" "$result" "documentation status with bat=$has_bat"
+      expect 'documentation output' "$output" "documentation output with bat=$has_bat"
+    done
+    result=0
+    help missing-doc-command >/dev/null || result=$?
+    expect 127 "$result" "missing documentation command with bat=$has_bat"
+    result=0
+    help docs-exit >/dev/null || result=$?
+    expect 19 "$result" "function exit stays in documentation subshell with bat=$has_bat"
+  done
 )
 
 fzf() {
@@ -354,6 +437,16 @@ export EDITOR='editor --clean'
 selection='-c quit | touch should-not-run'
 fzfe --query needle
 expect $'editor\n--clean\n--\n-c quit | touch should-not-run' "$(recorded)" 'editor option terminator and filename quoting'
+(
+  editor_name='editor with spaces'
+  functions[$editor_name]='record "editor with spaces" "$@"'
+  EDITOR='"editor with spaces" --clean "profile name" "$HOME" "$(print injected > $test_root/injected)" ; literal'
+  fzfe
+  expect $'editor with spaces\n--clean\nprofile name\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\n--\n-c quit | touch should-not-run' "$(recorded)" 'fzfe literal quoted editor tokens'
+  [[ ! -e "$test_root/injected" ]] || fail 'fzfe evaluated editor command substitution'
+  EDITOR=''
+  if fzfe >/dev/null 2>&1; then fail 'fzfe rejects empty editor'; fi
+)
 # Inspect forwarding separately without executing the binding.
 fzf() { record "$@"; }
 fzfe --preview-window=wrap --bind ctrl-s:toggle-preview-wrap --query needle
@@ -364,10 +457,10 @@ for os in darwin23 linux-gnu; do
     (
       OSTYPE=$os
       (( has_glow )) || unfunction glow
-      file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 {} || cat {}'
+      file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 -- {} || cat -- {}'
       preview=$file_preview
       if (( has_glow )); then
-        md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 {}'
+        md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 -- {}'
         if [[ $os == darwin* ]]; then
           md_preview="TERM=tmux-256color COLORTERM=truecolor script -q /dev/null $md_preview < /dev/null | tail -n +2"
         fi
@@ -378,6 +471,33 @@ for os in darwin23 linux-gnu; do
       expect "$expected" "$(recorded)" "fzfv preview shape and OS guard: $os / glow=$has_glow"
       fzfv --preview 'caller preview {}' --preview-window=nowrap --bind alt-t:ignore --query 'file name'
       expect "$expected"$'\n--preview\ncaller preview {}\n--preview-window=nowrap\n--bind\nalt-t:ignore\n--query\nfile name' "$(recorded)" "fzfv caller overrides last: $os / glow=$has_glow"
+
+      fzf() {
+        local preview=${4//'{}'/${(q)selection}}
+        eval "$preview"
+      }
+      cat() { record cat "$@"; }
+      script() {
+        expect '-q /dev/null' "$1 $2" 'preview PTY arguments'
+        shift 2
+        "$@"
+      }
+      tail() { expect '-n +2' "$*" 'preview PTY pipeline'; }
+      for selection in '-file' '-file.MD'; do
+        for bat_state in present failing missing; do
+          bat() { record bat "$@"; [[ $bat_state != failing ]]; }
+          [[ $bat_state != missing ]] || unfunction bat
+          fzfv
+          if (( has_glow )) && [[ $selection == *.MD ]]; then
+            expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n--width\n0\n--\n'"$selection"
+          elif [[ $bat_state == present ]]; then
+            expected=$'bat\n--color=always\n--wrap=never\n--style=numbers\n--line-range=:500\n--\n'"$selection"
+          else
+            expected=$'cat\n--\n'"$selection"
+          fi
+          expect "$expected" "$(recorded)" "executed preview: $os / glow=$has_glow / bat=$bat_state / $selection"
+        done
+      done
     )
   done
 done
