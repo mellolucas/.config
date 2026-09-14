@@ -96,6 +96,7 @@ Deliberate duplication that must stay behavior-identical across copies:
   - `nvim --headless "+lua vim.print('ok')" +q` for nvim config health
   - `nvim --headless -u NONE -l test-nvim.lua` for isolated Markdown preview checks
   - `git config --file git/config --list` for git config syntax
+  - `sh test-git.sh` for isolated viewer, clone-argument, and tag-preservation checks
   - `biome lint opencode/*.jsonc` for opencode config (JSONC) syntax
   - `ghostty +validate-config` when ghostty/ changed
   - `rg -n "that fix|now that|previously|no longer|used to" <changed files>` —

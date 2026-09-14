@@ -5,6 +5,8 @@ Minimal, XDG-first dotfiles for zsh, Neovim, Git, Ghostty, Homebrew, and more.
 Requires git, zsh, Ghostty >= 1.3 (older versions silently ignore
 `config.ghostty` and key tables), and Neovim >= 0.12 (`vim.pack`).
 Installing Homebrew additionally needs curl and bash (macOS: Xcode CLT).
+Bootstrapping Homebrew may require administrator authorization; non-admin
+accounts need an existing usable Homebrew installation.
 Ghostty workspace automation is macOS-only.
 
 ## Install
@@ -25,6 +27,7 @@ and the linked environment remains usable.
 Conflicting paths are never deleted: they are moved aside as `<path>.backup.<timestamp>`.
 If that backup name exists, a numeric suffix keeps both copies.
 Re-running is safe and idempotent.
+Use a fresh login shell (`exec zsh -l`) to load the installed environment.
 
 ## Daily use
 
@@ -65,10 +68,16 @@ Option-direction navigation tries Ghostty splits first, then Neovim windows
 in normal mode. Native Neovim window commands remain available. Markdown
 preview (`<leader>tm`) renders the saved file in place, approximates the
 rendered position, and restores the exact source view on return.
+Editor previews retain up to 1,000,000 scrollback lines; a capacity warning
+means the beginning may be truncated. Toggle again to re-render after resizing.
 
 ### Exploration and reading
 
 - `keys`: concise grouped reference for commands, capabilities, and keybindings.
+- `help COMMAND`: external `--help` or native builtin documentation. Simple
+  literal aliases are supported; complex shell expressions are rejected.
+  Editor aliases and `fzfe` accept quoted executable/argument words in `EDITOR`,
+  not shell expressions or variable expansion inside its value.
 - `l`: eza listing with hidden entries and directories first; icons appear only
   on terminal output. `ll` adds long metadata, readable binary sizes, and relative
   modification ages. Icons require suitable glyphs; `--icons=never` disables them.
@@ -109,6 +118,8 @@ Machine-local files are intentionally untracked (see the tracked `*.example` tem
 
 Non-admin macOS casks default to `$HOME/Applications` in the installer and
 login or interactive zsh shells. An existing `--appdir` override is preserved.
+In `HOMEBREW_CASK_OPTS`, use `--appdir=/path` (quote paths containing spaces),
+not the command-line spelling `--appdir /path`.
 
 `git/config.d/personal.example` includes the provisioning runbook for SSH
 commit signing; copy it to `personal`/`work` and follow the comments.
@@ -121,3 +132,5 @@ dotfiles uninstall
 
 Only symlinks owned by this repo are removed; `*.backup.*` files and created
 directories are left in place.
+Packages remain installed. Removing a Brewfile entry does not uninstall it;
+package removal is a separate explicit action.

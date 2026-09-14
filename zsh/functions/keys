@@ -15,7 +15,7 @@ SHELL & FILES
   --icons=never Disable icons; ls remains native (also when eza is absent)
   fzfe / fzfv    Find and edit files / with preview
   Ctrl-R/T      Search shell history / files; Alt-C searches directories
-  help COMMAND  Command help, including aliases
+  help COMMAND  Command/builtin help; simple literal aliases only
   awake [CMD]   macOS: inhibit display/idle sleep until Ctrl-C or CMD exits
 
 WORKSPACE & PANES (Ghostty; workspace is macOS-only)
@@ -45,6 +45,7 @@ READING & GIT
   Shift-drag    Ghostty selection while less captures mouse; / and n/N search
   gg / gs       Repository overview / status; ghopen / ghview opens repo/README
   gd / gds/gda  Unstaged / staged / all tracked changes
+  gcl REPO      Clone one owner/repo or GitHub URL; use git/gh for extra options
   gdo/gdi/gdm   Outgoing / incoming / default-branch merge diff
   git -c core.pager="less -R" diff   Full long lines without Delta truncation
 
