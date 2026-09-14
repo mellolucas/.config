@@ -91,6 +91,8 @@ Deliberate duplication that must stay behavior-identical across copies:
   - `for file in zsh/.zshrc zsh/.zprofile zsh/.zshenv zsh/*.zsh zsh/functions/*; do zsh -n "$file" || break; done`
   - `sh test-install.sh` for isolated lifecycle regression checks (no provisioning)
   - `sh test-zsh.sh` for isolated helper regression checks (no network or applications)
+  - `zsh -f test-zle.zsh` for isolated completion and vi-editing PTY checks
+  - `zsh -f test-workspace.zsh` for terminal-query PTY checks (no workspace applications)
   - `nvim --headless "+lua vim.print('ok')" +q` for nvim config health
   - `nvim --headless -u NONE -l test-nvim.lua` for isolated Markdown preview checks
   - `git config --file git/config --list` for git config syntax
