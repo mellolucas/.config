@@ -37,8 +37,8 @@ NEOVIM (normal mode)
   Esc Esc       Leave terminal-input mode, then use normal-mode mappings
 
 READING & GIT
-  mdv FILE      Full-width Markdown; less -S toggles fold/chop, then Enter
-  mdv -w 120    Opt into word-aware rendering capped at 120 columns
+  mdv FILE      Word-wrapped Markdown to pane width (max 120); -w N overrides
+  mdv -w 0 FILE No renderer wrapping; less -S toggles fold/chop, then Enter
   fzfv Option-t Toggle preview wrap; Shift-Up/Down scrolls; Ctrl-W deletes word
   less -S       Toggle wrap inside pager; --mouse toggles mouse capture
   Shift-drag    Ghostty selection while less captures mouse; / and n/N search

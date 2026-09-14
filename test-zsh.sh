@@ -117,12 +117,15 @@ for os in darwin23 linux-gnu; do
           fi
           if (( has_glow )); then
             for COLUMNS in 50 180 0 -1; do
-              width=0
+              width=120
+              (( COLUMNS != 50 )) || width=50
               expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n'"$width"
               eval 'mdv "document name.md"'
               expect "$expected"$'\ndocument name.md' "$(recorded)" "$label call-time width $COLUMNS"
               eval 'mdv -w 72 "document name.md"'
               expect "$expected"$'\n-w\n72\ndocument name.md' "$(recorded)" "$label explicit width last"
+              eval 'mdv -w 0 "document name.md"'
+              expect "$expected"$'\n-w\n0\ndocument name.md' "$(recorded)" "$label unrestricted width override"
             done
           else
             (( ! ${+aliases[mdv]} )) || fail "$label mdv dependency guard"

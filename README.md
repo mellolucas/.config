@@ -73,11 +73,11 @@ rendered position, and restores the exact source view on return.
   directory sizes describe the directory itself, not its contents.
 - `awake`: macOS display/idle-sleep inhibition until Ctrl-C; accepts a command
   to keep awake for that command's lifetime.
-- `mdv FILE`: themed Markdown without a renderer width cap. Inside less, type
-  `-S` then Enter to toggle folding/truncation; horizontal scrolling reveals
-  truncated columns without losing content. Folding may split words and does
-  not repeat Markdown indentation. `mdv -w 120 FILE` restores word-aware wrapping.
-  Existing source line breaks remain; short output may exit the pager immediately.
+- `mdv FILE`: themed, word-wrapped Markdown at the pane width, capped at 120
+  columns. Width is chosen at launch; `-w N` overrides it. Relaunch after resizing.
+  `mdv -w 0 FILE` disables renderer wrapping: less's native `-S` then Enter
+  toggles screen folding/chopping, which may split words. Neither mode removes
+  existing source line breaks; short output may exit the pager immediately.
 - `fzfv`: file picker with an initially wrapped preview; **Option-T** toggles
   preview wrapping. **Shift-Up/Down** scrolls the preview.
 
