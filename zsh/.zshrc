@@ -33,13 +33,18 @@ unset _brew_site_functions
 
 autoload -Uz compinit
 compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
+# Include dotfiles in completion without changing ordinary wildcard expansion.
+_comp_options+=(globdots)
 
-# Exact first, then case-insensitive, then partial-word
-zstyle ':completion:*' matcher-list '' 'm:{a-zA-Z}={A-Za-z}' 'm:{a-zA-Z}={A-Za-z} r:|[._-]=* r:|=*'
+# Exact prefix first, then case-insensitive, partial-word, and substring fallbacks
+zstyle ':completion:*' matcher-list '' 'm:{a-zA-Z}={A-Za-z}' 'm:{a-zA-Z}={A-Za-z} r:|[._-]=* r:|=*' 'm:{a-zA-Z}={A-Za-z} l:|=* r:|=*'
 zstyle ':completion:*' menu select
 
 # ---- Behavior ----
 bindkey -v
+# Erase across vi insertion boundaries and logical newlines in insert mode.
+bindkey -M viins '^?' backward-delete-char
+bindkey -M viins '^H' backward-delete-char
 # 10ms for snappy insert/vicmd switching; no multi-key vicmd sequences exist
 KEYTIMEOUT=1
 
