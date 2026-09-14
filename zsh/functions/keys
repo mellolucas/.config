@@ -1,0 +1,52 @@
+# vim: ft=zsh
+
+emulate -L zsh
+if (( $# )) && [[ $# != 1 || $1 != (-h|--help) ]]; then
+  print -u2 -- 'usage: keys [--help]'
+  return 1
+fi
+
+print -r -- 'DOTFILES QUICK REFERENCE   Option = Alt; Neovim leader = Space
+
+SHELL & FILES
+  ll / llt       Compact / newest first; recursive directory totals (eza)
+  lll / lllt     Detailed native / newest first; lli adds inodes
+  llt -r         Oldest first; without eza, ll falls back to native output
+  fzfe / fzfv    Find and edit files / with preview
+  Ctrl-R/T      Search shell history / files; Alt-C searches directories
+  help COMMAND  Command help, including aliases
+  awake [CMD]   macOS: inhibit display/idle sleep until Ctrl-C or CMD exits
+
+WORKSPACE & PANES (Ghostty; workspace is macOS-only)
+  workspace [DIR] --agent "kiro-cli chat"   One-off agent choice
+  --editor CMD  --middle-top CMD  --middle-bottom CMD  Override other panes
+  Option-h/j/k/l Move left/down/up/right (Ghostty first)
+  Option-s/v    New pane below/right; Option-Shift-h/j/k/l resizes
+  Option-= / z / q   Equalize / zoom / close terminal pane
+  Option-b      Browse scrollback: j/k, Ctrl-u/d, gg/G, /, n/N, y copies
+  Esc / q / i   Leave browse mode before using application keys
+
+NEOVIM (normal mode)
+  Space ee      Explore; :Rexplore returns to the prior netrw view
+  netrw p/P     Preview / open in previous editor window; o/v split below/right
+  Ctrl-w h/j/k/l Navigate editor windows; Option keys prefer Ghostty panes
+  Space tm/tw   Toggle saved Markdown/source / line wrap
+  Space cf/dq   Format / diagnostics to quickfix; Space td toggles inline text
+  Space bl/b-   List buffers / alternate buffer; :DiffSaved compares with disk
+  Space bww/bwq Save / save and quit; Space qq/q! quits / force quits
+  Esc Esc       Leave terminal-input mode, then use normal-mode mappings
+
+READING & GIT
+  mdv FILE      Render Markdown to pane width (max 120); -w N overrides
+  fzfv Option-t Toggle preview wrap; Shift-Up/Down scrolls; Ctrl-W deletes word
+  less -S       Toggle wrap inside pager; --mouse toggles mouse capture
+  Shift-drag    Ghostty selection while less captures mouse; / and n/N search
+  gg / gs       Repository overview / status; ghopen / ghview opens repo/README
+  gd / gds/gda  Unstaged / staged / all tracked changes
+  gdo/gdi/gdm   Outgoing / incoming / default-branch merge diff
+  git -c core.pager="less -R" diff   Full long lines without Delta truncation
+
+MAINTENANCE
+  dotfiles help CLI usage; status / doctor inspect, update / bundle can upgrade
+  ll totals can be slow on large trees. lll sizes directories themselves,
+  not their contents. This guide covers repository defaults, not local overrides.'

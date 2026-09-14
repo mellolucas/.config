@@ -8,7 +8,7 @@ emulate -LR zsh
 setopt errexit pipefail
 
 repo=${0:A:h}
-for file in "$repo"/zsh/{homebrew.zsh,.zprofile,.zshrc,functions/{fzfe,fzfv,github-open,github-view,help}} "$repo/test-zsh.sh"; do
+for file in "$repo"/zsh/{homebrew.zsh,.zprofile,.zshrc,functions/{fzfe,fzfv,github-open,github-view,help,keys}} "$repo/test-zsh.sh"; do
   zsh -n "$file"
 done
 
@@ -24,7 +24,7 @@ rel=$'nested dir/file #&%\xc3\xa9.md'
 print -r -- 'local README' > "$root/README.md"
 
 fpath=("$repo/zsh/functions")
-autoload -Uz fzfe fzfv github-open github-view help
+autoload -Uz fzfe fzfv github-open github-view help keys
 # No unstubbed executable can run after setup.
 path=()
 
@@ -36,6 +36,24 @@ recorded() {
   IFS= read -r -d '' content < "$test_root/${1:-call}" || [[ -n $content ]]
   print -rn -- "$content"
 }
+
+keys_output=$(keys) || fail 'keys without dependencies'
+for flag in -h --help; do
+  keys_help=$(keys "$flag") || fail "keys $flag status"
+  expect "$keys_output" "$keys_help" "keys $flag matches no arguments"
+done
+for args in '--invalid' 'help' '--help extra' '-h extra'; do
+  if keys ${=args} >/dev/null 2>&1; then
+    fail "keys rejects $args"
+  fi
+done
+for topic in 'll / llt' 'lll / lllt' 'lli' 'fzfv Option-t' 'Option-h/j/k/l' \
+  'Space ee' 'gd / gds/gda' 'dotfiles help'; do
+  [[ $keys_output == *"$topic"* ]] || fail "keys missing useful content: $topic"
+done
+for private_path in /Users/ /home/ /private/var/ /var/folders/ "$repo" "$HOME" "$XDG_CONFIG_HOME"; do
+  [[ $keys_output != *"$private_path"* ]] || fail 'keys exposes a private machine path'
+done
 
 # Source only the renderer and listing alias blocks, never startup or local config.
 alias_block=''
@@ -281,11 +299,11 @@ for os in darwin23 linux-gnu; do
         fi
         preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
       fi
-      expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap\n--bind\nctrl-s:toggle-preview-wrap'
+      expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap\n--bind\nalt-t:toggle-preview-wrap'
       fzfv
       expect "$expected" "$(recorded)" "fzfv preview shape and OS guard: $os / glow=$has_glow"
-      fzfv --preview 'caller preview {}' --preview-window=nowrap --bind ctrl-s:ignore --query 'file name'
-      expect "$expected"$'\n--preview\ncaller preview {}\n--preview-window=nowrap\n--bind\nctrl-s:ignore\n--query\nfile name' "$(recorded)" "fzfv caller overrides last: $os / glow=$has_glow"
+      fzfv --preview 'caller preview {}' --preview-window=nowrap --bind alt-t:ignore --query 'file name'
+      expect "$expected"$'\n--preview\ncaller preview {}\n--preview-window=nowrap\n--bind\nalt-t:ignore\n--query\nfile name' "$(recorded)" "fzfv caller overrides last: $os / glow=$has_glow"
     )
   done
 done

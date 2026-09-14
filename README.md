@@ -64,14 +64,18 @@ rendered position, and restores the exact source view on return.
 
 ### Exploration and reading
 
-- `lc`: compact listing with hidden entries, sizes, relative modification ages,
-  and file-type hints. Uses eza, falling back to native long output when absent.
-- `ll`: detailed listing; `llt`: newest-modified first (`llt -r` reverses).
+- `keys`: concise grouped reference for commands, capabilities, and keybindings.
+- `ll`: compact listing with hidden entries, recursive directory totals,
+  relative modification ages, and file-type hints. Uses eza; totals may be slow
+  on large trees. `llt` sorts newest-modified first (`llt -r` reverses).
+- `lll`: detailed native listing without recursive totals; `lllt`: newest first.
+  `lli` adds inodes. Without eza, `ll`/`llt` use the native equivalents, whose
+  directory sizes describe the directory itself, not its contents.
 - `awake`: macOS display/idle-sleep inhibition until Ctrl-C; accepts a command
   to keep awake for that command's lifetime.
 - `mdv FILE`: themed Markdown at the current pane width, capped at 120 columns.
   Width is chosen at launch; `-w N` overrides it. Relaunch after resizing.
-- `fzfv`: file picker with an initially wrapped preview; **Ctrl-S** toggles
+- `fzfv`: file picker with an initially wrapped preview; **Option-T** toggles
   preview wrapping. **Shift-Up/Down** scrolls the preview.
 
 In less, **Shift-drag** uses Ghostty's selection while the pager captures the

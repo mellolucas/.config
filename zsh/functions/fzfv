@@ -17,4 +17,4 @@ if command -v glow >/dev/null 2>&1; then
   preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
 fi
 
-fzfe --preview "$preview" --preview-window=wrap --bind 'ctrl-s:toggle-preview-wrap' "$@"
+fzfe --preview "$preview" --preview-window=wrap --bind 'alt-t:toggle-preview-wrap' "$@"
