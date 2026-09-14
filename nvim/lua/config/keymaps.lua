@@ -74,6 +74,14 @@ map("n", "<leader>tm", function()
   local ratio = view.lnum / vim.api.nvim_buf_line_count(source)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = "wipe"
+  vim.bo[buf].scrollback = 1000000
+  -- Count screen rows too: warn conservatively before scrollback can lose the prefix.
+  local saturated = false
+  vim.api.nvim_buf_attach(buf, false, {
+    on_lines = function()
+      saturated = saturated or vim.api.nvim_buf_line_count(buf) >= vim.bo[buf].scrollback
+    end,
+  })
   vim.b[buf].tm_source = source
   vim.b[buf].tm_view = view
   vim.api.nvim_win_set_buf(0, buf)
@@ -98,6 +106,9 @@ map("n", "<leader>tm", function()
           end)
         end
         vim.notify("Markdown preview: " .. message, vim.log.levels.WARN)
+      elseif saturated then
+        vim.notify("Markdown preview: output reached the scrollback limit; beginning may be truncated, "
+          .. "proportional positioning skipped", vim.log.levels.WARN)
       else
         local total = vim.api.nvim_buf_line_count(buf)
         local target = math.max(1, math.min(total, math.floor(ratio * total + 0.5)))

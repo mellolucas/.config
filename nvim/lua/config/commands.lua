@@ -43,7 +43,19 @@ vim.api.nvim_create_user_command("DiffSaved", function()
     return
   end
 
-  local ok, lines = pcall(vim.fn.readfile, path)
+  local encoding = vim.bo.fileencoding ~= "" and vim.bo.fileencoding or "utf-8"
+  local format = vim.bo.fileformat
+  local binary = vim.bo.binary and "++bin" or "++nobin"
+  local saved = vim.api.nvim_create_buf(false, true)
+  local ok, lines = pcall(vim.api.nvim_buf_call, saved, function()
+    -- Native decoding handles BOMs and line endings without touching the source.
+    vim.cmd("silent noautocmd keepalt read ++edit ++enc=" .. encoding .. " ++ff=" .. format
+      .. " " .. binary .. " " .. vim.fn.fnameescape(path))
+    -- :read leaves the scratch buffer's initial empty line above the file.
+    vim.api.nvim_buf_set_lines(saved, 0, 1, false, {})
+    return vim.api.nvim_buf_get_lines(saved, 0, -1, false)
+  end)
+  vim.api.nvim_buf_delete(saved, { force = true })
 
   if not ok then
     notify("Could not read saved file: " .. path, vim.log.levels.ERROR)

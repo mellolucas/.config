@@ -1,6 +1,7 @@
 -- Run with: nvim --headless -u NONE -l test-nvim.lua
 local api = vim.api
 local fn = vim.fn
+local real_jobstart, real_jobstop = fn.jobstart, fn.jobstop
 local notifications, jobs, timers = {}, {}, {}
 local start_result, readable = 1, 1
 
@@ -16,6 +17,7 @@ fn.filereadable = function()
 end
 fn.jobstart = function(command, opts)
   assert(command[1] == "glow" and opts.term)
+  assert(vim.bo.scrollback == 1000000)
   if start_result == "throw" then
     error("mock spawn failure")
   end
@@ -206,4 +208,129 @@ assert(not api.nvim_buf_is_valid(preview))
 warning("glow exited with code 2")
 api.nvim_win_close(preview_win, true)
 
-print("Markdown preview tests passed")
+-- Real PTY output must retain the prefix beyond Neovim's default scrollback.
+-- Lower only the test terminal's budget to exercise saturation cheaply.
+api.nvim_win_set_buf(0, source)
+fn.jobstop = real_jobstop
+local terminal_exited
+local output_count, scrollback = 12000, 1000000
+local stall = false
+fn.jobstart = function(command, opts)
+  assert(command[1] == "glow" and opts.term)
+  assert(vim.bo.scrollback == 1000000)
+  vim.bo.scrollback = scrollback
+  terminal_exited = false
+  local on_exit = opts.on_exit
+  opts.on_exit = function(id, code)
+    on_exit(id, code)
+    vim.schedule(function() terminal_exited = true end)
+  end
+  return real_jobstart({ "sh", "-c",
+    stall and 'printf "waiting\\n"; exec sleep 30'
+      or 'i=1; while [ "$i" -le "$1" ]; do printf "line %s\\n" "$i"; i=$((i + 1)); done',
+    "preview-test", tostring(output_count) }, opts)
+end
+local global_scrollback = vim.go.scrollback
+local windows = api.nvim_list_wins()
+for _, bounded in ipairs({ false, true }) do
+  output_count, scrollback = bounded and 300 or 12000, bounded and 64 or 1000000
+  view = source_view()
+  toggle()
+  preview = api.nvim_get_current_buf()
+  assert(vim.bo[preview].buftype == "terminal")
+  assert(vim.wait(5000, function() return terminal_exited end), "terminal fixture timed out")
+  drain()
+  assert(vim.deep_equal(api.nvim_list_wins(), windows), "preview changed layout")
+  local rendered = api.nvim_buf_get_lines(preview, 0, -1, false)
+  assert(vim.tbl_contains(rendered, "line " .. output_count), "terminal suffix missing")
+  if bounded then
+    assert(rendered[1] ~= "line 1", "fixture did not exhaust scrollback")
+    warning("beginning may be truncated")
+    assert(api.nvim_win_get_cursor(0)[1] ~= math.floor(90 / 200 * #rendered + 0.5),
+      "saturated preview used proportional positioning")
+  else
+    assert(rendered[1] == "line 1", "terminal prefix lost")
+    assert(#notifications == 0)
+    assert(api.nvim_win_get_cursor(0)[1] == math.floor(90 / 200 * #rendered + 0.5))
+  end
+  toggle()
+  timers[#timers]()
+  restored(view, preview)
+  assert(vim.go.scrollback == global_scrollback, "preview changed global scrollback")
+end
+stall = true
+view = source_view()
+toggle()
+preview = api.nvim_get_current_buf()
+assert(vim.wait(1000, function()
+  return api.nvim_buf_get_lines(preview, 0, 1, false)[1] == "waiting"
+end), "stalled terminal fixture did not start")
+timers[#timers]()
+restored(view, preview)
+warning("glow timed out")
+assert(vim.wait(1000, function() return terminal_exited end), "timed-out process not stopped")
+drain()
+assert(#notifications == 0, "late exit duplicated timeout warning")
+fn.jobstart = real_jobstart
+
+-- Saved comparisons use native decoding, including explicitly selected encodings.
+dofile("nvim/lua/config/commands.lua")
+local directory = fn.tempname()
+fn.mkdir(directory, "p")
+local ok, err = pcall(function()
+  local text = { "caf" .. fn.nr2char(233), "second line", "" }
+  for i, case in ipairs({
+    { "utf-8", "unix", false, true },
+    { "utf-8", "dos", true, true },
+    { "latin1", "dos", false, true },
+    { "utf-16le", "dos", true, true },
+    { "utf-16", "unix", true, true },
+    { "utf-16le", "unix", false, false },
+    { "utf-8", "unix", false, false },
+    { "utf-8", "unix", false, true, { "" } },
+    { "utf-8", "unix", false, true, { "embedded\rreturn", "" } },
+  }) do
+    local path = directory .. "/saved " .. i .. ".txt"
+    vim.cmd("enew")
+    local original = api.nvim_get_current_buf()
+    local expected = case[5] or (case[4] and text or { text[1], text[2] })
+    api.nvim_buf_set_lines(original, 0, -1, false, expected)
+    vim.bo.fileencoding, vim.bo.fileformat = case[1], case[2]
+    vim.bo.bomb, vim.bo.endofline = case[3], case[4]
+    vim.bo.fixendofline = false
+    vim.cmd("silent write " .. fn.fnameescape(path))
+    local original_win = api.nvim_get_current_win()
+    local buffers = api.nvim_list_bufs()
+    vim.cmd("DiffSaved")
+    local scratch = api.nvim_get_current_buf()
+    assert(scratch ~= original and vim.bo[scratch].buftype == "nofile")
+    assert(vim.deep_equal(api.nvim_buf_get_lines(scratch, 0, -1, false), expected),
+      "saved decoding mismatch: " .. vim.inspect(case))
+    assert(vim.deep_equal(api.nvim_buf_get_lines(original, 0, -1, false), expected))
+    assert(not vim.bo[original].modified)
+    vim.cmd("diffupdate")
+    for line = 1, #expected do
+      assert(fn.diff_hlID(line, 1) == 0, "unchanged file has a diff")
+    end
+    vim.cmd("close")
+    assert(api.nvim_get_current_win() == original_win)
+    assert(vim.deep_equal(api.nvim_list_bufs(), buffers), "saved diff leaked scratch")
+    api.nvim_buf_delete(original, { force = true })
+  end
+  -- An unreadable saved file must not open a split or retain a loader buffer.
+  vim.cmd("enew")
+  api.nvim_buf_set_name(0, directory .. "/missing.txt")
+  local buffers = api.nvim_list_bufs()
+  windows = api.nvim_list_wins()
+  view = fn.winsaveview()
+  vim.cmd("DiffSaved")
+  assert(vim.deep_equal(api.nvim_list_wins(), windows))
+  assert(vim.deep_equal(api.nvim_list_bufs(), buffers))
+  assert(vim.deep_equal(fn.winsaveview(), view))
+  assert(#notifications == 1 and notifications[1][1]:find("Could not read saved file", 1, true))
+  assert(notifications[1][2] == vim.log.levels.ERROR)
+end)
+fn.delete(directory, "rf")
+assert(ok, err)
+
+print("Markdown preview and DiffSaved tests passed")
