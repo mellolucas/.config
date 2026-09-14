@@ -24,12 +24,12 @@
 # Keep Git Consistent (1=1 mapping for upstream refs)
 [push]
   autoSetupRemote = true # Auto set remote as upstream for current branch
-  followTags = true # Push all local tags to the remote on any push
+  followTags = true # Include eligible reachable annotated tags
   useForceIfIncludes = true # Make --force-with-lease also require local awareness of remote tip
 
 [fetch]
   prune = true # Remove remote-tracking branches that no longer exist on remote
-  pruneTags = true # Remove local tags that no longer exist on remote
+  pruneTags = false # Tags share a namespace; prune only with explicit --prune-tags
   all = true # Update all available remotes, unless --no-all or explicit remote
 
 # --- Quality of Life Improvements ---
@@ -57,7 +57,7 @@
   date = iso-strict
 
 [core]
-  pager = "command -v delta >/dev/null && delta || less" # delta when present, less otherwise (fresh install, pre-bundle)
+  pager = "if command -v delta >/dev/null; then delta; else less; fi"
 
 [delta]
   syntax-theme = Catppuccin Mocha
@@ -66,7 +66,7 @@
   line-numbers-right-format = "│{nm:<2}┊{np:>2}│"
 
 [interactive]
-  diffFilter = "command -v delta >/dev/null && delta --color-only || cat" # Pipe colorized diffs through delta when available
+  diffFilter = "if command -v delta >/dev/null; then delta --color-only; else cat; fi"
 
 [diff]
   algorithm = histogram # Use histogram diff algorithm for clearer diffs
@@ -114,6 +114,7 @@
 [alias]
   # Clone into ~/code/<owner>/<repo>; accepts gh:, https, ssh, or owner/repo forms
   clone-smart = "!f() { \
+    if [ \"$#\" -ne 1 ]; then printf 'usage: git clone-smart <owner/repo-or-github-url>\\n' >&2; return 1; fi; \
     repo=\"$1\"; \
     repo=\"${repo#gh:}\"; \
     repo=\"${repo#https://github.com/}\"; \
@@ -121,6 +122,8 @@
     repo=\"${repo%.git}\"; \
     owner=\"${repo%%/*}\"; \
     name=\"${repo##*/}\"; \
+    if [ \"$repo\" != \"$owner/$name\" ]; then printf 'error: expected owner/repo\\n' >&2; return 1; fi; \
+    case \"$owner/$name\" in -*|/*|./*|../*|*/|*/..|*/.) printf 'error: invalid repository name\\n' >&2; return 1 ;; esac; \
     dest=\"$HOME/code/$owner/$name\"; \
     if command -v gh >/dev/null 2>&1; then \
       gh repo clone \"$repo\" \"$dest\"; \
