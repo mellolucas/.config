@@ -66,16 +66,37 @@ dir=${dir:A}
 # a split pane; on 0 the AppleScript falls back to equalized splits.
 local width=0 height=0
 if [[ -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
-  local reply='' char=''
-  printf '\e[14t' > /dev/tty
-  while read -s -k 1 -t 1 char < /dev/tty; do
-    reply+=$char
-    [[ $char == t ]] && break
-  done
-  local -a fields=(${(s.;.)${reply//[^0-9;]/}})
-  if (( $#fields == 3 )); then
-    height=$fields[2]
-    width=$fields[3]
+  local dimensions
+  if dimensions=$(
+    local tty saved reply='' char=''
+    local -a match
+    local MATCH MBEGIN MEND
+    local -a mbegin mend
+    # Byte reads cannot block waiting for the rest of a multibyte character.
+    local LC_ALL=C
+    local -F SECONDS=0 deadline remaining
+    exec {tty}<> /dev/tty || exit 1
+    saved=$(command stty -g <&$tty) || exit 1
+    trap 'command stty "$saved" <&$tty' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    command stty -echo -echonl -icanon min 1 time 0 <&$tty || exit 1
+    deadline=$(( SECONDS + 1 ))
+    printf '\e[14t' >&$tty || exit 1
+    while (( ${#reply} < 32 )); do
+      remaining=$(( deadline - SECONDS ))
+      (( remaining > 0 )) || exit 1
+      read -r -k 1 -u $tty -t $remaining char || exit 1
+      reply+=$char
+      [[ $char == t ]] && break
+    done
+    [[ $reply =~ $'^\e\\[4;([0-9]{1,6});([0-9]{1,6})t$' ]] || exit 1
+    (( 10#$match[1] > 0 && 10#$match[2] > 0 )) || exit 1
+    print -r -- "$(( 10#$match[2] )) $(( 10#$match[1] ))"
+  ); then
+    width=${dimensions%% *}
+    height=${dimensions##* }
   fi
 fi
 
