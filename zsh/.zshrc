@@ -129,7 +129,7 @@ alias view='$EDITOR -R -M'
 
 if command -v glow >/dev/null 2>&1; then
   alias glow='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json"'
-  alias mdv='glow -p -w $(( COLUMNS > 0 && COLUMNS < 120 ? COLUMNS : 120 ))'
+  alias mdv='glow -p -w 0'
 fi
 
 if command -v bat >/dev/null 2>&1; then
@@ -139,7 +139,7 @@ if command -v bat >/dev/null 2>&1; then
 fi
 
 alias lll='ls -plhA' # Detailed native listing
-alias lli='lll -i'  # Detailed listing with inodes
+alias llli='lll -i' # Detailed listing with inodes
 alias lllt='lll -t' # Newest modification first; -r reverses
 
 if command -v eza >/dev/null 2>&1; then

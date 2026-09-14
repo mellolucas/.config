@@ -47,7 +47,7 @@ for args in '--invalid' 'help' '--help extra' '-h extra'; do
     fail "keys rejects $args"
   fi
 done
-for topic in 'll / llt' 'lll / lllt' 'lli' 'fzfv Option-t' 'Option-h/j/k/l' \
+for topic in 'll / llt' 'lll / lllt' 'llli' 'fzfv Option-t' 'Option-h/j/k/l' \
   'Space ee' 'gd / gds/gda' 'dotfiles help'; do
   [[ $keys_output == *"$topic"* ]] || fail "keys missing useful content: $topic"
 done
@@ -87,13 +87,14 @@ for os in darwin23 linux-gnu; do
 
           eval 'lll "directory with spaces"'
           expect $'ls\n-plhA\ndirectory with spaces' "$(recorded)" "$label native listing"
-          eval 'lli "directory with spaces"'
+          eval 'llli "directory with spaces"'
           expect $'ls\n-plhA\n-i\ndirectory with spaces' "$(recorded)" "$label native inode listing"
           eval 'lllt "directory with spaces"'
           expect $'ls\n-plhA\n-t\ndirectory with spaces' "$(recorded)" "$label native newest date sort"
           eval 'lllt -r "directory with spaces"'
           expect $'ls\n-plhA\n-t\n-r\ndirectory with spaces' "$(recorded)" "$label native reversed date sort"
           (( ! ${+aliases[lc]} )) || fail "$label removed lc alias"
+          (( ! ${+aliases[lli]} )) || fail "$label renamed lli alias"
           if (( has_eza )); then
             expected=$'eza\n--long\n--all\n--total-size\n--binary\n--no-permissions\n--no-user\n--time=modified\n--time-style=relative\n--classify=always\n--icons=never'
             sort_flag=--sort=age
@@ -116,8 +117,7 @@ for os in darwin23 linux-gnu; do
           fi
           if (( has_glow )); then
             for COLUMNS in 50 180 0 -1; do
-              width=120
-              (( COLUMNS != 50 )) || width=50
+              width=0
               expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n'"$width"
               eval 'mdv "document name.md"'
               expect "$expected"$'\ndocument name.md' "$(recorded)" "$label call-time width $COLUMNS"
