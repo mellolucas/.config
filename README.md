@@ -47,14 +47,43 @@ Package versions follow Homebrew; idempotent linking does not pin packages.
 OpenCode reports available updates without installing them automatically.
 An explicit `dotfiles bundle` or `dotfiles update` can still upgrade Homebrew packages.
 
-`workspace [dir]` (zsh function, macOS) launches the Ghostty coding workspace
-layout; pane commands are overridable via `DOTFILES_WORKSPACE_*` variables
-(see `workspace --help`).
+`workspace [options] [dir]` (zsh function, macOS) launches the Ghostty coding
+workspace layout. `--agent`, `--editor`, `--middle-top`, and `--middle-bottom`
+override the corresponding `DOTFILES_WORKSPACE_*` command for one invocation.
+Quote commands containing arguments; empty middle commands leave a shell prompt.
+
+```sh
+workspace --agent 'kiro-cli chat' ~/code/owner/project
+workspace --middle-top '' --editor 'nvim .'
+```
 
 Option-direction navigation tries Ghostty splits first, then Neovim windows
 in normal mode. Native Neovim window commands remain available. Markdown
 preview (`<leader>tm`) renders the saved file in place, approximates the
 rendered position, and restores the exact source view on return.
+
+### Exploration and reading
+
+- `lc`: compact listing with hidden entries, sizes, relative modification ages,
+  and file-type hints. Uses eza, falling back to native long output when absent.
+- `ll`: detailed listing; `llt`: newest-modified first (`llt -r` reverses).
+- `awake`: macOS display/idle-sleep inhibition until Ctrl-C; accepts a command
+  to keep awake for that command's lifetime.
+- `mdv FILE`: themed Markdown at the current pane width, capped at 120 columns.
+  Width is chosen at launch; `-w N` overrides it. Relaunch after resizing.
+- `fzfv`: file picker with an initially wrapped preview; **Ctrl-S** toggles
+  preview wrapping. **Shift-Up/Down** scrolls the preview.
+
+In less, **Shift-drag** uses Ghostty's selection while the pager captures the
+mouse. Type `--mouse` then Enter to toggle that capture. `-S` toggles wrapping;
+Left/Right scroll horizontally. Leave Ghostty browse mode before using pager keys.
+
+Delta's compact side-by-side view can truncate long lines. For complete text,
+use `git -c core.pager='less -R' diff` (also accepts `--staged` or revision
+arguments). Pager wrapping cannot recover text already truncated by a renderer.
+
+In netrw, `p` previews a file; `:Rexplore` returns to the previous browser view
+in that Neovim window. These are editor windows, not neighboring Ghostty panes.
 
 ## Local overrides
 

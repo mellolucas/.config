@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# Exercise only the terminal query, never the AppleScript launcher.
+# Exercise argument dispatch and the terminal query, never launch applications.
 emulate -LR zsh
 setopt errexit pipefail
 
@@ -61,6 +61,103 @@ trap 'zpty -d 2>/dev/null || true' EXIT
 trap 'exit 1' HUP INT TERM
 
 fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
+
+# Stub platform checks and the absolute launcher, preserving its argument list.
+(
+  unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
+    DOTFILES_WORKSPACE_MIDDLE_TOP_CMD DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD
+  export DOTFILES_WORKSPACE_SCRIPT=$repo/test-workspace.zsh
+  code=$(<"$repo/zsh/functions/workspace")
+  local platform_check='[[ $OSTYPE == darwin* ]]' executable_check='[[ -x /usr/bin/osascript ]]'
+  [[ $code == *$platform_check* && $code == *$executable_check* ]] || fail 'platform fixture'
+  code=${code/$platform_check/'[[ 1 == 1 ]]'}
+  code=${code/$executable_check/'[[ 1 == 1 ]]'}
+  functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
+  workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
+  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode gg '' 0 0)
+  dispatch() {
+    local actual
+    actual=$(workspace "$@" 3>&1 < /dev/null) || fail "dispatch: ${(qqq)@}"
+    [[ $actual == "$(print -rl -- "${(@qqq)expected}")" ]] || fail "forwarded arguments: ${(qqq)actual}"
+  }
+  reject() {
+    local actual
+    if actual=$(workspace "$@" 3>&1 2>&1 < /dev/null); then
+      fail "accepted invalid arguments: ${(qqq)@}"
+    fi
+    [[ $actual == workspace:* && $actual != *"$DOTFILES_WORKSPACE_SCRIPT"* ]] || fail "invalid argument side effects: $actual"
+  }
+
+  dispatch
+  dispatch --
+  dispatch -- "$PWD"
+  export DOTFILES_WORKSPACE_EDITOR_CMD='' DOTFILES_WORKSPACE_AGENT_CMD=''
+  dispatch
+  export DOTFILES_WORKSPACE_EDITOR_CMD='env editor --wait' DOTFILES_WORKSPACE_AGENT_CMD='env agent chat'
+  export DOTFILES_WORKSPACE_MIDDLE_TOP_CMD='' DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD='env bottom'
+  expected[3]='env editor --wait'
+  expected[4]='env agent chat'
+  expected[5]=''
+  expected[6]='env bottom'
+  dispatch
+  expected[3]='editor --wait "quoted file"'
+  expected[4]='agent chat --model example'
+  expected[5]='top command'
+  expected[6]='bottom command'
+  dispatch --agent "$expected[4]" --editor "$expected[3]" \
+    --middle-top "$expected[5]" --middle-bottom "$expected[6]"
+  dispatch --editor="$expected[3]" --agent="$expected[4]" \
+    --middle-top="$expected[5]" --middle-bottom="$expected[6]" -- "$PWD"
+  expected[5]=''
+  expected[6]=''
+  dispatch --editor "$expected[3]" --agent "$expected[4]" --middle-top '' --middle-bottom=
+  # Metacharacters must remain literal data, not run in the launcher shell.
+  expected[3]='$(exit 91); "quoted" * \\ $HOME'
+  expected[4]='--literal=value'
+  dispatch --editor="$expected[3]" --agent="$expected[4]" --middle-top= --middle-bottom ''
+
+  local temporary
+  temporary=$(mktemp -d "${TMPDIR:-/tmp}/workspace-test.XXXXXXXX")
+  trap 'command rm -rf -- "$temporary"' EXIT
+  mkdir -- "$temporary/path with spaces" "$temporary/--directory"
+  (
+    builtin cd -- "$temporary"
+    expected[2]="${temporary:A}/path with spaces"
+    dispatch 'path with spaces' --editor="$expected[3]" --agent="$expected[4]" --middle-top= --middle-bottom=
+    expected[2]="${temporary:A}/--directory"
+    dispatch --editor="$expected[3]" --agent="$expected[4]" --middle-top= --middle-bottom= -- --directory
+  )
+
+  for option in --agent --editor --middle-top --middle-bottom; do
+    reject "$option"
+    reject "$option" --editor command
+    reject "$option" --
+  done
+  for option in --agent --editor; do
+    reject "$option" ''
+    reject "$option="
+  done
+  reject --unknown
+  reject --unknown=value
+  reject -x
+  reject . .
+  reject -- . .
+  reject -- --help --editor
+  reject "$temporary/missing-directory"
+
+  # Help must bypass even unavailable platform/script checks.
+  code=${functions[workspace]}
+  functions[workspace]=${code//'[[ 1 == 1 ]]'/'[[ 1 == 0 ]]'}
+  export DOTFILES_WORKSPACE_SCRIPT=$temporary/missing-script
+  for option in -h --help; do
+    actual=$(workspace "$option" 3>&1 < /dev/null) || fail "help: $option"
+    [[ $actual == 'usage: workspace '* && $actual != *$'\e[14t'* ]] || fail "help side effects: $option"
+    actual=$(workspace --agent 'agent chat' "$option" 3>&1 < /dev/null) || fail "help after flag: $option"
+    [[ $actual == 'usage: workspace '* ]] || fail "help after flag output: $option"
+  done
+  print -r -- 'ok: parser and dispatch'
+)
+
 wait_for() {
   local expected=$1 chunk
   local -F deadline=$(( SECONDS + 4 ))

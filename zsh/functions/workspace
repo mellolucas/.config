@@ -2,15 +2,33 @@
 
 emulate -L zsh
 
-if [[ ${1:-} == (-h|--help) ]]; then
-  cat <<'EOF'
-usage: workspace [DIR]
+local editor=${DOTFILES_WORKSPACE_EDITOR_CMD:-nvim .}
+local agent=${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}
+# Empty middle commands skip their pane's startup command.
+local middle_top=${DOTFILES_WORKSPACE_MIDDLE_TOP_CMD-gg}
+local middle_bottom=${DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD:-}
+local dir=$PWD option value
+local -a directories=()
+
+while (( $# )); do
+  case $1 in
+    -h|--help)
+      cat <<'EOF'
+usage: workspace [OPTIONS] [--] [DIR]
 
 Launch a Ghostty coding workspace layout as a new tab in the frontmost
 window (macOS only).
 
 Arguments:
   DIR   Workspace directory. Defaults to the current directory.
+
+Options (override environment; also accept --option=CMD):
+  --agent CMD          Command started in the right pane (nonempty).
+  --editor CMD         Command started in the left pane (nonempty).
+  --middle-top CMD     Middle-top command. Empty skips.
+  --middle-bottom CMD  Middle-bottom command. Empty skips.
+  -h, --help           Show this help without launching a workspace.
+  --                   Treat remaining arguments as the directory.
 
 Layout:
   left           editor  (20% width)
@@ -34,8 +52,41 @@ Environment:
   DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD=''
       Command started in the middle-bottom pane. Empty skips.
 EOF
-  return 0
+      return 0 ;;
+    --agent|--editor|--middle-top|--middle-bottom|--agent=*|--editor=*|--middle-top=*|--middle-bottom=*)
+      option=${1%%=*}
+      if [[ $1 == *=* ]]; then
+        value=${1#*=}
+      else
+        if (( $# < 2 )) || [[ $2 == (--*|-h) ]]; then
+          print -r -u2 -- "workspace: missing value for $option"
+          return 1
+        fi
+        shift
+        value=$1
+      fi
+      if [[ $option == (--agent|--editor) && -z $value ]]; then
+        print -r -u2 -- "workspace: $option requires a nonempty command"
+        return 1
+      fi
+      case $option in
+        --agent) agent=$value ;;
+        --editor) editor=$value ;;
+        --middle-top) middle_top=$value ;;
+        --middle-bottom) middle_bottom=$value ;;
+      esac ;;
+    --) shift; directories+=("$@"); break ;;
+    -*) print -r -u2 -- "workspace: unknown option: $1"; return 1 ;;
+    *) directories+=("$1") ;;
+  esac
+  shift
+done
+
+if (( ${#directories} > 1 )); then
+  print -u2 -- 'workspace: expected at most one directory'
+  return 1
 fi
+dir=${directories[1]:-$PWD}
 
 [[ $OSTYPE == darwin* ]] || {
   print -u2 -- 'workspace: Ghostty AppleScript automation requires macOS'
@@ -54,7 +105,6 @@ local script=${DOTFILES_WORKSPACE_SCRIPT:-${XDG_CONFIG_HOME:-$HOME/.config}/ghos
   return 1
 }
 
-local dir=${1:-$PWD}
 [[ -d $dir ]] || {
   print -r -u2 -- "workspace: not a directory: $dir"
   return 1
@@ -103,12 +153,8 @@ fi
 local output
 local -i rc=0
 output=$(
-  # MIDDLE_TOP uses ${var-} not ${var:-}: empty (unlike unset) skips the command
   /usr/bin/osascript "$script" "$dir" \
-    "${DOTFILES_WORKSPACE_EDITOR_CMD:-nvim .}" \
-    "${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}" \
-    "${DOTFILES_WORKSPACE_MIDDLE_TOP_CMD-gg}" \
-    "${DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD:-}" \
+    "$editor" "$agent" "$middle_top" "$middle_bottom" \
     "$width" "$height" \
     2>&1
 ) || {
