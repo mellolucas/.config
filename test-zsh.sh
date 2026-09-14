@@ -47,8 +47,9 @@ for args in '--invalid' 'help' '--help extra' '-h extra'; do
     fail "keys rejects $args"
   fi
 done
-for topic in 'll / llt' 'lll / lllt' 'llli' 'fzfv Option-t' 'Option-h/j/k/l' \
-  'Space ee' 'gd / gds/gda' 'dotfiles help'; do
+for topic in 'l / ll' '--sort=age' '--inode' '--tree --level=2' '--total-size' \
+  '--icons=never' 'ls remains native' 'mdv -w 120' 'less -S' 'fzfv Option-t' \
+  'Option-h/j/k/l' 'Space ee' 'gd / gds/gda' 'dotfiles help'; do
   [[ $keys_output == *"$topic"* ]] || fail "keys missing useful content: $topic"
 done
 for private_path in /Users/ /home/ /private/var/ /var/folders/ "$repo" "$HOME" "$XDG_CONFIG_HOME"; do
@@ -85,29 +86,30 @@ for os in darwin23 linux-gnu; do
           COLUMNS=90
           source /dev/stdin <<< "$alias_block"
 
-          eval 'lll "directory with spaces"'
-          expect $'ls\n-plhA\ndirectory with spaces' "$(recorded)" "$label native listing"
-          eval 'llli "directory with spaces"'
-          expect $'ls\n-plhA\n-i\ndirectory with spaces' "$(recorded)" "$label native inode listing"
-          eval 'lllt "directory with spaces"'
-          expect $'ls\n-plhA\n-t\ndirectory with spaces' "$(recorded)" "$label native newest date sort"
-          eval 'lllt -r "directory with spaces"'
-          expect $'ls\n-plhA\n-t\n-r\ndirectory with spaces' "$(recorded)" "$label native reversed date sort"
-          (( ! ${+aliases[lc]} )) || fail "$label removed lc alias"
-          (( ! ${+aliases[lli]} )) || fail "$label renamed lli alias"
+          for name in ls lc lli llli lll lllt llt lt; do
+            (( ! ${+aliases[$name]} )) || fail "$label unexpected $name alias"
+          done
+          eval 'ls -l "directory with spaces"'
+          expect $'ls\n-l\ndirectory with spaces' "$(recorded)" "$label explicit native listing"
           if (( has_eza )); then
-            expected=$'eza\n--long\n--all\n--total-size\n--binary\n--no-permissions\n--no-user\n--time=modified\n--time-style=relative\n--classify=always\n--icons=never'
-            sort_flag=--sort=age
+            for listing in l ll; do
+              expected=$'eza\n--all\n--group-directories-first\n--icons=auto'
+              [[ $listing != ll ]] || expected+=$'\n--long\n--binary\n--time-style=relative'
+              eval "$listing"' "directory with spaces"'
+              expect "$expected"$'\ndirectory with spaces' "$(recorded)" "$label $listing defaults"
+              for flags in --inode --sort=age --tree --level=2 --icons=never --total-size \
+                '--inode --sort=age --tree --level=2 --icons=never --total-size'; do
+                args=(${=flags})
+                eval "$listing"' "${args[@]}" "directory with spaces" "second directory"'
+                expect "$expected"$'\n'"${(F)args}"$'\ndirectory with spaces\nsecond directory' \
+                  "$(recorded)" "$label $listing forwards $flags"
+              done
+            done
           else
-            expected=$'ls\n-plhA'
-            sort_flag=-t
+            for name in l ll; do
+              (( ! ${+aliases[$name]} )) || fail "$label $name dependency guard"
+            done
           fi
-          eval 'll "directory with spaces"'
-          expect "$expected"$'\ndirectory with spaces' "$(recorded)" "$label compact listing or native fallback"
-          eval 'llt "directory with spaces"'
-          expect "$expected"$'\n'"$sort_flag"$'\ndirectory with spaces' "$(recorded)" "$label newest date sort"
-          eval 'llt -r "directory with spaces"'
-          expect "$expected"$'\n'"$sort_flag"$'\n-r\ndirectory with spaces' "$(recorded)" "$label reversed date sort"
 
           if [[ $os == darwin* ]] && (( has_caffeinate )); then
             eval 'awake -t 60'
@@ -117,11 +119,9 @@ for os in darwin23 linux-gnu; do
           fi
           if (( has_glow )); then
             for COLUMNS in 50 180 0 -1; do
-              width=120
-              (( COLUMNS != 50 )) || width=50
-              expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n'"$width"
+              expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n0'
               eval 'mdv "document name.md"'
-              expect "$expected"$'\ndocument name.md' "$(recorded)" "$label call-time width $COLUMNS"
+              expect "$expected"$'\ndocument name.md' "$(recorded)" "$label unrestricted width with COLUMNS=$COLUMNS"
               eval 'mdv -w 72 "document name.md"'
               expect "$expected"$'\n-w\n72\ndocument name.md' "$(recorded)" "$label explicit width last"
               eval 'mdv -w 0 "document name.md"'

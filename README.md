@@ -43,9 +43,13 @@ An already-current or locally-ahead checkout is reapplied without changing
 local edits. Incoming updates refuse dirty or diverged work. Both update modes
 refuse incoming tracked paths that collide with ignored local content.
 Discard cleans with the current ignore rules before resetting to upstream.
-Package versions follow Homebrew; idempotent linking does not pin packages.
-OpenCode reports available updates without installing them automatically.
-An explicit `dotfiles bundle` or `dotfiles update` can still upgrade Homebrew packages.
+Homebrew owns installation and updates for Brewfile-managed tools, including
+OpenCode. `dotfiles update` updates this repository and applies the Brewfile;
+`dotfiles bundle` applies packages without updating the repository. OpenCode
+only notifies about new versions rather than updating itself. Package versions
+follow Homebrew; idempotent linking does not pin them or update macOS itself.
+Temporary machine-local recovery installations are exceptions, not shared defaults;
+retire their PATH overrides after the Homebrew build is verified working.
 
 `workspace [options] [dir]` (zsh function, macOS) launches the Ghostty coding
 workspace layout. `--agent`, `--editor`, `--middle-top`, and `--middle-bottom`
@@ -65,19 +69,20 @@ rendered position, and restores the exact source view on return.
 ### Exploration and reading
 
 - `keys`: concise grouped reference for commands, capabilities, and keybindings.
-- `ll`: compact listing with hidden entries, recursive directory totals,
-  relative modification ages, and file-type hints. Uses eza; totals may be slow
-  on large trees. `llt` sorts newest-modified first (`llt -r` reverses).
-- `lll`: detailed native listing without recursive totals; `lllt`: newest first.
-  `llli` adds inodes. Without eza, `ll`/`llt` use the native equivalents, whose
-  directory sizes describe the directory itself, not its contents.
+- `l`: eza listing with hidden entries and directories first; icons appear only
+  on terminal output. `ll` adds long metadata, readable binary sizes, and relative
+  modification ages. Icons require suitable glyphs; `--icons=never` disables them.
+  Native `ls` remains unchanged and available if eza is missing.
+- Use eza flags instead of specialized aliases: `ll --sort=age` for newest first
+  within directory/file groups (`--reverse` reverses), `ll --inode` for inodes,
+  `l --tree --level=2` for a bounded tree, and `ll --total-size` for recursive
+  directory totals (potentially slow). `l --` or `ll --` then Tab describes options.
 - `awake`: macOS display/idle-sleep inhibition until Ctrl-C; accepts a command
   to keep awake for that command's lifetime.
-- `mdv FILE`: themed, word-wrapped Markdown at the pane width, capped at 120
-  columns. Width is chosen at launch; `-w N` overrides it. Relaunch after resizing.
-  `mdv -w 0 FILE` disables renderer wrapping: less's native `-S` then Enter
-  toggles screen folding/chopping, which may split words. Neither mode removes
-  existing source line breaks; short output may exit the pager immediately.
+- `mdv FILE`: themed Markdown without renderer wrapping. In less, `-S` then
+  Enter toggles screen folding/chopping without discarding text. Folding may split
+  words or indentation; `mdv -w 120 FILE` opts into word-aware rendering instead.
+  Source line breaks remain; short output may exit the pager immediately.
 - `fzfv`: file picker with an initially wrapped preview; **Option-T** toggles
   preview wrapping. **Shift-Up/Down** scrolls the preview.
 

@@ -100,14 +100,6 @@ add-zsh-hook precmd _vcs_info_precmd
 PROMPT='%F{blue}%~%f${vcs_info_msg_0_}
 %(?.%F{green}.%F{red})❯%f '
 
-# ---- Aesthetics ----
-if ls --version >/dev/null 2>&1; then # GNU ls
-  alias ls='ls --color=auto --time-style=+%Y-%m-%dT%H:%M:%S%z'
-elif ls -G -d . >/dev/null 2>&1; then # BSD ls
-  export CLICOLOR=1
-  alias ls='ls -D "%Y-%m-%dT%H:%M:%S%z"'
-fi
-
 # ---- Aliases ----
 alias dots='dotfiles'
 alias dotsup='dotfiles update'
@@ -129,7 +121,7 @@ alias view='$EDITOR -R -M'
 
 if command -v glow >/dev/null 2>&1; then
   alias glow='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json"'
-  alias mdv='glow -p -w $(( COLUMNS > 0 && COLUMNS < 120 ? COLUMNS : 120 ))'
+  alias mdv='glow -p -w 0'
 fi
 
 if command -v bat >/dev/null 2>&1; then
@@ -138,17 +130,9 @@ if command -v bat >/dev/null 2>&1; then
   alias bh='bat --plain --language=help'
 fi
 
-alias lll='ls -plhA' # Detailed native listing
-alias llli='lll -i' # Detailed listing with inodes
-alias lllt='lll -t' # Newest modification first; -r reverses
-
 if command -v eza >/dev/null 2>&1; then
-  # Directory totals scan contents; lll avoids recursive sizing.
-  alias ll='eza --long --all --total-size --binary --no-permissions --no-user --time=modified --time-style=relative --classify=always --icons=never'
-  alias llt='ll --sort=age'
-else
-  alias ll='lll'
-  alias llt='ll -t'
+  alias l='eza --all --group-directories-first --icons=auto'
+  alias ll='l --long --binary --time-style=relative'
 fi
 
 if [[ $OSTYPE == darwin* ]] && command -v caffeinate >/dev/null 2>&1; then

@@ -13,6 +13,11 @@ if [[ $1 == --child ]]; then
   config=${config#*'# ---- Completion ----'}
   config=${config%%'# Auto git-glance'*}
   eval "$config"
+  if [[ $4 == --eza ]]; then
+    config=$(<"$repo/zsh/.zshrc")
+    config=${config#*$'\nif command -v eza '}
+    eval "if command -v eza ${config%%$'\nfi'*}"$'\nfi'
+  fi
   cd "$HOME/fixtures"
   _test_snapshot() {
     print -r -- "ZLE-SNAPSHOT:${(qqqq)BUFFER}|$KEYMAP:END-SNAPSHOT"
@@ -32,6 +37,10 @@ if [[ $1 == --child ]]; then
   # Expansion runs outside completion, after the tracked options and integrations.
   print -r -- "EXPANSION:$(print -r -- glob/*):END-EXPANSION"
   buffer=''
+  if [[ $4 == --eza ]]; then
+    # Return to the interactive prompt for real command and alias completion.
+    return
+  fi
   vared -p 'test> ' buffer
   exit
 fi
@@ -40,6 +49,14 @@ setopt errexit pipefail
 repo=${0:A:h}
 zsh_bin=${commands[zsh]}
 fzf_bin=${commands[fzf]-}
+eza_bin=${commands[eza]-}
+eza_completion=''
+for directory in $fpath; do
+  if [[ -r $directory/_eza ]]; then
+    eza_completion=$directory/_eza
+    break
+  fi
+done
 # Only the native distribution functions, never site-functions or private completions.
 native_fpath=()
 for directory in $fpath; do
@@ -59,6 +76,15 @@ trap 'exit 1' HUP INT TERM
 mkdir -p "$test_root/home/fixtures" "$test_root/home/cache/zsh" "$test_root/home/bin"
 export HOME="$test_root/home" ZDOTDIR="$test_root/home"
 ln -s "${commands[mv]}" "$HOME/bin/mv"
+if [[ -n $eza_bin && -n $eza_completion ]]; then
+  # Include only the packaged eza completion, not the rest of site-functions.
+  mkdir -p "$HOME/completions"
+  ln -s "$eza_completion" "$HOME/completions/_eza"
+  ln -s "$eza_bin" "$HOME/bin/eza"
+  eza_fpath=("$HOME/completions" "${native_fpath[@]}")
+else
+  print -r -- "SKIP: eza alias completion (eza: ${eza_bin:-not installed}; _eza: ${eza_completion:-not found in original fpath})"
+fi
 fixture="$HOME/fixtures"
 mkdir -p "$fixture"/{prefix,case,partial,substring,hidden,dirs,all,glob}
 touch "$fixture/prefix/alpha" "$fixture/prefix/xalpha" \
@@ -148,6 +174,16 @@ for mode in native fzf; do
   snapshot $'\x18\x12\x18\x07'
   expect 'completion does not leak globdots into ordinary expansion' glob/visible
   zpty -d shell
+  if [[ -n $eza_bin && -n $eza_completion ]]; then
+    zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
+      "$zsh_bin" -dfi
+    zpty -w shell "source ${(q)repo}/test-zle.zsh --child ${(q)repo} ${(q)${(j.:.)eza_fpath}} --eza"
+    wait_for 'ZLE-READY'
+    complete 'eza option through l alias' 'l --ino' 'l --inode '
+    # ll already supplies --time-style, which _arguments excludes as a duplicate.
+    complete 'eza option value through nested ll alias' 'll --time=mod' 'll --time=modified '
+    zpty -d shell
+  fi
 done
 (( failures == 0 )) || { print -ru2 -- "$failures/$checks ZLE checks failed"; exit 1; }
-print -r -- "ok: $checks native ZLE checks (completion, wildcard isolation, vi editing, Ghostty, fzf)"
+print -r -- "ok: $checks native ZLE checks (completion, wildcard isolation, vi editing, Ghostty, fzf, optional eza aliases)"

@@ -9,9 +9,10 @@ fi
 print -r -- 'DOTFILES QUICK REFERENCE   Option = Alt; Neovim leader = Space
 
 SHELL & FILES
-  ll / llt       Compact / newest first; recursive directory totals (eza)
-  lll / lllt     Detailed native / newest first; llli adds inodes
-  llt -r         Oldest first; without eza, ll falls back to native output
+  l / ll        Eza listing / long details; hidden entries, directories first
+  ll --sort=age Newest first within groups; --inode adds inodes
+  l --tree --level=2    Bounded tree; ll --total-size scans directory totals
+  --icons=never Disable icons; ls remains native (also when eza is absent)
   fzfe / fzfv    Find and edit files / with preview
   Ctrl-R/T      Search shell history / files; Alt-C searches directories
   help COMMAND  Command help, including aliases
@@ -37,8 +38,8 @@ NEOVIM (normal mode)
   Esc Esc       Leave terminal-input mode, then use normal-mode mappings
 
 READING & GIT
-  mdv FILE      Word-wrapped Markdown to pane width (max 120); -w N overrides
-  mdv -w 0 FILE No renderer wrapping; less -S toggles fold/chop, then Enter
+  mdv FILE      No renderer wrapping; less -S toggles fold/chop, then Enter
+  mdv -w 120 FILE   Opt into word-aware rendering at 120 columns
   fzfv Option-t Toggle preview wrap; Shift-Up/Down scrolls; Ctrl-W deletes word
   less -S       Toggle wrap inside pager; --mouse toggles mouse capture
   Shift-drag    Ghostty selection while less captures mouse; / and n/N search
@@ -48,6 +49,7 @@ READING & GIT
   git -c core.pager="less -R" diff   Full long lines without Delta truncation
 
 MAINTENANCE
-  dotfiles help CLI usage; status / doctor inspect, update / bundle can upgrade
-  ll totals can be slow on large trees. lll sizes directories themselves,
-  not their contents. This guide covers repository defaults, not local overrides.'
+  dotfiles help CLI usage; status / doctor inspect; update applies the Brewfile
+  Homebrew owns package updates; OpenCode only notifies about new versions
+  Directory totals scan contents and can be slow. This guide covers repository
+  defaults, not local overrides.'
