@@ -3,6 +3,10 @@
 # Defaults: install when run as install.sh; help when invoked as dotfiles.
 set -eu
 
+# Repository selection belongs to this installer, not the invoking Git process.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
+unset GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+
 invocation_name=${0##*/}
 script_path=$0
 
@@ -24,7 +28,7 @@ resolve_path() {
   dir=$(dirname "$path")
   base=$(basename "$path")
 
-  (cd -P -- "$dir" 2>/dev/null && printf '%s/%s\n' "$PWD" "$base")
+  (CDPATH='' cd -P -- "$dir" 2>/dev/null && printf '%s/%s\n' "$PWD" "$base")
 }
 
 resolve_script() {
@@ -179,15 +183,62 @@ ensure_homebrew_cask_appdir() {
   is_darwin || return 0
   is_admin && return 0
 
+  cask_appdir=$(
+    # Shellwords treats operators and substitutions literally, unlike a shell lexer.
+    rest=${HOMEBREW_CASK_OPTS-} word='' quote='' explicit=0
+    whitespace=$(printf ' \t\n\r\013\014')
+    newline='
+'
+    while :; do
+      char=${rest%"${rest#?}"}
+      rest=${rest#?}
+      if [ -z "$char" ] && [ -n "$quote" ]; then
+        printf '%s\n' 'error: unmatched quote in HOMEBREW_CASK_OPTS' >&2
+        exit 1
+      fi
+      case "$quote:$char" in
+        ("':'"|'":"') quote= ;;
+        ("':"*) word=$word$char ;;
+        (':"'|":'") quote=$char ;;
+        (*:"\\")
+          next=${rest%"${rest#?}"}
+          rest=${rest#?}
+          case "$quote:$next" in
+            (:''|:"$newline") word="$word\\$next" ;;
+            (:*|'":$'|'":`'|'":"'|"\":\\"|\":"$newline") word=$word$next ;;
+            (*) word="$word\\$next" ;;
+          esac
+          ;;
+        (:''|:["$whitespace"])
+          case "$word" in
+            (--appdir)
+              printf '%s\n' 'error: HOMEBREW_CASK_OPTS requires --appdir=/path, not --appdir /path' >&2
+              exit 1 ;;
+            (--appdir=*) explicit=1 ;;
+          esac
+          word=
+          [ -n "$char" ] || break
+          ;;
+        (*) word=$word$char ;;
+      esac
+    done
+    if [ "$explicit" = 0 ]; then
+      # Single-quote one complete Shellwords token, including embedded apostrophes.
+      rest=$HOME/Applications
+      printf "'--appdir="
+      while :; do
+        case "$rest" in
+          (*"'"*) printf "%s'\\\\''" "${rest%%"'"*}"; rest=${rest#*"'"} ;;
+          (*) printf "%s'" "$rest"; break ;;
+        esac
+      done
+    fi
+  ) || { unset cask_appdir; return 1; }
+  if [ -n "$cask_appdir" ]; then
+    export HOMEBREW_CASK_OPTS="$cask_appdir${HOMEBREW_CASK_OPTS:+ $HOMEBREW_CASK_OPTS}"
+  fi
+  unset cask_appdir
   mkdir -p "$HOME/Applications"
-
-  case " ${HOMEBREW_CASK_OPTS:-} " in
-    *" --appdir="* | *" --appdir "*)
-      ;;
-    *)
-      export HOMEBREW_CASK_OPTS="--appdir=$HOME/Applications${HOMEBREW_CASK_OPTS:+ $HOMEBREW_CASK_OPTS}"
-      ;;
-  esac
 }
 
 ensure_homebrew() {
@@ -214,7 +265,7 @@ ensure_homebrew() {
     printf 'error: failed to download the Homebrew installer\n' >&2
     exit 1
   }
-  NONINTERACTIVE=1 /bin/bash -c "$install_script" || {
+  /bin/bash -c "$install_script" || {
     printf 'error: Homebrew installation failed\n' >&2
     exit 1
   }
@@ -248,7 +299,7 @@ install_dotfiles() {
   bundle_dotfiles
 
   printf '\ndone.\n'
-  printf 'restart your shell or run: exec zsh\n'
+  printf 'restart your shell or run: exec zsh -l\n'
 }
 
 # Follows `brew bundle --global` Brewfile resolution (HOMEBREW_BUNDLE_FILE_GLOBAL
@@ -263,8 +314,8 @@ bundle_dotfiles() {
 
   brewfile="${HOMEBREW_BUNDLE_FILE_GLOBAL:-$xdg_config_home/homebrew/Brewfile}"
   [ -f "$brewfile" ] || {
-    printf 'skip: no Brewfile found at %s\n' "$brewfile"
-    return 0
+    printf 'error: no Brewfile found at %s\n' "$brewfile" >&2
+    exit 1
   }
 
   ensure_homebrew_cask_appdir
@@ -282,8 +333,8 @@ bundle_dotfiles() {
 git_repo_dir_is_toplevel() {
   git -C "$repo_dir" rev-parse --git-dir >/dev/null 2>&1 || return 1
   toplevel=$(git -C "$repo_dir" rev-parse --show-toplevel 2>/dev/null) || return 1
-  toplevel_real=$(cd -P -- "$toplevel" 2>/dev/null && pwd) || return 1
-  repo_real=$(cd -P -- "$repo_dir" 2>/dev/null && pwd) || return 1
+  toplevel_real=$(CDPATH='' cd -P -- "$toplevel" 2>/dev/null && pwd) || return 1
+  repo_real=$(CDPATH='' cd -P -- "$repo_dir" 2>/dev/null && pwd) || return 1
   [ "$toplevel_real" = "$repo_real" ]
 }
 
@@ -300,14 +351,18 @@ git_require_repo() {
 }
 
 git_is_dirty() {
-  [ -n "$(git -C "$repo_dir" status --porcelain)" ]
+  git_status=$(git -C "$repo_dir" status --porcelain --untracked-files=all) || {
+    printf 'error: cannot inspect git working tree: %s\n' "$repo_dir" >&2
+    exit 1
+  }
+  [ -n "$git_status" ]
 }
 
 git_status_summary() {
   printf '\nlocal changes:\n'
 
   if git_is_dirty; then
-    git -C "$repo_dir" status --short | sed 's/^/  /'
+    git -C "$repo_dir" status --short --untracked-files=all | sed 's/^/  /'
   else
     printf '  none\n'
   fi
@@ -448,15 +503,13 @@ fast_forward_update() {
 update_dotfiles() {
   update_mode=default
   assume_yes=0
+  show_help=0
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --discard) update_mode=discard ;;
       -y|--yes) assume_yes=1 ;;
-      -h|--help)
-        usage
-        return 0
-        ;;
+      -h|--help) show_help=1 ;;
       *)
         printf 'error: unknown update option: %s\n\n' "$1" >&2
         usage >&2
@@ -465,6 +518,11 @@ update_dotfiles() {
     esac
     shift
   done
+
+  if [ "$show_help" = 1 ]; then
+    usage
+    return 0
+  fi
 
   git_require_repo
 
@@ -560,7 +618,7 @@ status_dotfiles() {
   fi
 
   printf '\n'
-  git -C "$repo_dir" status --short --branch
+  git -C "$repo_dir" status --short --branch --untracked-files=all
 
   stashes=$(git -C "$repo_dir" stash list 2>/dev/null | sed -n '1,5p' || true)
   if [ -n "$stashes" ]; then
@@ -747,20 +805,20 @@ doctor_dotfiles() {
     if is_admin; then
       printf 'yes\n'
     else
-    printf 'no; Homebrew casks default to %s\n' "$HOME/Applications"
+      printf 'no; Homebrew casks default to %s\n' "$HOME/Applications"
     fi
   fi
 }
 
 uninstall_dotfiles() {
+  if [ -f "$repo_dir/zsh/.zshenv" ]; then
+    remove_owned_link "$HOME/.zshenv" "$repo_dir/zsh/.zshenv"
+  fi
+
   managed_dirs | while IFS= read -r src; do
     name=${src##*/}
     remove_owned_link "$xdg_config_home/$name" "$src"
   done
-
-  if [ -f "$repo_dir/zsh/.zshenv" ]; then
-    remove_owned_link "$HOME/.zshenv" "$repo_dir/zsh/.zshenv"
-  fi
 
   remove_owned_link "$user_bin_home/dotfiles" "$installer"
 
@@ -806,10 +864,12 @@ default_command() {
   esac
 }
 
-cmd=${1:-$(default_command)}
-
+# CLI dispatcher.
 if [ "$#" -gt 0 ]; then
+  cmd=$1
   shift
+else
+  cmd=$(default_command)
 fi
 
 case "$cmd" in

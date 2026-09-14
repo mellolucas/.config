@@ -20,7 +20,8 @@ cp "$repo/install.sh" "$test_root/repo/install.sh"
 printf '# fixture\n' > "$test_root/repo/zsh/.zshenv"
 
 # Load function definitions without the CLI dispatcher.
-sed '/^cmd=${1:-$(default_command)}/,$d' "$repo/install.sh" > "$test_root/library.sh"
+test "$(grep -c '^# CLI dispatcher\.$' "$repo/install.sh")" = 1
+sed '/^# CLI dispatcher\.$/,$d' "$repo/install.sh" > "$test_root/library.sh"
 # shellcheck source=/dev/null
 . "$test_root/library.sh"
 repo_dir="$test_root/repo"
@@ -33,7 +34,86 @@ bundle_dotfiles() { :; }
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 check() { "$@" || fail "$*"; }
 
+# Run the complete dispatcher with a separate HOME and a non-provisioning brew.
+mkdir -p "$test_root/cli-home" "$test_root/cli-bin"
+cat > "$test_root/cli-bin/brew" <<'EOF'
+#!/bin/sh
+printf 'brew invoked\n' >> "$HOME/provision.log"
+exit 1
+EOF
+chmod +x "$test_root/cli-bin/brew"
+run_cli() {
+  env HOME="$test_root/cli-home" XDG_CONFIG_HOME="$test_root/cli-home/config" \
+    XDG_DATA_HOME="$test_root/cli-home/data" XDG_STATE_HOME="$test_root/cli-home/state" \
+    XDG_CACHE_HOME="$test_root/cli-home/cache" PATH="$test_root/cli-bin:$PATH" \
+    HOMEBREW_BUNDLE_FILE_GLOBAL="$test_root/missing.Brewfile" "$@"
+}
+if run_cli sh "$installer" '' > "$test_root/empty.log" 2>&1; then
+  fail 'an explicitly empty command must fail'
+fi
+check grep -Fq 'unknown command:' "$test_root/empty.log"
+check test ! -e "$test_root/cli-home/config"
+check test ! -e "$test_root/cli-home/provision.log"
+if run_cli sh "$installer" bundle > "$test_root/bundle.log" 2>&1; then
+  fail 'a missing selected Brewfile must fail'
+fi
+check grep -Fq "no Brewfile found at $test_root/missing.Brewfile" "$test_root/bundle.log"
+check test ! -e "$test_root/cli-home/provision.log"
+if run_cli sh "$installer" update --help --typo > "$test_root/help.log" 2>&1; then
+  fail 'update help must validate trailing options'
+fi
+check grep -Fq 'unknown update option: --typo' "$test_root/help.log"
+check run_cli sh "$installer" update --help --discard > "$test_root/help.log"
+check grep -Fq 'usage: dotfiles' "$test_root/help.log"
+ln -s "$installer" "$test_root/cli-bin/dotfiles"
+check run_cli "$test_root/cli-bin/dotfiles" > "$test_root/default.log"
+check grep -Fq 'usage: dotfiles' "$test_root/default.log"
+check test ! -e "$test_root/cli-home/config"
+
+# A relative parent present in CDPATH must neither redirect nor print into paths.
+(
+  cd "$test_root"
+  export CDPATH="$test_root"
+  check test "$(resolve_path repo/install.sh)" = "$installer"
+  check run_cli sh repo/install.sh help > "$test_root/cdpath.log"
+)
+check grep -Fq 'usage: dotfiles' "$test_root/cdpath.log"
+
+# Exercise removal through the dispatcher with the same two-hop entrypoint.
+mkdir -p "$test_root/cli-home/config" "$test_root/cli-home/.local/bin"
+ln -s "$test_root/repo/zsh" "$test_root/cli-home/config/zsh"
+ln -s "$test_root/cli-home/config/zsh/.zshenv" "$test_root/cli-home/.zshenv"
+ln -s "$installer" "$test_root/cli-home/.local/bin/dotfiles"
+check run_cli sh "$installer" uninstall > "$test_root/cli-uninstall.log"
+check test ! -L "$test_root/cli-home/.zshenv"
+check test ! -e "$test_root/cli-home/.zshenv"
+check test ! -L "$test_root/cli-home/config/zsh"
+check test ! -L "$test_root/cli-home/.local/bin/dotfiles"
+rmdir "$test_root/cli-home/config"
+
+# The bootstrap delegates interactivity to Homebrew without overwriting callers.
+(
+  # shellcheck source=/dev/null
+  . "$test_root/library.sh"
+  brew_bin() { return 1; }
+  ensure_macos_command_line_tools() { :; }
+  curl() {
+    # shellcheck disable=SC2016
+    printf '%s\n' 'printf "bootstrap NONINTERACTIVE=%s\n" "${NONINTERACTIVE-unset}"'
+  }
+  unset NONINTERACTIVE
+  ensure_homebrew
+  export NONINTERACTIVE=1
+  ensure_homebrew
+  export NONINTERACTIVE=0
+  ensure_homebrew
+) > "$test_root/bootstrap.log"
+check grep -Fxq 'bootstrap NONINTERACTIVE=unset' "$test_root/bootstrap.log"
+check grep -Fxq 'bootstrap NONINTERACTIVE=1' "$test_root/bootstrap.log"
+check grep -Fxq 'bootstrap NONINTERACTIVE=0' "$test_root/bootstrap.log"
+
 install_dotfiles > "$test_root/install.log"
+check grep -Fq 'exec zsh -l' "$test_root/install.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
 check test -L "$HOME/.local/bin/dotfiles"
@@ -44,6 +124,9 @@ printf 'foreign\n' > "$test_root/foreign"
 ln -s "$test_root/foreign" "$XDG_CONFIG_HOME/foreign"
 uninstall_dotfiles > "$test_root/uninstall.log"
 check test ! -L "$XDG_CONFIG_HOME/zsh"
+check test ! -L "$HOME/.zshenv"
+check test ! -e "$HOME/.zshenv"
+check test ! -L "$HOME/.local/bin/dotfiles"
 check test -L "$XDG_CONFIG_HOME/foreign"
 check test -f "$test_root/foreign"
 
@@ -165,6 +248,60 @@ rm "$seed/.gitignore"
 unignored_commit=$(fixture_commit unignored -p "$incoming_commit")
 printf 'incoming secret\n' > "$seed/local.secret"
 collision_commit=$(fixture_commit collision -p "$unignored_commit")
+
+# Check inherited repository selectors at the actual process boundary. The Git
+# shim verifies isolation and retained user config, then delegates to real Git.
+export REAL_GIT
+REAL_GIT=$(command -v git)
+cat > "$test_root/cli-bin/git" <<'EOF'
+#!/bin/sh
+set -eu
+if [ -n "${GIT_DIR+x}${GIT_WORK_TREE+x}${GIT_INDEX_FILE+x}${GIT_COMMON_DIR+x}${GIT_OBJECT_DIRECTORY+x}${GIT_ALTERNATE_OBJECT_DIRECTORIES+x}" ]; then
+  printf 'inherited Git repository selector\n' >&2
+  exit 1
+fi
+if [ "${GIT_CONFIG_COUNT:-}" != 1 ] || [ "${GIT_CONFIG_KEY_0:-}" != status.showUntrackedFiles ] || [ "${GIT_CONFIG_VALUE_0:-}" != no ]; then
+  printf 'user Git configuration was not preserved\n' >&2
+  exit 1
+fi
+if [ "${FAIL_GIT_STATUS:-0}" = 1 ] && [ "$3" = status ]; then
+  printf 'fixture: git status failed\n' >&2
+  exit 1
+fi
+exec "$REAL_GIT" "$@"
+EOF
+chmod +x "$test_root/cli-bin/git"
+git -C "$seed" update-ref refs/heads/main "$base_commit"
+cli_repo="$test_root/cli-repo"
+git clone -q --template= --branch main "$seed" "$cli_repo"
+cp "$repo/install.sh" "$cli_repo/install.sh"
+printf 'untracked\n' > "$cli_repo/dispatcher-marker"
+for selector in GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR \
+  GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES; do
+  check run_cli env "$selector=$test_root/invalid-git-path" \
+    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=status.showUntrackedFiles GIT_CONFIG_VALUE_0=no \
+    sh "$cli_repo/install.sh" status > "$test_root/$selector.log" 2>&1
+  check grep -Fq '?? dispatcher-marker' "$test_root/$selector.log"
+done
+git -C "$seed" update-ref refs/heads/main "$incoming_commit"
+for failure in hidden-untracked failed-status; do
+  fail_status=0
+  diagnostic='local changes exist; refusing to update'
+  if [ "$failure" = failed-status ]; then
+    fail_status=1
+    diagnostic='cannot inspect git working tree:'
+  fi
+  if run_cli env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=status.showUntrackedFiles \
+    GIT_CONFIG_VALUE_0=no FAIL_GIT_STATUS="$fail_status" \
+    sh "$cli_repo/install.sh" update > "$test_root/$failure.log" 2>&1; then
+    fail "$failure: unsafe update must fail"
+  fi
+  check grep -Fq "$diagnostic" "$test_root/$failure.log"
+  check test "$(git -C "$cli_repo" rev-parse HEAD)" = "$base_commit"
+  check test "$(cat "$cli_repo/dispatcher-marker")" = untracked
+  check test ! -e "$test_root/cli-home/config"
+  check test ! -e "$test_root/cli-home/provision.log"
+done
 
 reinstall_after_update() { printf 'fixture: reinstall\n'; exit 0; }
 check_update() {

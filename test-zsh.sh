@@ -8,6 +8,8 @@ emulate -LR zsh
 setopt errexit pipefail
 
 repo=${0:A:h}
+ruby_bin=${commands[ruby]-}
+zsh_bin=${commands[zsh]}
 for file in "$repo"/zsh/{homebrew.zsh,.zprofile,.zshrc,functions/{fzfe,fzfv,github-open,github-view,help,keys}} "$repo/test-zsh.sh"; do
   zsh -n "$file"
 done
@@ -155,7 +157,8 @@ done
     for groups in 'staff admin everyone' 'staff admin-helper everyone'; do
       for cask_opts in unset '' '--no-quarantine --language=en' \
         '--appdir=/custom/Apps --no-quarantine' \
-        '--no-quarantine --appdir /custom/Apps' \
+        '"--appdir=/custom/Apps with spaces" --no-quarantine' \
+        '--appdir="/custom/Apps with spaces"' \
         '--appdir-extra=/other'; do
         unset HOMEBREW_CASK_OPTS
         [[ $cask_opts == unset ]] || HOMEBREW_CASK_OPTS=$cask_opts
@@ -167,9 +170,9 @@ done
         if [[ $OSTYPE == darwin* && $groups == 'staff admin-helper everyone' ]]; then
           expected_mkdir=(-p "$HOME/Applications")
           case $cask_opts in
-            unset|'') expected="--appdir=$HOME/Applications" ;;
+            unset|'') expected="'--appdir=$HOME/Applications'" ;;
             '--no-quarantine --language=en'|'--appdir-extra=/other')
-              expected="--appdir=$HOME/Applications $cask_opts" ;;
+              expected="'--appdir=$HOME/Applications' $cask_opts" ;;
           esac
           expected_set=1
         fi
@@ -189,6 +192,74 @@ done
       done
     done
   done
+
+  # Ruby is a test-only oracle for Homebrew's Shellwords and Config.env selection.
+  if [[ -n $ruby_bin ]]; then
+  PATH=/usr/bin:/bin "$ruby_bin" -rshellwords -ropen3 - "$repo" "$test_root" "$zsh_bin" <<'RUBY'
+repo, root, zsh = ARGV
+installer = File.read("#{repo}/install.sh")[/^ensure_homebrew_cask_appdir\(\) \{\n.*?^\}/m]
+abort 'missing installer cask function' unless installer
+policies = {
+  '/bin/sh' => "#{installer}\nis_darwin() { return 0; }; is_admin() { return 1; }; policy() { ensure_homebrew_cask_appdir; }",
+  zsh => 'OSTYPE=darwin; id() { printf "staff\\n"; }; grep() { return 1; }; policy() { source "$1/zsh/homebrew.zsh"; }',
+}
+installer_body = installer[/^  cask_appdir=\$\(\n.*?^  mkdir -p "\$HOME\/Applications"/m]
+abort 'runtime cask policies drifted' unless installer_body && File.read("#{repo}/zsh/homebrew.zsh").include?(installer_body)
+inputs = [nil, '', '--no-quarantine --language=en', '--appdir-extra=/other',
+          '--appdir=/custom/Apps', '--appdir="/custom/Apps with spaces"',
+          '"--appdir=/custom/Apps with spaces"', "'--appdir=/custom/O'\\''Brien'",
+          "\t--appdir=/custom/Apps\n", '--appdir=', '--appdir=/a --appdir=/b',
+          '--language="en --appdir=/not-an-option"', '--language=en;--appdir=/not-an-option',
+          '$\'--appdir=/not-an-option\'', '--appdir=$(touch sentinel)',
+          '--language="$(touch sentinel)"', '--appdir=/a\\ b', '--appdir\\=/a',
+          "--appdir=\"/a\\\nb\"", '--appdir="/a\\qb"', '--appdir="/a\\$b\\`c\\\\d\\\"e"',
+          "--language='a\\b'\v--appdir=/custom/Apps\f--language=en\r", "--appdir=/a\n\n",
+          "--language=en\\\n--appdir=/not-an-option", '--language=trailing\\',
+          '--appdir /custom/Apps', '"--appdir" /custom/Apps', '--appdir',
+          '--appdir=/a --appdir /b', '--appdir="unfinished', "--language='unfinished"]
+homes = ["#{root}/ordinary", "#{root}/O'Brien home \\ $ ` ; * ? [ ] \"\t\n"]
+homes.product(inputs).each do |home, input|
+  begin
+    words = Shellwords.shellsplit(input || '')
+    invalid = words.include?('--appdir') ? '--appdir=/path' : nil
+  rescue ArgumentError
+    invalid = 'unmatched quote'
+  end
+  policies.each do |shell, policy|
+    script = "#{policy}\nmkdir() { :; }; " \
+             'if policy "$1"; then policy "$1" || exit; printf "%s" "${HOMEBREW_CASK_OPTS-}"; ' \
+             'else printf "%s" "${HOMEBREW_CASK_OPTS-}"; exit 1; fi'
+    output, error, status = Open3.capture3({'HOME' => home, 'HOMEBREW_CASK_OPTS' => input},
+                                         shell, '-f', '-c', script, 'cask-test', repo, chdir: root)
+    label = "#{shell}: #{home.inspect} / #{input.inspect}"
+    if invalid
+      abort "#{label}: invalid options accepted or mutated: #{error}" unless
+        !status.success? && error.include?(invalid) && output == (input || '')
+      next
+    end
+    abort "#{label}: #{error}" unless status.success? && error.empty?
+    parsed = Shellwords.shellsplit(output)
+    # Config.env consumes equals-form flags; the final matching flag wins.
+    config = parsed.select { |arg| arg.include?('=') }.map { |arg| arg.split('=', 2) }
+                   .to_h { |flag, value| [flag.sub(/^--/, '').tr('-', '_'), value] }
+    appdirs = words.grep(/\A--appdir=/).map { |word| word.split('=', 2).last }
+    actual = parsed.grep(/\A--appdir=/).map { |word| word.split('=', 2).last }
+    expected = appdirs.empty? ? ["#{home}/Applications"] : appdirs
+    abort "#{label}: wrong appdir tokens: #{parsed.inspect}" unless actual == expected
+    abort "#{label}: wrong Config.env appdir" unless config['appdir'] == expected.last
+    if appdirs.empty?
+      abort "#{label}: other options changed" unless parsed.drop(1) == words
+    else
+      abort "#{label}: explicit options changed" unless output == input
+    end
+  end
+end
+abort 'options were evaluated' if File.exist?("#{root}/sentinel")
+puts 'ok: both cask policies match Shellwords and equals-form appdir selection'
+RUBY
+  else
+    print -r -- 'SKIP: optional Ruby Shellwords comparison (ruby not installed)'
+  fi
 
   # Check wiring as text: executing profiles could evaluate a real brew binary.
   [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nsource "$ZDOTDIR/homebrew.zsh"\n'* ]] ||
