@@ -67,18 +67,28 @@ for os in darwin23 linux-gnu; do
           COLUMNS=90
           source /dev/stdin <<< "$alias_block"
 
-          eval 'll "directory with spaces"'
-          expect $'ls\n-plhA\ndirectory with spaces' "$(recorded)" "$label original ll"
-          eval 'llt "directory with spaces"'
-          expect $'ls\n-plhA\n-t\ndirectory with spaces' "$(recorded)" "$label newest date sort"
-          eval 'llt -r "directory with spaces"'
-          expect $'ls\n-plhA\n-t\n-r\ndirectory with spaces' "$(recorded)" "$label reversed date sort"
-          eval 'lc "directory with spaces"'
+          eval 'lll "directory with spaces"'
+          expect $'ls\n-plhA\ndirectory with spaces' "$(recorded)" "$label native listing"
+          eval 'lli "directory with spaces"'
+          expect $'ls\n-plhA\n-i\ndirectory with spaces' "$(recorded)" "$label native inode listing"
+          eval 'lllt "directory with spaces"'
+          expect $'ls\n-plhA\n-t\ndirectory with spaces' "$(recorded)" "$label native newest date sort"
+          eval 'lllt -r "directory with spaces"'
+          expect $'ls\n-plhA\n-t\n-r\ndirectory with spaces' "$(recorded)" "$label native reversed date sort"
+          (( ! ${+aliases[lc]} )) || fail "$label removed lc alias"
           if (( has_eza )); then
-            expect $'eza\n--long\n--all\n--binary\n--no-permissions\n--no-user\n--time=modified\n--time-style=relative\n--classify=always\n--icons=never\ndirectory with spaces' "$(recorded)" "$label compact listing"
+            expected=$'eza\n--long\n--all\n--total-size\n--binary\n--no-permissions\n--no-user\n--time=modified\n--time-style=relative\n--classify=always\n--icons=never'
+            sort_flag=--sort=age
           else
-            expect $'ls\n-lhAF\ndirectory with spaces' "$(recorded)" "$label ls fallback"
+            expected=$'ls\n-plhA'
+            sort_flag=-t
           fi
+          eval 'll "directory with spaces"'
+          expect "$expected"$'\ndirectory with spaces' "$(recorded)" "$label compact listing or native fallback"
+          eval 'llt "directory with spaces"'
+          expect "$expected"$'\n'"$sort_flag"$'\ndirectory with spaces' "$(recorded)" "$label newest date sort"
+          eval 'llt -r "directory with spaces"'
+          expect "$expected"$'\n'"$sort_flag"$'\n-r\ndirectory with spaces' "$(recorded)" "$label reversed date sort"
 
           if [[ $os == darwin* ]] && (( has_caffeinate )); then
             eval 'awake -t 60'

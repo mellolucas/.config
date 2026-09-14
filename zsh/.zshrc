@@ -138,14 +138,17 @@ if command -v bat >/dev/null 2>&1; then
   alias bh='bat --plain --language=help'
 fi
 
-alias ll='ls -plhA' # List long
-alias lli='ll -i'   # List long with inodes
-alias llt='ll -t'   # Newest modification first; -r reverses
+alias lll='ls -plhA' # Detailed native listing
+alias lli='lll -i'  # Detailed listing with inodes
+alias lllt='lll -t' # Newest modification first; -r reverses
 
 if command -v eza >/dev/null 2>&1; then
-  alias lc='eza --long --all --binary --no-permissions --no-user --time=modified --time-style=relative --classify=always --icons=never'
+  # Directory totals scan contents; lll avoids recursive sizing.
+  alias ll='eza --long --all --total-size --binary --no-permissions --no-user --time=modified --time-style=relative --classify=always --icons=never'
+  alias llt='ll --sort=age'
 else
-  alias lc='ls -lhAF'
+  alias ll='lll'
+  alias llt='ll -t'
 fi
 
 if [[ $OSTYPE == darwin* ]] && command -v caffeinate >/dev/null 2>&1; then
