@@ -50,11 +50,11 @@ on run argv
 		set cfg to new surface configuration
 		set initial working directory of cfg to workspaceDir
 		
-		try
+		if (count of windows) > 0 then
 			set workspaceTab to new tab in front window with configuration cfg
-		on error
+		else
 			set workspaceTab to selected tab of (new window with configuration cfg)
-		end try
+		end if
 		
 		set middleTop to focused terminal of workspaceTab
 		set leftEditor to split middleTop direction left with configuration cfg
