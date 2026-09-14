@@ -9,6 +9,8 @@ Bootstrapping Homebrew may require administrator authorization; non-admin
 accounts need an existing usable Homebrew installation.
 Ghostty workspace automation is macOS-only.
 
+See [release notes](RELEASE_NOTES.md) for migration details and validation scope.
+
 ## Install
 
 ```sh
@@ -51,8 +53,6 @@ OpenCode. `dotfiles update` updates this repository and applies the Brewfile;
 `dotfiles bundle` applies packages without updating the repository. OpenCode
 only notifies about new versions rather than updating itself. Package versions
 follow Homebrew; idempotent linking does not pin them or update macOS itself.
-Temporary machine-local recovery installations are exceptions, not shared defaults;
-retire their PATH overrides after the Homebrew build is verified working.
 
 `workspace [options] [dir]` (zsh function, macOS) launches the Ghostty coding
 workspace layout. `--agent`, `--editor`, `--middle-top`, and `--middle-bottom`
