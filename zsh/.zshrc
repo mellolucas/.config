@@ -140,6 +140,17 @@ fi
 
 alias ll='ls -plhA' # List long
 alias lli='ll -i'   # List long with inodes
+alias llt='ll -t'   # Newest modification first; -r reverses
+
+if command -v eza >/dev/null 2>&1; then
+  alias lc='eza --long --all --binary --no-permissions --no-user --time=modified --time-style=relative --classify=always --icons=never'
+else
+  alias lc='ls -lhAF'
+fi
+
+if [[ $OSTYPE == darwin* ]] && command -v caffeinate >/dev/null 2>&1; then
+  alias awake='caffeinate -di'
+fi
 
 alias rg='rg --hidden --follow --smart-case --glob="!.git/*" --max-columns=120 --max-columns-preview'
 alias rga='rg --no-ignore --glob="!.git/*"'

@@ -5,6 +5,7 @@ brew "neovim"
 brew "ripgrep"
 brew "fzf"
 brew "bat"
+brew "eza"
 brew "git-delta"
 brew "glow"
 
@@ -26,4 +27,3 @@ cask "obsidian" if OS.mac?
 
 local_brewfile = File.expand_path("local.Brewfile", __dir__)
 instance_eval(File.read(local_brewfile)) if File.exist?(local_brewfile)
-
