@@ -8,7 +8,7 @@ emulate -LR zsh
 setopt errexit pipefail
 
 repo=${0:A:h}
-for file in "$repo"/zsh/{homebrew.zsh,.zprofile,.zshrc,functions/{fzfe,github-open,github-view,help}} "$repo/test-zsh.sh"; do
+for file in "$repo"/zsh/{homebrew.zsh,.zprofile,.zshrc,functions/{fzfe,fzfv,github-open,github-view,help}} "$repo/test-zsh.sh"; do
   zsh -n "$file"
 done
 
@@ -24,7 +24,7 @@ rel=$'nested dir/file #&%\xc3\xa9.md'
 print -r -- 'local README' > "$root/README.md"
 
 fpath=("$repo/zsh/functions")
-autoload -Uz fzfe github-open github-view help
+autoload -Uz fzfe fzfv github-open github-view help
 # No unstubbed executable can run after setup.
 path=()
 
@@ -36,6 +36,74 @@ recorded() {
   IFS= read -r -d '' content < "$test_root/${1:-call}" || [[ -n $content ]]
   print -rn -- "$content"
 }
+
+# Source only the renderer and listing alias blocks, never startup or local config.
+alias_block=''
+collect_aliases=0
+while IFS= read -r line; do
+  [[ $line != 'if command -v glow >/dev/null 2>&1; then' ]] || collect_aliases=1
+  [[ $line != 'alias rg='* ]] || break
+  (( ! collect_aliases )) || alias_block+="$line"$'\n'
+done < "$repo/zsh/.zshrc"
+[[ -n $alias_block && $line == 'alias rg='* ]] || fail 'alias block boundaries'
+
+for os in darwin23 linux-gnu; do
+  for has_eza in 0 1; do
+    for has_caffeinate in 0 1; do
+      for has_glow in 0 1; do
+        (
+          OSTYPE=$os
+          label="aliases: $os / eza=$has_eza / caffeinate=$has_caffeinate / glow=$has_glow"
+          ls() { record ls "$@"; }
+          if (( has_eza )); then
+            eza() { record eza "$@"; }
+          fi
+          if (( has_caffeinate )); then
+            caffeinate() { record caffeinate "$@"; }
+          fi
+          if (( has_glow )); then
+            glow() { record glow "$@"; }
+          fi
+          COLUMNS=90
+          source /dev/stdin <<< "$alias_block"
+
+          eval 'll "directory with spaces"'
+          expect $'ls\n-plhA\ndirectory with spaces' "$(recorded)" "$label original ll"
+          eval 'llt "directory with spaces"'
+          expect $'ls\n-plhA\n-t\ndirectory with spaces' "$(recorded)" "$label newest date sort"
+          eval 'llt -r "directory with spaces"'
+          expect $'ls\n-plhA\n-t\n-r\ndirectory with spaces' "$(recorded)" "$label reversed date sort"
+          eval 'lc "directory with spaces"'
+          if (( has_eza )); then
+            expect $'eza\n--long\n--all\n--binary\n--no-permissions\n--no-user\n--time=modified\n--time-style=relative\n--classify=always\n--icons=never\ndirectory with spaces' "$(recorded)" "$label compact listing"
+          else
+            expect $'ls\n-lhAF\ndirectory with spaces' "$(recorded)" "$label ls fallback"
+          fi
+
+          if [[ $os == darwin* ]] && (( has_caffeinate )); then
+            eval 'awake -t 60'
+            expect $'caffeinate\n-di\n-t\n60' "$(recorded)" "$label awake arguments"
+          else
+            (( ! ${+aliases[awake]} )) || fail "$label awake guard"
+          fi
+          if (( has_glow )); then
+            for COLUMNS in 50 180 0 -1; do
+              width=120
+              (( COLUMNS != 50 )) || width=50
+              expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n'"$width"
+              eval 'mdv "document name.md"'
+              expect "$expected"$'\ndocument name.md' "$(recorded)" "$label call-time width $COLUMNS"
+              eval 'mdv -w 72 "document name.md"'
+              expect "$expected"$'\n-w\n72\ndocument name.md' "$(recorded)" "$label explicit width last"
+            done
+          else
+            (( ! ${+aliases[mdv]} )) || fail "$label mdv dependency guard"
+          fi
+        )
+      done
+    done
+  done
+done
 
 (
   HOME="$test_root/home with spaces"
@@ -186,8 +254,31 @@ fzfe --query needle
 expect $'editor\n--clean\n--\n-c quit | touch should-not-run' "$(recorded)" 'editor option terminator and filename quoting'
 # Inspect forwarding separately without executing the binding.
 fzf() { record "$@"; }
-fzfe --query needle
-expect $'--bind\nenter:become(editor --clean -- {})\n--query\nneedle' "$(recorded)" 'fzf argument forwarding'
+fzfe --preview-window=wrap --bind ctrl-s:toggle-preview-wrap --query needle
+expect $'--bind\nenter:become(editor --clean -- {})\n--preview-window=wrap\n--bind\nctrl-s:toggle-preview-wrap\n--query\nneedle' "$(recorded)" 'fzf argument forwarding'
+
+for os in darwin23 linux-gnu; do
+  for has_glow in 0 1; do
+    (
+      OSTYPE=$os
+      (( has_glow )) || unfunction glow
+      file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 {} || cat {}'
+      preview=$file_preview
+      if (( has_glow )); then
+        md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 {}'
+        if [[ $os == darwin* ]]; then
+          md_preview="TERM=tmux-256color COLORTERM=truecolor script -q /dev/null $md_preview < /dev/null | tail -n +2"
+        fi
+        preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
+      fi
+      expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap\n--bind\nctrl-s:toggle-preview-wrap'
+      fzfv
+      expect "$expected" "$(recorded)" "fzfv preview shape and OS guard: $os / glow=$has_glow"
+      fzfv --preview 'caller preview {}' --preview-window=nowrap --bind ctrl-s:ignore --query 'file name'
+      expect "$expected"$'\n--preview\ncaller preview {}\n--preview-window=nowrap\n--bind\nctrl-s:ignore\n--query\nfile name' "$(recorded)" "fzfv caller overrides last: $os / glow=$has_glow"
+    )
+  done
+done
 
 git_state=branch
 branch=$'feature/#&%\xc3\xa9'
@@ -291,4 +382,4 @@ if github-open "$test_root/missing" 2>/dev/null; then
   fail 'missing path must fail'
 fi
 
-print -r -- 'ok: zsh syntax, cask policy, startup wiring, and hermetic function regression checks'
+print -r -- 'ok: zsh syntax, cask policy, startup wiring, and hermetic alias/function regression checks'
