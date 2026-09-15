@@ -21,7 +21,8 @@ trap 'exit 1' HUP INT TERM
 export HOME="$test_root/home" XDG_CONFIG_HOME="$test_root/config"
 root="$HOME/code/owner/repo"
 rel=$'nested dir/file #&%\xc3\xa9.md'
-/bin/mkdir -p "$root/${rel:h}" "$test_root/outside"
+/bin/mkdir -p "$root/${rel:h}" "$test_root/outside" "$XDG_CONFIG_HOME"
+/bin/ln -s "$repo/zsh" "$XDG_CONFIG_HOME/zsh"
 : > "$root/$rel"
 print -r -- 'local README' > "$root/README.md"
 
@@ -41,24 +42,106 @@ recorded() {
   print -rn -- "$content"
 }
 
-keys_output=$(keys) || fail 'keys without dependencies'
-for flag in -h --help; do
-  keys_help=$(keys "$flag") || fail "keys $flag status"
-  expect "$keys_output" "$keys_help" "keys $flag matches no arguments"
-done
-for args in '--invalid' 'help' '--help extra' '-h extra'; do
-  if keys ${=args} >/dev/null 2>&1; then
-    fail "keys rejects $args"
-  fi
-done
-for topic in 'l / ll' '--sort=age' '--inode' '--tree --level=2' '--total-size' \
-  '--icons=never' 'ls remains native' 'mdv -w 120' 'less -S' 'fzfv Option-t' \
-  'Option-h/j/k/l' 'Space ee' 'gd / gds/gda' 'dotfiles help'; do
-  [[ $keys_output == *"$topic"* ]] || fail "keys missing useful content: $topic"
-done
-for private_path in /Users/ /home/ /private/var/ /var/folders/ "$repo" "$HOME" "$XDG_CONFIG_HOME"; do
-  [[ $keys_output != *"$private_path"* ]] || fail 'keys exposes a private machine path'
-done
+(
+  topics=(workspace files panes reading documents editor git maintain)
+  typeset -A sections titles intents topic_outputs
+  intents=(
+    workspace 'workspace --agent'
+    files 'fzfv'
+    panes 'editor-window navigation'
+    reading 'Enter browse mode'
+    documents 'mdv FILE'
+    editor 'Space e e'
+    git 'gds'
+    maintain 'dotfiles doctor'
+  )
+  current=''
+  guide_topics=()
+  while IFS= read -r line || [[ -n $line ]]; do
+    if [[ $line == '## '* ]]; then
+      heading=${line#'## '}
+      current=${(L)${heading%%:*}}
+      titles[$current]=${heading#*: }
+      sections[$current]="# $titles[$current]"$'\n'
+      guide_topics+=("$current")
+    elif [[ -n $current ]]; then
+      sections[$current]+="$line"$'\n'
+    fi
+  done < "$repo/GUIDE.md"
+  expect "${(j: :)topics}" "${(j: :)guide_topics}" 'guide topic contract'
+
+  keys_output=$(print -r -- '' | keys) || fail 'piped keys without dependencies'
+  keys_all=$(keys all) || fail 'keys all without dependencies'
+  [[ $keys_all == *'A field guide'* ]] || fail 'keys all includes guide introduction'
+  outputs=("$keys_output" "$keys_all")
+  for flag in -h --help; do
+    keys_help=$(keys "$flag") || fail "keys $flag status"
+    [[ $keys_help == 'usage: keys '* ]] || fail "keys $flag usage"
+    outputs+=("$keys_help")
+    for topic in "${topics[@]}"; do
+      [[ $keys_help == *"\`keys $topic\` - $titles[$topic]"* ]] || fail "keys $flag index: $topic"
+    done
+  done
+  for topic in "${topics[@]}"; do
+    [[ $keys_output == *"\`keys $topic\` - $titles[$topic]"* ]] || fail "keys index: $topic"
+    [[ $keys_output != *"$intents[$topic]"* ]] || fail "keys index includes section body: $topic"
+    keys "$topic" > "$test_root/keys-section" || fail "redirected keys $topic status"
+    section=$(recorded keys-section)
+    topic_outputs[$topic]=$section
+    plain=$(keys --plain "$topic") || fail "plain keys $topic status"
+    expect "$section" "$plain" "plain and redirected keys $topic agree"
+    [[ $section == "$sections[$topic]"* ]] || fail "keys $topic includes complete source section"
+    [[ $section == *"$intents[$topic]"* ]] || fail "keys $topic lookup intent"
+    [[ $keys_all == *"$sections[$topic]"* ]] || fail "keys all includes complete $topic section"
+    for other in "${topics[@]}"; do
+      [[ $other == $topic || $section != *"# $titles[$other]"* ]] || fail "keys $topic leaks $other section"
+    done
+    case $topic in
+      files) [[ ${(L)section} == *'ctrl+d'*'scrolls the preview down half a page'* ]] || fail 'file preview scrolling lookup' ;;
+      reading) [[ $section == *'Ghostty'*'Return to your application'* ]] || fail 'terminal browse and return lookup' ;;
+      documents) [[ $section == *'Shift-drag'* && $section == *'mdv -w 120 FILE'* ]] || fail 'document selection and wrapping lookup' ;;
+    esac
+    outputs+=("$section" "$plain")
+  done
+  for args in '--invalid' 'help' 'missing-topic' 'files extra' 'all files' '--plain files extra'; do
+    if keys ${=args} > "$test_root/keys-error" 2>&1; then
+      fail "keys rejects $args"
+    fi
+    error=$(recorded keys-error)
+    [[ -n $error ]] || fail "keys explains invalid input: $args"
+    outputs+=("$error")
+  done
+
+  # Present viewers must remain unused for redirected or explicitly plain output.
+  fzf() { fail 'keys unexpectedly invoked the picker'; }
+  glow() { fail 'keys unexpectedly invoked the renderer'; }
+  less() { fail 'keys unexpectedly invoked the pager'; }
+  output=$(print -r -- '' | keys) || fail 'piped keys with viewers status'
+  expect "$keys_output" "$output" 'piped keys bypasses picker and renderer'
+  output=$(keys --plain) || fail 'plain index with viewers status'
+  expect "$keys_output" "$output" 'plain index bypasses viewers'
+  output=$(keys all --plain) || fail 'plain whole guide with viewers status'
+  expect "$keys_all" "$output" 'plain whole guide bypasses viewers'
+  for topic in "${topics[@]}"; do
+    output=$(keys "$topic") || fail "keys $topic with viewers status"
+    expect "$topic_outputs[$topic]" "$output" "redirected keys $topic bypasses installed viewers"
+    output=$(keys "$topic" --plain) || fail "plain keys $topic with viewers status"
+    expect "$topic_outputs[$topic]" "$output" "plain keys $topic bypasses installed viewers"
+  done
+
+  # Installed configs resolve the guide beside the physical source, not in XDG or cwd.
+  unfunction keys
+  fpath=("$XDG_CONFIG_HOME/zsh/functions")
+  autoload -Uz keys
+  builtin cd "$test_root/outside"
+  output=$(keys all) || fail 'keys autoload through XDG symlink status'
+  expect "$keys_all" "$output" 'keys autoload through XDG symlink'
+  for output in "${outputs[@]}"; do
+    for private_path in /Users/ /home/ /private/var/ /var/folders/ "$repo" "$HOME" "$XDG_CONFIG_HOME" "$test_root"; do
+      [[ $output != *"$private_path"* ]] || fail 'keys exposes a private machine path'
+    done
+  done
+)
 
 # Source only the editor, renderer and listing aliases, never startup or local config.
 alias_block=''
