@@ -40,7 +40,8 @@ NEOVIM (normal mode)
 READING & GIT
   mdv FILE      No renderer wrapping; less -S toggles fold/chop, then Enter
   mdv -w 120 FILE   Opt into word-aware rendering at 120 columns
-  fzfv Option-t Toggle preview wrap; Shift-Up/Down scrolls; Ctrl-W deletes word
+  fzfv Option-t Toggle preview wrap; Ctrl-U/D scrolls preview half-pages
+  Shift-Up/Down Preview lines; Ctrl-W deletes query word (inside fzfv)
   less -S       Toggle wrap inside pager; --mouse toggles mouse capture
   Shift-drag    Ghostty selection while less captures mouse; / and n/N search
   gg / gs       Repository overview / status; ghopen / ghview opens repo/README

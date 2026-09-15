@@ -93,7 +93,9 @@ means the beginning may be truncated. Toggle again to re-render after resizing.
   words or indentation; `mdv -w 120 FILE` opts into word-aware rendering instead.
   Source line breaks remain; short output may exit the pager immediately.
 - `fzfv`: file picker with an initially wrapped preview; **Option-T** toggles
-  preview wrapping. **Shift-Up/Down** scrolls the preview.
+  preview wrapping. **Ctrl-U/D** scrolls the preview by half a page;
+  **Shift-Up/Down** scrolls by line. In this helper only, Ctrl-U/D replace fzf's
+  query-clear and character-delete/exit bindings; ordinary fzf is unchanged.
 
 In less, **Shift-drag** uses Ghostty's selection while the pager captures the
 mouse. Type `--mouse` then Enter to toggle that capture. `-S` toggles wrapping;

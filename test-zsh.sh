@@ -466,7 +466,7 @@ for os in darwin23 linux-gnu; do
         fi
         preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
       fi
-      expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap\n--bind\nalt-t:toggle-preview-wrap'
+      expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap\n--bind\nalt-t:toggle-preview-wrap,ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down'
       fzfv
       expect "$expected" "$(recorded)" "fzfv preview shape and OS guard: $os / glow=$has_glow"
       fzfv --preview 'caller preview {}' --preview-window=nowrap --bind alt-t:ignore --query 'file name'

@@ -30,7 +30,8 @@ framework or generated keymap layer.
   invocation. Terminal-size queries are bounded and restore terminal settings.
 - Markdown source/preview toggling preserves the editing view; saved-file diffs
   use native decoding. Shell Markdown uses native less folding/chopping, and
-  fzf previews use Option-T to toggle wrapping.
+  fzfv previews use Option-T to toggle wrapping and Ctrl-U/D for half-page
+  scrolling, replacing those query-editing bindings only inside this helper.
 - `keys` provides a concise command and keybinding reference. GitHub helpers,
   editor commands, and help dispatch have explicit argument-safety behavior.
 - Ordinary Git fetches preserve local tags. Viewer errors propagate, and clone
