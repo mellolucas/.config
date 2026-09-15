@@ -93,6 +93,7 @@ Deliberate duplication that must stay behavior-identical across copies:
   - `sh test-zsh.sh` for isolated helper regression checks (no network or applications)
   - `zsh -f test-zle.zsh` for isolated completion and vi-editing PTY checks
   - `zsh -f test-workspace.zsh` for terminal-query PTY checks (no workspace applications)
+  - `zsh -f test-guide.zsh` for isolated field-guide reader and picker PTY checks
   - `nvim --headless "+lua vim.print('ok')" +q` for nvim config health
   - `nvim --headless -u NONE -l test-nvim.lua` for isolated Markdown preview checks
   - `git config --file git/config --list` for git config syntax

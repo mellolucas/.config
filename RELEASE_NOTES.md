@@ -32,7 +32,8 @@ framework or generated keymap layer.
   use native decoding. Shell Markdown uses native less folding/chopping, and
   fzfv previews use Option-T to toggle wrapping and Ctrl-U/D for half-page
   scrolling, replacing those query-editing bindings only inside this helper.
-- `keys` provides a concise command and keybinding reference. GitHub helpers,
+- `keys` opens a task-oriented field guide with direct topic access, a searchable
+  picker, and plain-text fallbacks. The same pages live in `GUIDE.md`. GitHub helpers,
   editor commands, and help dispatch have explicit argument-safety behavior.
 - Ordinary Git fetches preserve local tags. Viewer errors propagate, and clone
   shortcuts reject unsupported arguments rather than silently ignoring them.

@@ -54,59 +54,35 @@ OpenCode. `dotfiles update` updates this repository and applies the Brewfile;
 only notifies about new versions rather than updating itself. Package versions
 follow Homebrew; idempotent linking does not pin them or update macOS itself.
 
-`workspace [options] [dir]` (zsh function, macOS) launches the Ghostty coding
-workspace layout. `--agent`, `--editor`, `--middle-top`, and `--middle-bottom`
-override the corresponding `DOTFILES_WORKSPACE_*` command for one invocation.
-Quote commands containing arguments; empty middle commands leave a shell prompt.
+Run `keys` for a task-oriented field guide. Choose what you want to do, rather
+than remembering which tool or shortcut provides it. Enter opens a page;
+Esc cancels the picker, and `q` leaves the reader.
 
 ```sh
-workspace --agent 'kiro-cli chat' ~/code/owner/project
-workspace --middle-top '' --editor 'nvim .'
+keys files       # list, search, preview, and open a file
+keys reading     # read terminal scrollback and return to your application
+keys editor      # explore files and restore your editing view
+keys git         # resume a repository and compare changes
+keys all         # read the complete guide
+keys --plain     # index without picker or renderer
 ```
 
-Option-direction navigation tries Ghostty splits first, then Neovim windows
-in normal mode. Native Neovim window commands remain available. Markdown
-preview (`<leader>tm`) renders the saved file in place, approximates the
-rendered position, and restores the exact source view on return.
-Editor previews retain up to 1,000,000 scrollback lines; a capacity warning
-means the beginning may be truncated. Toggle again to re-render after resizing.
+The same content is available in [GUIDE.md](GUIDE.md). Direct topics do not
+require fzf. Without Glow or less, or when redirected, output is readable Markdown.
+`--plain` also works with a topic. The picker only selects documentation;
+it never executes example commands. Machine-local overrides may differ.
 
-### Exploration and reading
+### Behavior boundaries
 
-- `keys`: concise grouped reference for commands, capabilities, and keybindings.
-- `help COMMAND`: external `--help` or native builtin documentation. Simple
-  literal aliases are supported; complex shell expressions are rejected.
-  Editor aliases and `fzfe` accept quoted executable/argument words in `EDITOR`,
-  not shell expressions or variable expansion inside its value.
-- `l`: eza listing with hidden entries and directories first; icons appear only
-  on terminal output. `ll` adds long metadata, readable binary sizes, and relative
-  modification ages. Icons require suitable glyphs; `--icons=never` disables them.
-  Native `ls` remains unchanged and available if eza is missing.
-- Use eza flags instead of specialized aliases: `ll --sort=age` for newest first
-  within directory/file groups (`--reverse` reverses), `ll --inode` for inodes,
-  `l --tree --level=2` for a bounded tree, and `ll --total-size` for recursive
-  directory totals (potentially slow). `l --` or `ll --` then Tab describes options.
-- `awake`: macOS display/idle-sleep inhibition until Ctrl-C; accepts a command
-  to keep awake for that command's lifetime.
-- `mdv FILE`: themed Markdown without renderer wrapping. In less, `-S` then
-  Enter toggles screen folding/chopping without discarding text. Folding may split
-  words or indentation; `mdv -w 120 FILE` opts into word-aware rendering instead.
-  Source line breaks remain; short output may exit the pager immediately.
-- `fzfv`: file picker with an initially wrapped preview; **Option-T** toggles
-  preview wrapping. **Ctrl-U/D** scrolls the preview by half a page;
-  **Shift-Up/Down** scrolls by line. In this helper only, Ctrl-U/D replace fzf's
-  query-clear and character-delete/exit bindings; ordinary fzf is unchanged.
-
-In less, **Shift-drag** uses Ghostty's selection while the pager captures the
-mouse. Type `--mouse` then Enter to toggle that capture. `-S` toggles wrapping;
-Left/Right scroll horizontally. Leave Ghostty browse mode before using pager keys.
-
-Delta's compact side-by-side view can truncate long lines. For complete text,
-use `git -c core.pager='less -R' diff` (also accepts `--staged` or revision
-arguments). Pager wrapping cannot recover text already truncated by a renderer.
-
-In netrw, `p` previews a file; `:Rexplore` returns to the previous browser view
-in that Neovim window. These are editor windows, not neighboring Ghostty panes.
+- Ghostty panes and Neovim windows are separate layers. Option navigation
+  tries Ghostty first, with Neovim fallback in normal mode only.
+- Editor Markdown previews render the saved file, restore the source view,
+  and approximate rendered position. They retain up to 1,000,000 scrollback
+  lines and warn at capacity. Toggle again to re-render after resizing.
+- `help` accepts simple literal aliases, not shell expressions. `EDITOR`
+  supports quoted command/argument words without evaluating expressions.
+- Eza icons depend on font support; directory totals are opt-in scans.
+  Delta may truncate long lines; the guide describes a native-pager alternative.
 
 ## Local overrides
 
