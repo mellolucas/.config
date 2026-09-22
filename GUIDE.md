@@ -70,13 +70,53 @@ Type to filter filenames. Use the arrow keys to choose a result. The preview fol
 
 **Open:** Enter opens the selected file in your editor. **Leave:** Esc cancels the picker. Use `fzfe` when you do not need a preview.
 
-### Stay in the shell
+### Build a command instead
 
-`Ctrl+T` finds a file to insert into the current command line. `Option+c` finds a directory to enter. Tab completion includes hidden entries and tries substring matches when prefix matching finds nothing.
-
-Use `v .` to open the current directory in the default editor's netrw explorer. Shell vi command mode keeps its native Space motion; it does not have a Space leader.
+To insert paths into a command, change directory with a picker, or recall a command from history, open `keys shell`. Use `v .` to explore the current directory in the default editor's netrw browser.
 
 **Remember:** directory totals require `ll --total-size` and may take time. Icons can be disabled with `--icons=never`. Native `ls` remains available when eza is absent. Ctrl+U/D are preview controls only in `fzfv`, not ordinary fzf.
+
+## Shell: Work at the shell prompt
+
+Go somewhere, insert a path, or reuse a command without losing what you are typing.
+
+### Go somewhere
+
+**At the zsh prompt, press left Option+c**
+
+Fzf opens a directory picker beneath the prompt. Type part of a directory name to filter, use the arrow keys to choose, then press Enter to change directory. Esc cancels.
+
+This searches beneath the current directory, including hidden directories subject to fzf's exclusions; it is not a global directory-history search. If you had started typing a command, that unfinished command returns at the next prompt in the new directory.
+
+**Go back:** `cd -` returns to the previous directory. A directory path entered by itself also changes directory when it is not interpreted as another command: zsh's native automatic-directory-change option is enabled.
+
+### Put a path into your command
+
+**Press Ctrl+T**
+
+For example, type `git diff -- ` and press Ctrl+T. Search files and directories, choose a path, and press Enter to insert it into the command line. The command is not executed: inspect it, then press Enter yourself.
+
+Inside this picker, Tab toggles selection and moves downward; Shift+Tab toggles selection and moves upward. Select several paths before accepting when needed. Fzf quotes selected paths for the shell, including names with spaces. Esc cancels the picker.
+
+Use `fzfv` when you want to preview and open a file in the editor instead of adding its path to a command.
+
+### Reuse a command
+
+**Press Ctrl+R**
+
+Search your shell history by typing part of a command. Enter places the selection on the command line for inspection or editing; it does not run it. Press Enter at the shell only when ready, or use Esc to cancel the picker.
+
+Text already typed before the cursor seeds the history search. This is useful for recalling a long invocation without remembering its flags or risking immediate execution.
+
+### Complete a path as you type
+
+Regular Tab completion tries prefixes first, then case-insensitive, partial-word, and substring matches. Hidden entries participate without requiring a leading dot. Press Tab again to enter the selectable completion menu when there are several candidates; use the arrow keys to choose.
+
+For a fuzzy picker at a particular argument, type `v **` then press Tab. Choose paths and press Enter to insert them; the editor does not start until you accept the resulting shell command.
+
+`cd **` then Tab restricts that picker to directories. Unlike Option+c, it completes a path without changing directory yet.
+
+**Scope:** these pickers are fzf's native zsh integration, not Ghostty navigation. Option+c, Ctrl+T, and Ctrl+R work at the prompt in insert and vi command modes; foreground applications own their own keys. Shell vi command mode keeps native Space movement, not a Space leader.
 
 ## Panes: Move between panes
 

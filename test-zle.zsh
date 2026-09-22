@@ -23,8 +23,30 @@ if [[ $1 == --child ]]; then
     config=${config#*$'\nif command -v eza '}
     eval "if command -v eza ${config%%$'\nfi'*}"$'\nfi'
   fi
+  if [[ $4 == --widgets ]]; then
+    # Keep the installed native widgets; replace only their interactive picker.
+    fzf() {
+      local opts="$FZF_DEFAULT_OPTS $*" line selected=''
+      print -r -- "$opts" > "$HOME/picker-options"
+      case $opts in
+        *--scheme=history*)
+          while IFS= read -r line; do
+            [[ $line != *'zle-test-command history-sentinel'* ]] || selected=$line
+          done
+          [[ -n $selected ]] || return 1
+          print -r -- "$selected"
+          ;;
+        *--walker=dir,*|*'--walker dir,'*) print -r -- 'widget files/directory space' ;;
+        *) print -rl -- 'widget files/one file' 'widget files/two;file' ;;
+      esac
+    }
+    HISTSIZE=100
+    fc -p
+    print -s -- 'zle-test-command history-sentinel'
+  fi
   cd "$HOME/fixtures"
   _test_snapshot() {
+    print -r -- "ZLE-PWD:$PWD:END-PWD"
     print -r -- "ZLE-SNAPSHOT:${(qqqq)BUFFER}|$KEYMAP:END-SNAPSHOT"
   }
   _test_reset() { BUFFER=''; CURSOR=0; zle -K viins; }
@@ -43,7 +65,7 @@ if [[ $1 == --child ]]; then
   # Expansion runs outside completion, after the tracked options and integrations.
   print -r -- "EXPANSION:$(print -r -- glob/*):END-EXPANSION"
   buffer=''
-  if [[ $4 == --commands ]]; then
+  if [[ $4 == --commands || $4 == --widgets ]]; then
     # Return to the interactive prompt for real command and alias completion.
     return
   fi
@@ -104,6 +126,8 @@ touch "$fixture/prefix/alpha" "$fixture/prefix/xalpha" \
   "$fixture/all/visible" "$fixture/glob/.hidden" "$fixture/glob/visible"
 mkdir -p "$fixture/dirs/.xxsecretxx" "$fixture/dirs/visible"
 mkdir -p "$fixture/workspace-dirs/space project" "$fixture/--project"
+mkdir -p "$fixture/widget files/directory space"
+touch "$fixture/widget files/one file" "$fixture/widget files/two;file"
 
 failures=0
 checks=0
@@ -139,6 +163,16 @@ expect() {
 complete() {
   snapshot $'\x18\x12'"$2"$'\t'
   expect "$1" "$3"
+}
+expect_widget() {
+  expect "$1" "$2" "${5:-viins}"
+  local cwd=${${transcript##*ZLE-PWD:}%%:END-PWD*}
+  local picker_options=$(<"$HOME/picker-options")
+  (( ++checks ))
+  if [[ $cwd != "${3:a}" || -e $HOME/helper-calls || $picker_options != ${~4} ]]; then
+    print -ru2 -- "FAIL [$mode]: $1: cwd=$cwd; picker options=$picker_options; executed=$([[ -e $HOME/helper-calls ]] && print yes || print no)"
+    (( ++failures ))
+  fi
 }
 
 for mode in native fzf; do
@@ -258,5 +292,36 @@ for mode in native fzf; do
     (( ++failures ))
   fi
 done
+if [[ -n $fzf_bin ]]; then
+  mode=fzf-widgets
+  widget_checks=$checks
+  # Native history extraction needs awk; omit Perl to exercise its fc fallback.
+  ln -s "${commands[awk]}" "$HOME/bin/awk"
+  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
+    "$zsh_bin" -dfi
+  zpty -w shell "source ${(q)repo}/test-zle.zsh --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --widgets"
+  wait_for 'ZLE-READY'
+  snapshot $'zle-test-command \x14'
+  expect_widget 'Ctrl+T inserts multiple shell-quoted paths without execution' \
+    'zle-test-command widget\ files/one\ file widget\ files/two\;file ' "$fixture" '* -m *' main
+  snapshot $'\x18\x12history-sentinel\x12'
+  expect_widget 'Ctrl+R recalls a real history entry without execution' \
+    'zle-test-command history-sentinel' "$fixture" '*--scheme=history*'
+  snapshot $'\x18\x12zle-test-command **\t'
+  expect_widget '**Tab inserts multiple shell-quoted paths without execution' \
+    'zle-test-command widget\ files/one\ file widget\ files/two\;file ' "$fixture" '* -m *--walker file,dir,*'
+  snapshot $'\x18\x12cd **\t'
+  expect_widget 'cd **Tab requests directories and inserts without changing cwd' \
+    'cd widget\ files/directory\ space/' "$fixture" '*--walker dir,*'
+  zpty -w -n shell $'\x18\x12zle-test-command pending-sentinel\ec'
+  wait_for 'ZLE-READY'
+  snapshot ''
+  expect_widget 'Option+c changes cwd and restores the unexecuted buffer at the next prompt' \
+    'zle-test-command pending-sentinel' "$fixture/widget files/directory space" '*--walker=dir,*' main
+  zpty -d shell
+  (( failures )) || print -r -- "ok: $((checks - widget_checks)) native fzf prompt checks (deterministic picker)"
+else
+  print -r -- 'SKIP: native fzf prompt widgets and **Tab (fzf not installed)'
+fi
 (( failures == 0 )) || { print -ru2 -- "$failures/$checks ZLE checks failed"; exit 1; }
 print -r -- "ok: $checks native ZLE checks (completion, helper aliases, wildcard isolation, vi editing, Ghostty, fzf, optional eza aliases)"

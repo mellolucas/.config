@@ -23,6 +23,7 @@ Run **`keys`** and choose what you want to do. Type to find a task, Enter to rea
 
 ```sh
 keys files       # Find, preview, and open files
+keys shell       # Change directory, insert paths, and recall commands
 keys panes       # Move and arrange your workspace
 keys editor      # Explore, edit, and compare
 keys git         # Resume work and review changes

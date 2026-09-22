@@ -43,11 +43,12 @@ recorded() {
 }
 
 (
-  topics=(workspace files panes reading documents editor git maintain)
+  topics=(workspace files shell panes reading documents editor git maintain)
   typeset -A sections titles intents topic_outputs
   intents=(
     workspace 'workspace --agent'
     files 'fzfv'
+    shell 'Reuse a command'
     panes 'editor-window navigation'
     reading 'Enter browse mode'
     documents 'mdv FILE'
