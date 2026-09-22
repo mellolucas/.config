@@ -164,6 +164,10 @@ map("n", "<leader>bwq", "<cmd>wq<CR>", { desc = "Save and quit" })
 map("n", "<leader>ee", vim.cmd.Explore, {
   desc = "Explore files",
 })
+map("n", "<leader>er", vim.cmd.Rexplore, { desc = "Return to explorer" })
+
+-- Git: <leader>g*
+map("n", "<leader>gd", "<cmd>GitDiff<CR>", { desc = "Diff saved file against index" })
 
 -- Quit: <leader>q*
 map("n", "<leader>qq", "<cmd>q<CR>", { desc = "Quit" })

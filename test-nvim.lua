@@ -333,4 +333,256 @@ end)
 fn.delete(directory, "rf")
 assert(ok, err)
 
-print("Markdown preview and DiffSaved tests passed")
+-- Guard and lifecycle tests stub Git discovery and replace the pager with a PTY fixture.
+notifications = {}
+local real_system = vim.system
+local real_environ = fn.environ
+local cwd = fn.getcwd()
+local root = directory .. "/repo with spaces"
+local parent = root .. "/nested [dir]"
+fn.mkdir(parent, "p")
+-- Neovim expands macOS's /var alias when assigning buffer names.
+directory = assert(vim.uv.fs_realpath(directory))
+root = directory .. "/repo with spaces"
+parent = root .. "/nested [dir]"
+local isolated_env = {
+  PATH = vim.env.PATH,
+  HOME = directory .. "/home",
+  XDG_CONFIG_HOME = directory .. "/home/config",
+  GIT_CONFIG_NOSYSTEM = "1",
+  GIT_CONFIG_SYSTEM = "/dev/null",
+  GIT_CONFIG_GLOBAL = "/dev/null",
+  GIT_PAGER = "inherited-pager-must-not-run",
+  TERM = "xterm",
+}
+fn.mkdir(isolated_env.XDG_CONFIG_HOME, "p")
+fn.environ = function()
+  local env = vim.deepcopy(isolated_env)
+  for _, name in ipairs({ "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES" }) do
+    env[name] = directory .. "/invalid-" .. name
+  end
+  return env
+end
+local git_source = api.nvim_get_current_buf()
+local filename, missing_tool, discovery_failure
+local calls, launched = {}, {}
+fn.executable = function(tool)
+  assert(tool == "git" or tool == "delta")
+  return tool == missing_tool and 0 or 1
+end
+vim.system = function(argv, opts)
+  assert(vim.deep_equal(opts, { env = isolated_env, clear_env = true }))
+  calls[#calls + 1] = argv
+  local discovery = argv[4] == "rev-parse"
+  local expected = discovery
+    and { "git", "-C", parent, "rev-parse", "--show-toplevel" }
+    or { "git", "-C", parent, "--literal-pathspecs", "ls-files", "--full-name",
+      "--error-unmatch", "--deduplicate", "-z", "--", filename }
+  assert(vim.deep_equal(argv, expected), vim.inspect(argv))
+  if discovery_failure == "throw" then
+    error("mock discovery failure")
+  end
+  return { wait = function()
+    return {
+      code = discovery_failure == (discovery and "repo" or "tracked") and 1 or 0,
+      stdout = discovery and (root .. "\n") or ("nested [dir]/" .. filename .. "\0"),
+    }
+  end }
+end
+fn.jobstart = function(argv, opts)
+  launched[#launched + 1] = argv
+  assert(vim.deep_equal(argv, {
+    "git", "-C", root, "--literal-pathspecs", "-c", "core.pager=delta --paging=always",
+    "--paginate", "diff", "--", "nested [dir]/" .. filename,
+  }), vim.inspect(argv))
+  local env = vim.deepcopy(isolated_env)
+  env.GIT_PAGER = "delta --paging=always"
+  assert(vim.deep_equal(opts, { term = true, env = env, clear_env = true }))
+  assert(vim.bo.bufhidden == "wipe" and not vim.bo.buflisted and not vim.bo.swapfile)
+  if start_result == "throw" then
+    error("mock spawn failure")
+  end
+  if start_result <= 0 then
+    return start_result
+  end
+  return real_jobstart({ "sh", "-c", "printf 'pager fixture\\n'" }, opts)
+end
+
+ok, err = pcall(function()
+  assert(fn.maparg(" gd", "n") == "<Cmd>GitDiff<CR>")
+  assert(fn.maparg(" gd", "i") == "" and fn.maparg(" gd", "t") == "")
+  local explored
+  api.nvim_create_user_command("Explore", function() explored = "Explore" end, {})
+  api.nvim_create_user_command("Rexplore", function() explored = "Rexplore" end, {})
+  for _, pair in ipairs({ { " ee", "Explore" }, { " er", "Rexplore" } }) do
+    fn.maparg(pair[1], "n", false, true).callback()
+    assert(explored == pair[2])
+  end
+  assert(api.nvim_get_commands({}).GitDiff.nargs == "0")
+  assert(not pcall(vim.cmd, "GitDiff extra"))
+
+  -- Keep a split and another tab present to catch layout/focus regressions.
+  vim.cmd("tabnew")
+  vim.cmd("tabprevious")
+  vim.cmd("vsplit")
+  local source_win = api.nvim_get_current_win()
+  local source_tab = api.nvim_get_current_tabpage()
+  local tabs, wins = api.nvim_list_tabpages(), api.nvim_list_wins()
+  local layout = fn.winlayout()
+  local function unchanged(buffers, saved_view)
+    assert(api.nvim_get_current_win() == source_win)
+    assert(api.nvim_get_current_tabpage() == source_tab)
+    assert(api.nvim_get_current_buf() == git_source)
+    assert(vim.deep_equal(api.nvim_list_tabpages(), tabs))
+    assert(vim.deep_equal(api.nvim_list_wins(), wins))
+    assert(vim.deep_equal(fn.winlayout(), layout))
+    assert(vim.deep_equal(api.nvim_list_bufs(), buffers), "GitDiff leaked buffer: "
+      .. vim.inspect({ before = buffers, after = api.nvim_list_bufs(), file = filename }))
+    assert(vim.deep_equal(fn.winsaveview(), saved_view))
+    assert(fn.getcwd() == cwd, "GitDiff changed cwd")
+  end
+
+  local function rejected(message, expected_calls)
+    local buffers, saved_view = api.nvim_list_bufs(), fn.winsaveview()
+    calls, launched = {}, {}
+    vim.cmd("GitDiff")
+    unchanged(buffers, saved_view)
+    assert(#calls == expected_calls and #launched == 0,
+      message .. ": " .. vim.inspect({ calls = calls, launched = launched, notifications = notifications }))
+    warning(message)
+  end
+  api.nvim_buf_set_name(git_source, "")
+  rejected("not a named file", 0)
+  filename = "file.txt"
+  api.nvim_buf_set_name(git_source, parent .. "/" .. filename)
+  vim.bo.buftype = "nofile"
+  rejected("not a named file", 0)
+  vim.bo.buftype = ""
+  for _, tool in ipairs({ "git", "delta" }) do
+    missing_tool = tool
+    rejected(tool .. " not found", 0)
+  end
+  missing_tool = nil
+  for _, failure in ipairs({ "repo", "throw", "tracked" }) do
+    discovery_failure = failure
+    rejected(failure == "tracked" and "not tracked" or "could not resolve", failure == "tracked" and 2 or 1)
+  end
+  discovery_failure = nil
+
+  for _, result in ipairs({ 0, -1, "throw" }) do
+    start_result = result
+    local buffers, saved_view = api.nvim_list_bufs(), fn.winsaveview()
+    vim.cmd("GitDiff")
+    unchanged(buffers, saved_view)
+    warning("git failed to start")
+  end
+  start_result = 1
+
+  assert(vim.uv.fs_symlink(directory .. "/outside-target", parent .. "/symlink.txt"))
+  for _, name in ipairs({ "file.txt", "[ab]*.txt", ":(glob)*", "-leading-dash",
+    "quotes'\" and spaces.txt", "symlink.txt" }) do
+    filename = name
+    api.nvim_buf_set_name(git_source, parent .. "/" .. filename)
+    api.nvim_buf_set_lines(git_source, 0, -1, false, { "unsaved contents" })
+    vim.bo.modified = name == "file.txt"
+    local modified = vim.bo.modified
+    local buffers, saved_view = api.nvim_list_bufs(), fn.winsaveview()
+    calls, launched = {}, {}
+    vim.cmd("GitDiff")
+    local terminal = api.nvim_get_current_buf()
+    assert(terminal ~= git_source and vim.bo.buftype == "terminal")
+    assert(vim.bo.bufhidden == "wipe", "terminal startup changed bufhidden: " .. vim.bo.bufhidden)
+    assert(#api.nvim_list_tabpages() == #tabs + 1)
+    assert(#api.nvim_tabpage_list_wins(0) == 1, "pager did not get full tab")
+    assert(#calls == 2 and #launched == 1)
+    assert(api.nvim_win_get_buf(source_win) == git_source)
+    assert(vim.bo[git_source].modified == modified)
+    assert(vim.deep_equal(api.nvim_buf_get_lines(git_source, 0, -1, false), { "unsaved contents" }))
+    if modified then
+      assert(notifications[1][1]:find("showing saved working tree vs index only", 1, true))
+      assert(notifications[1][2] == vim.log.levels.WARN)
+    end
+    assert(#notifications == (modified and 2 or 1))
+    assert(notifications[#notifications][1]:find("Esc Esc then :q", 1, true))
+    notifications = {}
+    local job = vim.b.terminal_job_id
+    assert(vim.wait(5000, function() return fn.jobwait({ job }, 0)[1] ~= -1 end))
+    drain()
+    assert(api.nvim_get_current_buf() == terminal, "successful exit closed pager tab")
+    assert(vim.bo.bufhidden == "wipe", "exit changed bufhidden: " .. vim.bo.bufhidden)
+    vim.cmd("stopinsert")
+    vim.cmd("quit")
+    drain()
+    -- Native :q chooses the adjacent tab when other tabs exist.
+    api.nvim_set_current_win(source_win)
+    unchanged(buffers, saved_view)
+    assert(not api.nvim_buf_is_valid(terminal))
+    vim.bo.modified = false
+  end
+
+  -- Exercise real discovery and index stages without commits or user Git config.
+  local function fixture_git(args, input)
+    local argv = { "git", "-C", root }
+    vim.list_extend(argv, args)
+    local result = real_system(argv, { env = isolated_env, clear_env = true, stdin = input }):wait()
+    assert(result.code == 0, result.stderr)
+    return result.stdout
+  end
+  fixture_git({ "init", "--template=" })
+  local objects = {}
+  for _, content in ipairs({ "base\n", "ours\n", "theirs\n" }) do
+    objects[#objects + 1] = fixture_git({ "hash-object", "-w", "--stdin" }, content):gsub("\n$", "")
+  end
+  local names = { "-[literal]*.txt", ":(glob)*", "quotes'\" and spaces.txt", "unmerged.txt" }
+  for _, name in ipairs(names) do
+    fn.writefile({ "saved working tree" }, parent .. "/" .. name)
+    local relative = "nested [dir]/" .. name
+    if name == "unmerged.txt" then
+      local entries = {}
+      for stage, object in ipairs(objects) do
+        entries[#entries + 1] = "100644 " .. object .. " " .. stage .. "\t" .. relative .. "\0"
+      end
+      fixture_git({ "update-index", "-z", "--index-info" }, table.concat(entries))
+      assert(fixture_git({ "ls-files", "-z", "--", relative }) == string.rep(relative .. "\0", 3),
+        "fixture did not create all three unmerged stages")
+    else
+      fixture_git({ "update-index", "--add", "--cacheinfo", "100644," .. objects[1] .. "," .. relative })
+    end
+  end
+  vim.system = function(argv, opts)
+    assert(vim.deep_equal(opts, { env = isolated_env, clear_env = true }))
+    calls[#calls + 1] = argv
+    return real_system(argv, opts)
+  end
+  assert(cwd ~= root and cwd ~= parent)
+  for _, name in ipairs(names) do
+    filename = name
+    api.nvim_buf_set_name(git_source, parent .. "/" .. filename)
+    local buffers, saved_view = api.nvim_list_bufs(), fn.winsaveview()
+    calls, launched = {}, {}
+    vim.cmd("GitDiff")
+    assert(#calls == 2 and #launched == 1, "real Git discovery failed: " .. vim.inspect(notifications))
+    assert(#notifications == 1 and notifications[1][2] == vim.log.levels.INFO)
+    notifications = {}
+    local terminal, job = api.nvim_get_current_buf(), vim.b.terminal_job_id
+    assert(vim.bo.buftype == "terminal")
+    assert(vim.wait(5000, function() return fn.jobwait({ job }, 0)[1] ~= -1 end))
+    vim.cmd("stopinsert")
+    vim.cmd("quit")
+    drain()
+    api.nvim_set_current_win(source_win)
+    unchanged(buffers, saved_view)
+    assert(not api.nvim_buf_is_valid(terminal))
+  end
+  filename = "untracked.txt"
+  fn.writefile({ "untracked" }, parent .. "/" .. filename)
+  api.nvim_buf_set_name(git_source, parent .. "/" .. filename)
+  rejected("not tracked", 2)
+end)
+vim.system, fn.jobstart = real_system, real_jobstart
+fn.environ = real_environ
+fn.delete(directory, "rf")
+assert(ok, err)
+
+print("Markdown preview, DiffSaved, and GitDiff tests passed")

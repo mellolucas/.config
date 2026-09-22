@@ -33,8 +33,87 @@ local function diff_current_window_with_scratch(label, lines)
   vim.cmd("diffthis")
 end
 
--- Git/clipboard diffs live in the shell (git aliases + delta); only the
--- buffer-vs-disk diff needs the editor.
+vim.api.nvim_create_user_command("GitDiff", function()
+  local path = vim.api.nvim_buf_get_name(0)
+  if path == "" or vim.bo.buftype ~= "" then
+    notify("Git diff: current buffer is not a named file", vim.log.levels.WARN)
+    return
+  end
+  for _, tool in ipairs({ "git", "delta" }) do
+    if vim.fn.executable(tool) ~= 1 then
+      notify("Git diff: " .. tool .. " not found", vim.log.levels.WARN)
+      return
+    end
+  end
+
+  local env = vim.fn.environ()
+  for _, name in ipairs({ "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR",
+    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES" }) do
+    env[name] = nil
+  end
+  local function git(args)
+    local ok, result = pcall(function()
+      return vim.system(args, { env = env, clear_env = true }):wait()
+    end)
+    return ok and result or { code = -1 }
+  end
+  local parent = vim.fn.fnamemodify(path, ":h")
+  local repo = git({ "git", "-C", parent, "rev-parse", "--show-toplevel" })
+  if repo.code ~= 0 then
+    notify("Git diff: could not resolve file's repository", vim.log.levels.WARN)
+    return
+  end
+  -- Ask the index for the relative name without resolving a file symlink's target.
+  local tracked = git({ "git", "-C", parent, "--literal-pathspecs", "ls-files",
+    "--full-name", "--error-unmatch", "--deduplicate", "-z", "--", vim.fn.fnamemodify(path, ":t") })
+  local relative = (tracked.stdout or ""):match("^([^%z]+)%z$")
+  if tracked.code ~= 0 or not relative then
+    notify("Git diff: current file is not tracked", vim.log.levels.WARN)
+    return
+  end
+  if vim.bo.modified then
+    notify("Git diff: buffer modified; showing saved working tree vs index only", vim.log.levels.WARN)
+  end
+
+  local source_win = vim.api.nvim_get_current_win()
+  vim.cmd("tabnew")
+  local terminal_win = vim.api.nvim_get_current_win()
+  local terminal_buf = vim.api.nvim_get_current_buf()
+  vim.bo.bufhidden = "wipe"
+  vim.bo.buflisted = false
+  vim.bo.swapfile = false
+  -- Terminal :q can hide the buffer despite bufhidden=wipe.
+  vim.api.nvim_create_autocmd("BufHidden", {
+    buffer = terminal_buf,
+    once = true,
+    callback = function()
+      vim.schedule(function()
+        if vim.api.nvim_buf_is_valid(terminal_buf) and #vim.fn.win_findbuf(terminal_buf) == 0 then
+          vim.api.nvim_buf_delete(terminal_buf, { force = true })
+        end
+      end)
+    end,
+  })
+  env.GIT_PAGER = "delta --paging=always"
+  local ok, job = pcall(vim.fn.jobstart, {
+    "git", "-C", repo.stdout:gsub("\n$", ""), "--literal-pathspecs",
+    "-c", "core.pager=delta --paging=always", "--paginate", "diff", "--", relative,
+  }, { term = true, env = env, clear_env = true })
+  if not ok or job <= 0 then
+    vim.api.nvim_win_close(terminal_win, true)
+    if vim.api.nvim_buf_is_valid(terminal_buf) then
+      vim.api.nvim_buf_delete(terminal_buf, { force = true })
+    end
+    vim.api.nvim_set_current_win(source_win)
+    notify("Git diff: git failed to start", vim.log.levels.WARN)
+    return
+  end
+  notify("Git diff: q quits pager; Esc Esc then :q closes this tab")
+  vim.cmd("startinsert")
+end, {
+  desc = "Diff saved working tree file against index in delta",
+})
+
 vim.api.nvim_create_user_command("DiffSaved", function()
   local path = vim.api.nvim_buf_get_name(0)
 
