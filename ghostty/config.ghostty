@@ -2,7 +2,7 @@ theme = dark:Catppuccin Mocha,light:Catppuccin Latte
 
 window-save-state = always
 
-# When unset, Option's behavior depends on the active keyboard layout
-macos-option-as-alt = true
+# Left Option sends Alt; right Option retains native macOS character input.
+macos-option-as-alt = left
 
 config-file = vim.ghostty

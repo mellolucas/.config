@@ -84,6 +84,6 @@ on run argv
 			send key "enter" to middleBottom
 		end if
 		
-		focus middleTop
+		focus middleBottom
 	end tell
 end run
