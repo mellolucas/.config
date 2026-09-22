@@ -4,7 +4,7 @@ A field guide to finding, moving, reading, and editing without losing your place
 
 Run `keys` to choose a task, or open a page directly with `keys files`, `keys panes`, or `keys git`. `keys all` reads the whole guide. `keys --plain` prints the index without a picker or renderer.
 
-**Notation:** `Option+b` is a chord: hold Option and press b, without Shift. Option is Alt on other keyboards. `Space t m` is a sequence in Neovim normal mode. Bare uppercase letters matter: `n` and `N` are different actions.
+**Notation:** `Option+b` is a chord: hold left Option and press b, without Shift. Left Option sends Alt in Ghostty; right Option retains macOS character input where no explicit shortcut intercepts it. `Space t m` is a sequence in Neovim normal mode. Bare uppercase letters matter: `n` and `N` are different actions.
 
 The guide describes repository defaults, not machine-local overrides. Examples are for you to run; choosing a topic never executes them. In the topic picker, Enter opens a page and Esc cancels. In the reader, `q` returns to the shell; `/` searches and `n` finds the next match.
 
@@ -22,13 +22,15 @@ Open a project with an editor, two shells, and your preferred agent.
 
 `workspace --agent 'kiro-cli chat' DIR`
 
-Replace `DIR` with your project directory. Quote a command when it includes arguments. The left pane is the editor, the middle panes are shells, and the right pane is the agent.
+Replace `DIR` with your project directory. Quote a command when it includes arguments. The left pane is the editor, the middle panes are shells, and the right pane is the agent. Focus starts in the larger middle-bottom shell, ready for your next command.
 
 ### Make it yours
 
 Use `--editor CMD`, `--middle-top CMD`, or `--middle-bottom CMD` to override other pane commands. An empty middle command, such as `--middle-top ''`, leaves a shell prompt. Flags override environment defaults for this launch only.
 
 `workspace --help` lists every option and its default.
+
+Use Tab to discover flags, command values, and directories. Completion also works through `dotscode`; `keys` completes guide topics and `dotfiles` completes lifecycle commands without running them.
 
 ### Keep working
 
@@ -72,6 +74,8 @@ Type to filter filenames. Use the arrow keys to choose a result. The preview fol
 
 `Ctrl+T` finds a file to insert into the current command line. `Option+c` finds a directory to enter. Tab completion includes hidden entries and tries substring matches when prefix matching finds nothing.
 
+Use `v .` to open the current directory in the default editor's netrw explorer. Shell vi command mode keeps its native Space motion; it does not have a Space leader.
+
 **Remember:** directory totals require `ll --total-size` and may take time. Icons can be disabled with `--icons=never`. Native `ls` remains available when eza is absent. Ctrl+U/D are preview controls only in `fzfv`, not ordinary fzf.
 
 ## Panes: Move between panes
@@ -103,6 +107,8 @@ If Ghostty cannot move in that direction, the chord reaches the application. Neo
 Use `Ctrl+W h/j/k/l` to move specifically between editor windows, without Ghostty taking precedence. Native `Ctrl+W v` and `Ctrl+W s` create editor windows, not terminal panes.
 
 **Remember:** terminal panes and editor windows are separate layers. `Option+q` closes a terminal pane, potentially containing a running program; it is not a buffer-close shortcut. Toggle `Option+z` again to return from zoom.
+
+**Accented text on macOS:** use right Option with your keyboard layout's native accent combinations. Left Option remains available for terminal shortcuts. Explicit Ghostty Option bindings may still take precedence; Character Viewer is an alternative for those characters.
 
 ## Reading: Read terminal output
 
@@ -180,11 +186,11 @@ Explore files, return to your place, and inspect changes without leaving the edi
 **In normal mode; press Space, then the letters in order**
 
 - `Space e e` opens the native file explorer.
-- `:Rexplore` returns to the prior netrw view in this window.
+- `Space e r` returns to the prior netrw view in this window (`:Rexplore`).
 - `Space b -` switches to the alternate buffer.
 - `Space b l` lists open buffers.
 
-Inside netrw, Enter opens the selected file. `:Rexplore` returns to the browser, or from the browser to the last file edited there. `p` previews a file while keeping browser focus; `Ctrl+W z` closes that preview. `P` opens in the last-accessed editor window, creating a split if only one exists. `o` opens a split below and `v` a split to the right.
+Inside netrw, Enter opens the selected file. `Space e r` returns to the browser, or from the browser to the last file edited there. It requires that window's explorer history; `Space e e` opens exploration when there is none. `p` previews a file while keeping browser focus; `Ctrl+W z` closes that preview. `P` opens in the last-accessed editor window, creating a split if only one exists. `o` opens a split below and `v` a split to the right.
 
 ### Change the view
 
@@ -198,10 +204,13 @@ Inside netrw, Enter opens the selected file. `:Rexplore` returns to the browser,
 - `Space c f` formats with an attached language server.
 - `Space d q` opens diagnostics in the quickfix list.
 - `:DiffSaved` compares the buffer with its saved file.
+- `Space g d` opens the saved file's unstaged Git diff in Delta (`:GitDiff`).
 - `Space b w w` saves; `Space b w q` saves and quits.
 - `Space q q` quits; `Space q !` force-quits without saving.
 
 `:DiffSaved` focuses a disposable saved-file comparison on the right. Use `:close` to return to your source.
+
+`:GitDiff` opens a temporary editor tab without changing your existing windows. It compares disk with the index, excluding unsaved edits and staged-only changes. Press `q` to quit the pager, Esc twice to leave terminal-input mode, then `:q` to close its tab. This uses the current Ghostty pane's width; `Option+z` can zoom the pane for a wider diff. Delta may truncate very long lines; the **git** page shows a full-content alternative.
 
 **Return:** Esc leaves insert mode. Esc twice leaves terminal-input mode. Use the **panes** page to distinguish terminal navigation from editor-window navigation. Netrw does not open files in neighboring Ghostty panes.
 

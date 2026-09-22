@@ -1,114 +1,74 @@
 # .config
 
-Minimal, XDG-first dotfiles for zsh, Neovim, Git, Ghostty, Homebrew, and more.
+A focused terminal environment for Ghostty, zsh, Neovim, and Git. Native tools, XDG locations, and a single Homebrew-managed package lifecycle keep the setup understandable and portable.
 
-Requires git, zsh, Ghostty >= 1.3 (older versions silently ignore
-`config.ghostty` and key tables), and Neovim >= 0.12 (`vim.pack`).
-Installing Homebrew additionally needs curl and bash (macOS: Xcode CLT).
-Bootstrapping Homebrew may require administrator authorization; non-admin
-accounts need an existing usable Homebrew installation.
-Ghostty workspace automation is macOS-only.
+## Get started
 
-See [release notes](RELEASE_NOTES.md) for migration details and validation scope.
+Requires Git, zsh, Ghostty 1.3+, and Neovim 0.12+. macOS is the primary platform; workspace automation is macOS-only. Fresh-machine and Linux testing remain user follow-up work; see the [release notes](RELEASE_NOTES.md) for validation scope.
 
-## Install
+From this checkout:
 
 ```sh
 ./install.sh install
+exec zsh -l
 ```
 
-Full environment setup in one command:
+Installation links each configuration directory into `$XDG_CONFIG_HOME`, adds the shell entrypoint and `dotfiles` command, then ensures Homebrew and applies the Brewfile. Bootstrapping Homebrew also needs curl and bash, plus Xcode Command Line Tools on macOS. Administrator authorization may be required; non-admin accounts need an existing usable Homebrew installation.
 
-- Links each top-level config directory into `$XDG_CONFIG_HOME`
-- Links `$HOME/.zshenv` to the zsh entrypoint
-- Links the installer to `$HOME/.local/bin/dotfiles` (the `dotfiles` command)
-- Ensures Homebrew (including Xcode CLT when bootstrapping on macOS), then runs the Brewfile
+Links land before provisioning. Conflicting paths are moved to unique timestamped backups, never overwritten, and rerunning installation is safe. A package-setup failure leaves the linked configuration available.
 
-Links always land first; if Homebrew setup fails, install reports the error
-and the linked environment remains usable.
-Conflicting paths are never deleted: they are moved aside as `<path>.backup.<timestamp>`.
-If that backup name exists, a numeric suffix keeps both copies.
-Re-running is safe and idempotent.
-Use a fresh login shell (`exec zsh -l`) to load the installed environment.
+## Find your flow
 
-## Daily use
+Run **`keys`** and choose what you want to do. Type to find a task, Enter to read it, Esc to cancel, and `q` to leave the reader.
 
 ```sh
-dotfiles status                  # show repo status
-dotfiles update                  # safe update; refuses to touch local changes
-dotfiles update --discard        # review and discard local changes, then update
-dotfiles update --discard --yes  # discard local changes without prompting
-dotfiles bundle                  # run the Brewfile
-dotfiles doctor                  # show environment status
+keys files       # Find, preview, and open files
+keys panes       # Move and arrange your workspace
+keys editor      # Explore, edit, and compare
+keys git         # Resume work and review changes
 ```
 
-A successful `update` re-runs `install`: new config directories get linked and
-the Brewfile is applied automatically.
-An already-current or locally-ahead checkout is reapplied without changing
-local edits. Incoming updates refuse dirty or diverged work. Both update modes
-refuse incoming tracked paths that collide with ignored local content.
-Discard cleans with the current ignore rules before resetting to upstream.
-Homebrew owns installation and updates for Brewfile-managed tools, including
-OpenCode. `dotfiles update` updates this repository and applies the Brewfile;
-`dotfiles bundle` applies packages without updating the repository. OpenCode
-only notifies about new versions rather than updating itself. Package versions
-follow Homebrew; idempotent linking does not pin them or update macOS itself.
+The [field guide](GUIDE.md) is the same content, readable on GitHub. `keys all` opens everything; `keys TOPIC --plain` needs no renderer. Direct topics work without fzf, and missing viewers fall back to Markdown. Selecting a topic never executes its examples.
 
-Run `keys` for a task-oriented field guide. Choose what you want to do, rather
-than remembering which tool or shortcut provides it. Enter opens a page;
-Esc cancels the picker, and `q` leaves the reader.
+Use Tab to discover topics, workspace flags, and lifecycle commands. Native editor controls stay available, and the guide identifies whether a shortcut belongs to Ghostty, Neovim, a picker, or a pager.
+
+## Maintain the setup
 
 ```sh
-keys files       # list, search, preview, and open a file
-keys reading     # read terminal scrollback and return to your application
-keys editor      # explore files and restore your editing view
-keys git         # resume a repository and compare changes
-keys all         # read the complete guide
-keys --plain     # index without picker or renderer
+dotfiles status   # Inspect the configuration repository
+dotfiles doctor   # Check the environment
+dotfiles update   # Update the repository and apply the Brewfile
+dotfiles bundle   # Apply packages without updating the repository
+dotfiles help     # Full lifecycle usage
 ```
 
-The same content is available in [GUIDE.md](GUIDE.md). Direct topics do not
-require fzf. Without Glow or less, or when redirected, output is readable Markdown.
-`--plain` also works with a topic. The picker only selects documentation;
-it never executes example commands. Machine-local overrides may differ.
+Homebrew owns Brewfile-managed tools, including OpenCode; OpenCode only notifies about updates. Applying the Brewfile can download and upgrade packages, but does not update macOS or pin package versions.
 
-### Behavior boundaries
+Normal incoming updates require a clean, fast-forwardable checkout. An already-current or locally-ahead checkout is reapplied without altering local edits. Both update modes refuse incoming tracked paths that collide with ignored local content. `dotfiles update --discard` is an explicit destructive alternative, not a routine repair command; `--yes` skips its confirmation.
 
-- Ghostty panes and Neovim windows are separate layers. Option navigation
-  tries Ghostty first, with Neovim fallback in normal mode only.
-- Editor Markdown previews render the saved file, restore the source view,
-  and approximate rendered position. They retain up to 1,000,000 scrollback
-  lines and warn at capacity. Toggle again to re-render after resizing.
-- `help` accepts simple literal aliases, not shell expressions. `EDITOR`
-  supports quoted command/argument words without evaluating expressions.
-- Eza icons depend on font support; directory totals are opt-in scans.
-  Delta may truncate long lines; the guide describes a native-pager alternative.
+## Make it local
 
-## Local overrides
+Keep machine-specific settings in ignored overrides, using the tracked example templates:
 
-Machine-local files are intentionally untracked (see the tracked `*.example` templates). Use:
+- `zsh/local.zsh`
+- `git/config.d/local`, `personal`, or `work`
+- `homebrew/local.Brewfile`
 
-- `$XDG_CONFIG_HOME/zsh/local.zsh`
-- `$XDG_CONFIG_HOME/git/config.d/local`
-- `$XDG_CONFIG_HOME/git/config.d/personal`
-- `$XDG_CONFIG_HOME/git/config.d/work`
-- `$XDG_CONFIG_HOME/homebrew/local.Brewfile`
+These paths are relative to `$XDG_CONFIG_HOME`. The Git identity template includes the SSH commit-signing runbook.
 
-Non-admin macOS casks default to `$HOME/Applications` in the installer and
-login or interactive zsh shells. An existing `--appdir` override is preserved.
-In `HOMEBREW_CASK_OPTS`, use `--appdir=/path` (quote paths containing spaces),
-not the command-line spelling `--appdir /path`.
+Non-admin macOS casks default to `$HOME/Applications`. An explicit override takes precedence: inside `HOMEBREW_CASK_OPTS`, use `--appdir=/path`, quoting paths with spaces, rather than `--appdir /path`.
 
-`git/config.d/personal.example` includes the provisioning runbook for SSH
-commit signing; copy it to `personal`/`work` and follow the comments.
+## Know the boundaries
 
-## Uninstall
+- Ghostty panes and Neovim windows are separate layers. Option navigation tries Ghostty first, with normal-mode editor fallback.
+- Markdown previews show saved content and restore the source view. Rendered positioning is approximate; a warning indicates the finite scrollback limit was reached. Toggle again after resizing.
+- `help` accepts simple literal aliases, not shell expressions. `EDITOR` supports quoted executable/argument words without evaluating expressions.
+- Directory totals are opt-in scans. Icons depend on font support. Delta can truncate long lines; the guide provides a native-pager alternative.
+
+## Remove the links
 
 ```sh
 dotfiles uninstall
 ```
 
-Only symlinks owned by this repo are removed; `*.backup.*` files and created
-directories are left in place.
-Packages remain installed. Removing a Brewfile entry does not uninstall it;
-package removal is a separate explicit action.
+Only owned symlinks are removed. Backups, local data, created directories, and installed packages remain. Removing a Brewfile entry does not uninstall its package; package removal is a separate explicit action.

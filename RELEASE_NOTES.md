@@ -23,6 +23,12 @@ framework or generated keymap layer.
   native command-mode behavior with usable insert-mode Backspace.
 - Completion includes hidden files and substring fallback while keeping prefix
   priority and ordinary wildcard expansion unchanged.
+- Native completion covers `workspace`, `keys`, and `dotfiles`, including shell
+  aliases. Workspace focus starts in the middle-bottom pane.
+- Neovim adds `Space e r` for explorer return and `Space g d` for the saved
+  file's unstaged Delta diff in a temporary editor tab.
+- Left Option sends Alt in Ghostty; right Option retains macOS character input
+  where explicit shortcuts do not take precedence. Keyboard layouts need a live check.
 - Two eza listing aliases, `l` and `ll`, replace specialized listing shortcuts.
   Native `ls` remains available; sorting, inodes, trees, and directory totals
   use explicit eza options.
