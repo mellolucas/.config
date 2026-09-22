@@ -1,0 +1,18 @@
+#compdef keys
+
+local source_file=${${(%):-%x}:A}
+local guide=${source_file:h:h:h}/GUIDE.md line topic
+local -a topics=('all:Read the whole guide')
+
+if [[ -r $guide ]]; then
+  while IFS= read -r line || [[ -n $line ]]; do
+    [[ $line == '## '*': '* ]] || continue
+    topic=${${line#'## '}%%:*}
+    topics+=("${(L)topic}:${line#*: }")
+  done < "$guide"
+fi
+
+_arguments \
+  '--plain[print without a picker or renderer]' \
+  '(- *)'{-h,--help}'[show help]' \
+  '1:topic: _describe topic topics'

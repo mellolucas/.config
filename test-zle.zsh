@@ -13,7 +13,12 @@ if [[ $1 == --child ]]; then
   config=${config#*'# ---- Completion ----'}
   config=${config%%'# Auto git-glance'*}
   eval "$config"
-  if [[ $4 == --eza ]]; then
+  # Completion must never invoke the helpers or pane commands.
+  workspace keys dotfiles zle-test-command() { print -r -- "$0 $*" >> "$HOME/helper-calls"; }
+  config=$(<"$repo/zsh/.zshrc")
+  config=${config#*'# ---- Aliases ----'}
+  eval "${config%%'if command -v github-open '*}"
+  if [[ $4 == --commands ]]; then
     config=$(<"$repo/zsh/.zshrc")
     config=${config#*$'\nif command -v eza '}
     eval "if command -v eza ${config%%$'\nfi'*}"$'\nfi'
@@ -31,13 +36,14 @@ if [[ $1 == --child ]]; then
     bindkey -M "$keymap" '^X^B' _test_snapshot
     bindkey -M "$keymap" '^X^R' _test_reset
     bindkey -M "$keymap" '^X^G' _test_glob
+    bindkey -M "$keymap" '^X^L' list-choices
   done
   zle-line-init() { print -r -- 'ZLE-READY'; }
   zle -N zle-line-init
   # Expansion runs outside completion, after the tracked options and integrations.
   print -r -- "EXPANSION:$(print -r -- glob/*):END-EXPANSION"
   buffer=''
-  if [[ $4 == --eza ]]; then
+  if [[ $4 == --commands ]]; then
     # Return to the interactive prompt for real command and alias completion.
     return
   fi
@@ -76,12 +82,15 @@ trap 'exit 1' HUP INT TERM
 mkdir -p "$test_root/home/fixtures" "$test_root/home/cache/zsh" "$test_root/home/bin"
 export HOME="$test_root/home" ZDOTDIR="$test_root/home"
 ln -s "${commands[mv]}" "$HOME/bin/mv"
+mkdir -p "$HOME/completions"
+for completion in _workspace _keys _dotfiles; do
+  ln -s "$repo/zsh/functions/$completion" "$HOME/completions/$completion"
+done
+native_fpath=("$HOME/completions" "${native_fpath[@]}")
 if [[ -n $eza_bin && -n $eza_completion ]]; then
   # Include only the packaged eza completion, not the rest of site-functions.
-  mkdir -p "$HOME/completions"
   ln -s "$eza_completion" "$HOME/completions/_eza"
   ln -s "$eza_bin" "$HOME/bin/eza"
-  eza_fpath=("$HOME/completions" "${native_fpath[@]}")
 else
   print -r -- "SKIP: eza alias completion (eza: ${eza_bin:-not installed}; _eza: ${eza_completion:-not found in original fpath})"
 fi
@@ -94,6 +103,7 @@ touch "$fixture/prefix/alpha" "$fixture/prefix/xalpha" \
   "$fixture/hidden/.xxsecretxx" "$fixture/all/.hidden" \
   "$fixture/all/visible" "$fixture/glob/.hidden" "$fixture/glob/visible"
 mkdir -p "$fixture/dirs/.xxsecretxx" "$fixture/dirs/visible"
+mkdir -p "$fixture/workspace-dirs/space project" "$fixture/--project"
 
 failures=0
 checks=0
@@ -174,16 +184,79 @@ for mode in native fzf; do
   snapshot $'\x18\x12\x18\x07'
   expect 'completion does not leak globdots into ordinary expansion' glob/visible
   zpty -d shell
+  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
+    "$zsh_bin" -dfi
+  zpty -w shell "source ${(q)repo}/test-zle.zsh --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --commands"
+  wait_for 'ZLE-READY'
+  for helper in workspace dotscode; do
+    for option in agent editor middle-top middle-bottom; do
+      complete "$helper $option flag" "$helper --${option[1,-2]}" "$helper --$option="
+      complete "$helper $option separate command" "$helper --$option zle-test-co" "$helper --$option zle-test-command"
+      complete "$helper $option equals command" "$helper --$option=zle-test-co" "$helper --$option=zle-test-command"
+    done
+    complete "$helper help" "$helper --hel" "$helper --help "
+    complete "$helper short help" "$helper -h" "$helper -h "
+    complete "$helper flags after directory" "$helper dirs/visible --edi" "$helper dirs/visible --editor="
+    complete "$helper directory after command" "$helper --agent 'zle-test-command arg' dirs/sec" "$helper --agent 'zle-test-command arg' dirs/.xxsecretxx/"
+    complete "$helper directory after equals command" "$helper --agent='zle-test-command arg' dirs/sec" "$helper --agent='zle-test-command arg' dirs/.xxsecretxx/"
+    complete "$helper command after directory" "$helper dirs/visible --editor zle-test-co" "$helper dirs/visible --editor zle-test-command"
+    complete "$helper quoted command" "$helper --agent 'zle-test-co" "$helper --agent 'zle-test-command"
+    complete "$helper command argument" "$helper --editor 'mv prefix/al" "$helper --editor 'mv prefix/alpha"
+    complete "$helper equals quoted command argument" "$helper --editor=\"mv prefix/al" "$helper --editor=mv\\ prefix/alpha"
+    complete "$helper hidden directory after terminator" "$helper -- dirs/sec" "$helper -- dirs/.xxsecretxx/"
+    complete "$helper spaced directory after terminator" "$helper -- workspace-dirs/spa" "$helper -- workspace-dirs/space\\ project/"
+    complete "$helper option-like directory after terminator" "$helper -- --pro" "$helper -- --project/"
+    complete "$helper terminator disables options" "$helper -- --age" "$helper -- --age"
+    complete "$helper only one directory" "$helper dirs/visible dirs/sec" "$helper dirs/visible dirs/sec"
+  done
+  for helper in dotfiles dots; do
+    for subcommand in install bundle update status doctor uninstall help; do
+      complete "$helper $subcommand" "$helper ${subcommand[1,-2]}" "$helper $subcommand "
+      if [[ $subcommand != update ]]; then
+        complete "$helper $subcommand has no flags" "$helper $subcommand --dis" "$helper $subcommand --dis"
+        complete "$helper $subcommand has no arguments" "$helper $subcommand prefix/al" "$helper $subcommand prefix/al"
+      fi
+    done
+  done
+  for helper in 'dotfiles update' 'dots update' dotsup; do
+    complete "$helper discard" "$helper --dis" "$helper --discard "
+    complete "$helper yes" "$helper --ye" "$helper --yes "
+    complete "$helper short yes" "$helper -y" "$helper -y "
+    complete "$helper help" "$helper --hel" "$helper --help "
+    complete "$helper short help" "$helper -h" "$helper -h "
+    complete "$helper multiple flags" "$helper --discard --ye" "$helper --discard --yes "
+    complete "$helper has no positional arguments" "$helper prefix/al" "$helper prefix/al"
+  done
+  while IFS= read -r line; do
+    [[ $line == '## '*': '* ]] || continue
+    topic=${${line#'## '}%%:*}
+    topic=${(L)topic}
+    complete "keys topic $topic from unrelated cwd" "keys ${topic[1,-2]}" "keys $topic "
+    snapshot $'\x18\x12'"keys $topic"$'\x18\x0c'
+    (( ++checks ))
+    if [[ $transcript != *"${line#*: }"* ]]; then
+      print -ru2 -- "FAIL [$mode]: keys $topic description missing: ${(qqqq)transcript}"
+      (( ++failures ))
+    fi
+  done < "$repo/GUIDE.md"
+  complete 'keys all' 'keys al' 'keys all '
+  complete 'keys plain' 'keys --pla' 'keys --plain '
+  complete 'keys help' 'keys --hel' 'keys --help '
+  complete 'keys short help' 'keys -h' 'keys -h '
+  complete 'keys topic after flag' 'keys --plain wor' 'keys --plain workspace '
+  complete 'keys flag after topic' 'keys workspace --pla' 'keys workspace --plain '
+  complete 'keys only one topic' 'keys workspace fil' 'keys workspace fil'
   if [[ -n $eza_bin && -n $eza_completion ]]; then
-    zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
-      "$zsh_bin" -dfi
-    zpty -w shell "source ${(q)repo}/test-zle.zsh --child ${(q)repo} ${(q)${(j.:.)eza_fpath}} --eza"
-    wait_for 'ZLE-READY'
     complete 'eza option through l alias' 'l --ino' 'l --inode '
     # ll already supplies --time-style, which _arguments excludes as a duplicate.
     complete 'eza option value through nested ll alias' 'll --time=mod' 'll --time=modified '
-    zpty -d shell
+  fi
+  zpty -d shell
+  (( ++checks ))
+  if [[ -e $HOME/helper-calls ]]; then
+    print -ru2 -- "FAIL [$mode]: completion executed a helper: $(<"$HOME/helper-calls")"
+    (( ++failures ))
   fi
 done
 (( failures == 0 )) || { print -ru2 -- "$failures/$checks ZLE checks failed"; exit 1; }
-print -r -- "ok: $checks native ZLE checks (completion, wildcard isolation, vi editing, Ghostty, fzf, optional eza aliases)"
+print -r -- "ok: $checks native ZLE checks (completion, helper aliases, wildcard isolation, vi editing, Ghostty, fzf, optional eza aliases)"

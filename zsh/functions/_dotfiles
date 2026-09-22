@@ -1,0 +1,21 @@
+#compdef dotfiles
+
+if (( CURRENT == 2 )); then
+  local -a subcommands=(
+    'install:Link configuration and provision Homebrew packages'
+    'bundle:Apply Homebrew packages (may upgrade tools)'
+    'update:Update the repository and configuration'
+    'status:Show repository status'
+    'doctor:Check configuration health'
+    'uninstall:Remove owned configuration symlinks'
+    'help:Show help'
+  )
+  _describe command subcommands
+elif [[ $words[2] == update ]]; then
+  local -a words=("${words[@]:1}")
+  local CURRENT=$(( CURRENT - 1 ))
+  _arguments \
+    '--discard[review and discard local changes before updating]' \
+    '(--yes -y)'{--yes,-y}'[skip discard confirmation]' \
+    '(--help -h)'{--help,-h}'[show help]'
+fi
