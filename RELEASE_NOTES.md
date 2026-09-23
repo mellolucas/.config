@@ -18,9 +18,15 @@ framework or generated keymap layer.
 - Updates reject unsafe repository states and incoming paths that would replace
   ignored local content. Git operations are isolated from inherited repository
   selectors, and inspection failures stop updates.
+- Installation and updates refuse a checkout that is also the physical XDG
+  configuration home. Keep a separate checkout to protect other apps' files.
 - Homebrew manages Brewfile packages, including OpenCode. OpenCode reports
   available updates without installing them itself. No shared version pin or
   alternate OpenCode installation is introduced.
+- Ghostty's automatic updater is disabled. Obsidian's native automatic-update
+  toggle must be disabled per machine for exclusive Homebrew ownership.
+- Container remains shared on its supported Apple silicon/macOS 26+ hosts;
+  its services may be interrupted by a package upgrade.
 - Go and Bun are explicit shared runtimes; their existing storage settings are
   left intact. The local Brewfile template offers commented opt-in agent,
   infrastructure, and personal-application examples.
@@ -52,6 +58,11 @@ framework or generated keymap layer.
 
 ### Migration
 
+- If an older setup keeps the checkout at `~/.config` itself, preserve its local
+  commits and carry intended edits and overrides into a separate clone outside
+  `~/.config`; do not move the whole configuration directory. Run the separate
+  clone's installer afterward; conflicting configuration directories are backed
+  up aside. Do not use `update --discard` to perform this migration.
 - Use `dotfiles install` instead of `bootstrap`. Installation includes package
   provisioning; start a fresh login shell with `exec zsh -l` afterward.
 - Use `workspace` instead of `dotfiles workspace` or `dotfiles code`.
@@ -86,7 +97,7 @@ Known limits: workspace ratios use the invoking pane's dimensions; terminal
 responses arriving after the query deadline are not drained. Editor Markdown
 previews are saved-state renders with approximate positioning and a finite
 scrollback limit, with a warning at capacity. Delta may truncate long lines;
-the README documents a full-content native-pager alternative. Eza icons depend
+the field guide documents a full-content native-pager alternative. Eza icons depend
 on terminal font support, and recursive directory totals remain opt-in.
 
 Opening netrw selections in neighboring Ghostty panes is post-release work.

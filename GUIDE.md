@@ -311,7 +311,9 @@ Start with `dotfiles check-updates` when you want to inspect availability. Git c
 
 `dotfiles update`
 
-This updates the configuration repository and applies its Brewfile. Homebrew owns package installation and updates, including OpenCode. `dotfiles bundle` applies packages without updating the repository. These commands can download and upgrade tools, not macOS itself.
+This updates the configuration repository and applies its Brewfile. Use Homebrew for package upgrades, including OpenCode. Ghostty automatic updates are disabled; turn off Obsidian's automatic updates in its General settings on each machine. `dotfiles bundle` applies packages without updating the repository. These commands can download and upgrade tools, not macOS itself.
+
+`HOMEBREW_BUNDLE_NO_UPGRADE=1 dotfiles install` skips normal upgrades of installed entries, but can still install missing packages and change dependencies. It is not an offline or links-only mode. Neovim's native package lock and project-selected Go toolchains remain separate from Brewfile updates.
 
 If incoming changes conflict with local work, stop and inspect it. `dotfiles update --discard` is an explicit destructive choice, not a routine repair command.
 

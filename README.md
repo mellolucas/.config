@@ -6,6 +6,8 @@ A focused terminal environment for Ghostty, zsh, Neovim, and Git. Native tools, 
 
 Requires Git, zsh, Ghostty 1.3+, and Neovim 0.12+. macOS is the primary platform; workspace automation is macOS-only. Fresh-machine and Linux testing remain user follow-up work; see the [release notes](RELEASE_NOTES.md) for validation scope.
 
+Keep the checkout separate from `$XDG_CONFIG_HOME` (normally `~/.config`). Installation and updates refuse physically identical paths, including symlink aliases, to protect unrelated applications' configuration.
+
 From this checkout:
 
 ```sh
@@ -44,9 +46,11 @@ dotfiles bundle   # Apply packages without updating the repository
 dotfiles help     # Full lifecycle usage
 ```
 
-Homebrew owns Brewfile-managed tools, including OpenCode; OpenCode only notifies about updates. Applying the Brewfile can download and upgrade packages, but does not update macOS or pin package versions.
+Use Homebrew for Brewfile package upgrades. Ghostty's automatic updater is disabled and OpenCode only notifies about updates. In Obsidian, turn off **Settings → General → Automatic updates** on each machine; this repository does not rewrite its private preferences. Applying the Brewfile can download and upgrade packages, but does not update macOS or pin package versions.
 
-The shared baseline includes Go for the enabled Go language server and Bun for AI-related utilities. macOS also includes the conditional App Store CLI, Container, and Obsidian as intentional general-use tools. Container-based project environments are future work, not configured automatically. Use the commented local Brewfile template for alternative agents and project-specific tools.
+The shared baseline includes Go for the enabled Go language server and Bun for AI-related utilities. macOS also includes the conditional App Store CLI and Obsidian; Container is included on Apple silicon with macOS 26+. Container-based project environments are future work, not configured automatically. Container upgrades may interrupt its running services. Use the commented local Brewfile template for alternative agents and project-specific tools.
+
+For a run that skips upgrades of already-installed Bundle entries, use `HOMEBREW_BUNDLE_NO_UPGRADE=1 dotfiles install`; add `HOMEBREW_NO_AUTO_UPDATE=1` to suppress Homebrew's automatic catalogue refresh. This is not links-only or offline: missing packages and their dependencies may still be installed or upgraded. Native Neovim packages and project-selected Go toolchains have separate lifecycles; Go may download a required toolchain without replacing its Homebrew installation.
 
 `dotfiles check-updates` is explicit, not a startup hook. It fetches the configured Git remote and reports incoming/local commits without merging or changing the checkout. It then runs `brew bundle check --global --verbose`, with automatic metadata refresh disabled and outdated checks enabled. Homebrew metadata freshness is reported as unknown; run `brew update` explicitly for a fresh catalogue before checking again. No Bundle install/upgrade command is invoked, but Brewfile Ruby and package-manager extensions can perform their own work or access the network; this is not an offline sandbox.
 

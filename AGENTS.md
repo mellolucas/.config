@@ -58,8 +58,10 @@ Deliberate duplication that must stay behavior-identical across copies:
    program. Its four `performable:alt+h/j/k/l` navigation binds pair with
    nvim's `<A-h/j/k/l>` window maps in `nvim/lua/config/keymaps.lua` — the
    normal-mode pass-through layer when no Ghostty split exists in that
-   direction. Ghostty takes precedence over internal editor windows. Change
-   both together.
+   direction. The matching insert-mode no-op bindings in `zsh/.zshrc` prevent
+   those pass-through chords from dropping the shell into vi command mode.
+   Ghostty takes precedence over internal editor windows. Change all three
+   together.
 2. **Non-admin cask `--appdir`** logic exists in two places, one per
    invocation path:
    - `zsh/homebrew.zsh` — sourced by login and interactive shells (direct `brew` use)

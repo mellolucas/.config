@@ -18,8 +18,8 @@
   autoSetupRebase = always # Automatically set up rebase for new branches
 
 [pull]
-  rebase = true # Rebase current branch on top of upstream after fetching
-  ff = only # Only update to new history if there is no divergent local history
+  rebase = true # Rebase preference when fast-forward-only is explicitly overridden
+  ff = only # Plain pull refuses divergent history; use --rebase deliberately
 
 # Keep Git Consistent (1=1 mapping for upstream refs)
 [push]
