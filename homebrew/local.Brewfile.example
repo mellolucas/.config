@@ -1,4 +1,16 @@
-cask "discord"
-cask "steam"
-cask "battle-net"
+# Optional machine/project tools. Copy to local.Brewfile and enable what you use.
+# Go, Bun, OpenCode, and the shared editor tools are already in the main Brewfile.
 
+# Alternative workspace agents (workspace --agent 'kiro-cli chat')
+# cask "kiro-cli" if OS.mac?
+# cask "copilot-cli" if OS.mac?
+
+# Cloud and infrastructure projects
+# brew "awscli"
+# tap "hashicorp/tap"
+# brew "hashicorp/tap/terraform"
+
+# Personal applications
+# cask "discord" if OS.mac?
+# cask "steam" if OS.mac?
+# cask "battle-net" if OS.mac?

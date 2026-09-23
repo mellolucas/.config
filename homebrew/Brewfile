@@ -18,8 +18,10 @@ brew "yaml-language-server"
 brew "bash-language-server"
 brew "typescript-language-server"
 brew "basedpyright"
+brew "go"
 brew "gopls"
 
+brew "bun"
 brew "gh"
 brew "opencode"
 
