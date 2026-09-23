@@ -244,7 +244,7 @@ for mode in native fzf; do
     complete "$helper only one directory" "$helper dirs/visible dirs/sec" "$helper dirs/visible dirs/sec"
   done
   for helper in dotfiles dots; do
-    for subcommand in install bundle update status doctor uninstall help; do
+    for subcommand in install bundle update check-updates status doctor uninstall help; do
       complete "$helper $subcommand" "$helper ${subcommand[1,-2]}" "$helper $subcommand "
       if [[ $subcommand != update ]]; then
         complete "$helper $subcommand has no flags" "$helper $subcommand --dis" "$helper $subcommand --dis"

@@ -604,6 +604,102 @@ update_dotfiles() {
   fi
 }
 
+check_git_updates() (
+  # Keep exiting guards local to this section; status must not refresh the index.
+  export GIT_OPTIONAL_LOCKS=0
+  git_require_repo
+  if git_is_dirty; then
+    printf 'note: local changes exist and were left untouched\n'
+  else
+    printf 'working tree: clean\n'
+  fi
+
+  branch=$(git -C "$repo_dir" symbolic-ref --quiet --short HEAD) || {
+    printf 'dotfiles: detached HEAD\n'
+    return 1
+  }
+  local_rev=$(git -C "$repo_dir" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || {
+    printf 'dotfiles: unborn branch or unreadable HEAD\n'
+    return 1
+  }
+  remote=$(git -C "$repo_dir" config --get "branch.$branch.remote") && [ -n "$remote" ] || {
+    printf 'dotfiles: no upstream configured\n'
+    return 1
+  }
+  # Preserve trailing newlines so even empty extra merge entries are rejected.
+  upstream=$(git -C "$repo_dir" config --get-all "branch.$branch.merge" && printf '.') || {
+    printf 'dotfiles: no upstream configured\n'
+    return 1
+  }
+  upstream=${upstream%'
+.'}
+  case "$upstream" in
+    refs/*) ;;
+    *) printf 'dotfiles: upstream must be one full ref\n'; return 1 ;;
+  esac
+  git -C "$repo_dir" check-ref-format "$upstream" || {
+    printf 'dotfiles: upstream must be one valid ref (multiple merge refs are unsupported)\n'
+    return 1
+  }
+
+  # Ignore configured destinations, including mappings into local branches/tags.
+  GIT_TERMINAL_PROMPT=0 git -C "$repo_dir" -c fetch.pruneTags=false \
+    fetch --no-tags --no-prune --no-recurse-submodules --refmap= "$remote" "$upstream" || return 1
+  fetched_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ') || return 1
+  printf 'dotfiles fetched at: %s (UTC)\n' "$fetched_at"
+  upstream_rev=$(git -C "$repo_dir" rev-parse --verify 'FETCH_HEAD^{commit}') || return 1
+  incoming_count=$(git -C "$repo_dir" rev-list --count "$local_rev..$upstream_rev") || return 1
+  local_count=$(git -C "$repo_dir" rev-list --count "$upstream_rev..$local_rev") || return 1
+  if [ "$local_count" -eq 0 ] && [ "$incoming_count" -eq 0 ]; then
+    state=equal
+  elif [ "$incoming_count" -eq 0 ]; then
+    state=ahead
+  elif [ "$local_count" -eq 0 ]; then
+    state=behind
+  elif git -C "$repo_dir" merge-base "$local_rev" "$upstream_rev" >/dev/null; then
+    state=diverged
+  else
+    merge_status=$?
+    [ "$merge_status" -eq 1 ] || return 1
+    state=no-common-history
+  fi
+  printf 'dotfiles: %s (%s)\n' "$state" "$upstream"
+  printf '  incoming commits: %s\n  local-only commits: %s\n' "$incoming_count" "$local_count"
+)
+
+check_updates() {
+  check_result=0
+  printf 'dotfiles repo: %s\n' "$repo_dir"
+  if ! check_git_updates; then
+    printf 'dotfiles: unknown (inspection incomplete)\n'
+    check_result=1
+  fi
+
+  brewfile="${HOMEBREW_BUNDLE_FILE_GLOBAL:-$xdg_config_home/homebrew/Brewfile}"
+  printf '\nHomebrew Brewfile: %s\n' "$brewfile"
+  printf 'Homebrew metadata freshness: unknown; automatic update disabled.\n'
+  printf 'Package extensions may contact upstream services.\n'
+  if [ ! -f "$brewfile" ]; then
+    printf 'error: no Brewfile found at %s\n' "$brewfile" >&2
+    check_result=1
+  elif ! brew=$(brew_bin); then
+    printf 'error: Homebrew is not installed\n' >&2
+    check_result=1
+  elif (
+    unset HOMEBREW_BUNDLE_NO_UPGRADE HOMEBREW_BUNDLE_INSTALL
+    unset HOMEBREW_FORCE_API_AUTO_UPDATE HOMEBREW_BUNDLE_CHECK_ALREADY_OUTPUT_FORMULAE_ERRORS
+    HOMEBREW_NO_AUTO_UPDATE=1 "$brew" bundle check --global --verbose
+  ); then
+    printf 'Homebrew: Brewfile satisfied by current checks\n'
+  else
+    printf 'Homebrew: Brewfile unmet or check failed; see native output above\n'
+    check_result=1
+  fi
+  printf '\nNext: dotfiles status to inspect; dotfiles update to apply repo and package updates.\n'
+  printf 'Package metadata was not explicitly refreshed; brew update refreshes it without upgrading packages.\n'
+  return "$check_result"
+}
+
 status_dotfiles() {
   printf 'dotfiles repo: %s\n' "$repo_dir"
 
@@ -827,12 +923,13 @@ uninstall_dotfiles() {
 
 usage() {
   cat <<EOF
-usage: dotfiles [install|bundle|update|status|doctor|uninstall|help]
+usage: dotfiles [install|bundle|update|check-updates|status|doctor|uninstall|help]
 
 commands:
   install     link configs into XDG_CONFIG_HOME, ensure Homebrew, brew bundle
   bundle      run brew bundle for this dotfiles Brewfile
   update      fetch upstream, fast-forward when clean, then reinstall
+  check-updates  fetch and compare dotfiles; run brew bundle check (no arguments)
   status      show dotfiles repo status
   doctor      show environment status and next steps
   uninstall   remove symlinks owned by this repo
@@ -841,6 +938,12 @@ commands:
 update options:
   --discard   review and discard local repo changes, then reset to upstream
   --yes       skip the --discard confirmation prompt
+
+check-updates exit codes:
+  0           inspection completed and Brewfile satisfied, even if dotfiles differ
+  1           unavailable/incomplete inspection, or Brewfile unmet/check failed
+              Brew's failure cannot distinguish unmet dependencies from errors.
+              No install/upgrade; automatic Homebrew update is disabled.
 
 default command:
   install     when executed directly as install.sh
@@ -876,6 +979,7 @@ case "$cmd" in
   install) require_no_args install "$@"; install_dotfiles ;;
   bundle) require_no_args bundle "$@"; bundle_dotfiles ;;
   update) update_dotfiles "$@" ;;
+  check-updates) require_no_args check-updates "$@"; check_updates ;;
   status) require_no_args status "$@"; status_dotfiles ;;
   doctor) require_no_args doctor "$@"; doctor_dotfiles ;;
   uninstall) require_no_args uninstall "$@"; uninstall_dotfiles ;;

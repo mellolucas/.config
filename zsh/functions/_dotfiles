@@ -5,6 +5,7 @@ if (( CURRENT == 2 )); then
     'install:Link configuration and provision Homebrew packages'
     'bundle:Apply Homebrew packages (may upgrade tools)'
     'update:Update the repository and configuration'
+    'check-updates:Fetch repository status and check Brewfile without applying updates'
     'status:Show repository status'
     'doctor:Check configuration health'
     'uninstall:Remove owned configuration symlinks'
