@@ -10,16 +10,22 @@ if [[ $1 == --child ]]; then
   export TERM=xterm-256color TERM_PROGRAM=ghostty
   # Select complete sections, excluding provisioning, prompt hooks, and local config.
   config=$(<"$repo/zsh/.zshrc")
+  [[ $config == *$'\n# ---- Completion ----\n'*$'\n# Auto git-glance'* ]] ||
+    { print -u2 'FAIL: completion block boundaries'; exit 1; }
   config=${config#*'# ---- Completion ----'}
   config=${config%%'# Auto git-glance'*}
   eval "$config"
   # Completion must never invoke the helpers or pane commands.
   workspace keys dotfiles zle-test-command() { print -r -- "$0 $*" >> "$HOME/helper-calls"; }
   config=$(<"$repo/zsh/.zshrc")
+  [[ $config == *$'\n# ---- Aliases ----\n'*$'\nif command -v github-open '* ]] ||
+    { print -u2 'FAIL: helper alias block boundaries'; exit 1; }
   config=${config#*'# ---- Aliases ----'}
   eval "${config%%'if command -v github-open '*}"
   if [[ $4 == --commands ]]; then
     config=$(<"$repo/zsh/.zshrc")
+    [[ $config == *$'\nif command -v eza '*$'\nfi\n'* ]] ||
+      { print -u2 'FAIL: eza alias block boundaries'; exit 1; }
     config=${config#*$'\nif command -v eza '}
     eval "if command -v eza ${config%%$'\nfi'*}"$'\nfi'
   fi

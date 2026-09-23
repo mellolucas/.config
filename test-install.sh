@@ -34,6 +34,20 @@ bundle_dotfiles() { :; }
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 check() { "$@" || fail "$*"; }
 
+# Only id is stubbed: group matching uses the real shell implementation.
+(
+  id() { check test "$*" = -Gn; printf '%s\n' "$fixture_groups"; return "$id_rc"; }
+  id_rc=0
+  for fixture_groups in admin 'admin staff' 'staff admin' 'staff admin wheel'; do
+    check is_admin
+  done
+  for fixture_groups in '' staff admin-helper admin_helper superadmin 'staff admin-helper wheel'; do
+    if is_admin; then fail "not an admin group: $fixture_groups"; fi
+  done
+  fixture_groups='staff admin' id_rc=1
+  if is_admin; then fail 'failed id lookup must not grant admin status'; fi
+)
+
 # Run the complete dispatcher with a separate HOME and a non-provisioning brew.
 mkdir -p "$test_root/cli-home" "$test_root/cli-bin"
 cat > "$test_root/cli-bin/brew" <<'EOF'
@@ -256,6 +270,10 @@ REAL_GIT=$(command -v git)
 cat > "$test_root/cli-bin/git" <<'EOF'
 #!/bin/sh
 set -eu
+if [ "${REJECT_GIT:-0}" = 1 ]; then
+  printf '%s\n' "$*" >> "$HOME/rejected-git.log"
+  exit 97
+fi
 if [ -n "${GIT_DIR+x}${GIT_WORK_TREE+x}${GIT_INDEX_FILE+x}${GIT_COMMON_DIR+x}${GIT_OBJECT_DIRECTORY+x}${GIT_ALTERNATE_OBJECT_DIRECTORIES+x}" ]; then
   printf 'inherited Git repository selector\n' >&2
   exit 1
@@ -295,6 +313,45 @@ cli_repo="$test_root/cli-repo"
 git clone -q --template= --branch main "$seed" "$cli_repo"
 cp "$repo/install.sh" "$cli_repo/install.sh"
 printf 'untracked\n' > "$cli_repo/dispatcher-marker"
+
+# In-place installs and updates must reject before any links, provisioning, or Git.
+mkdir -p "$cli_repo/zsh" "$cli_repo/homebrew" "$cli_repo/runtime"
+printf '# existing entrypoint\n' > "$cli_repo/zsh/.zshenv"
+printf '# existing Brewfile\n' > "$cli_repo/homebrew/Brewfile"
+printf 'private\n' > "$cli_repo/runtime/data"
+ln -s "$cli_repo" "$test_root/config-alias"
+cp -R "$cli_repo" "$test_root/in-place-before"
+for config_path in "$cli_repo" "$test_root/config-alias" "$test_root/CLI-REPO"; do
+  [ -d "$config_path" ] || continue # Case-variant path exists only on insensitive filesystems.
+  for invocation_path in "$cli_repo" "$config_path"; do
+  for operation in install default-install update discard; do
+    case "$operation" in
+      install) set -- install ;;
+      default-install) set -- ;;
+      update) set -- update ;;
+      discard) set -- update --discard --yes ;;
+    esac
+    if run_cli env XDG_CONFIG_HOME="$config_path" REJECT_GIT=1 \
+      sh "$invocation_path/install.sh" "$@" > "$test_root/in-place.log" 2>&1; then
+      fail "$operation: in-place checkout must be rejected"
+    fi
+    check grep -Fq 'require a checkout separate from XDG_CONFIG_HOME' "$test_root/in-place.log"
+    check diff -r "$test_root/in-place-before" "$cli_repo"
+    check test ! -L "$cli_repo/zsh"
+    check test ! -L "$cli_repo/homebrew"
+    check test ! -e "$test_root/cli-home/.zshenv"
+    check test ! -L "$test_root/cli-home/.zshenv"
+    check test ! -e "$test_root/cli-home/.local/bin/dotfiles"
+    check test ! -L "$test_root/cli-home/.local/bin/dotfiles"
+    check test ! -e "$test_root/cli-home/data"
+    check test ! -e "$test_root/cli-home/state"
+    check test ! -e "$test_root/cli-home/cache"
+    check test ! -e "$test_root/cli-home/provision.log"
+    check test ! -e "$test_root/cli-home/rejected-git.log"
+  done
+  done
+done
+
 for selector in GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR \
   GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES; do
   check run_cli env "$selector=$test_root/invalid-git-path" \

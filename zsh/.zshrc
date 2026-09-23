@@ -69,10 +69,11 @@ if command -v fzf >/dev/null 2>&1; then
   source <(fzf --zsh)
 fi
 
-# Auto git-glance custom function whenever the shell lands in a different repo
+# Auto git-glance in the top-level shell when entering a different repo
 if command -v git-glance >/dev/null 2>&1; then
   typeset -g _git_glance_last=$(git rev-parse --show-toplevel 2>/dev/null)
   _git-glance-chpwd() {
+    [[ $ZSH_SUBSHELL == 0 && -t 1 ]] || return 0
     local top
     top=$(git rev-parse --show-toplevel 2>/dev/null) || { _git_glance_last=''; return 0 }
     [[ $top == $_git_glance_last ]] && return 0

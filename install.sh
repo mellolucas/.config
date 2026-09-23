@@ -69,8 +69,24 @@ export XDG_STATE_HOME="$xdg_state_home"
 export XDG_CACHE_HOME="$xdg_cache_home"
 
 is_darwin() { [ "$(uname -s)" = Darwin ]; }
-is_admin() { id -Gn | grep -qw admin; }
+is_admin() (
+  admin_groups=$(id -Gn 2>/dev/null) || exit 1
+  case " $admin_groups " in
+    *' admin '*) exit 0 ;;
+    *) exit 1 ;;
+  esac
+)
 timestamp() { date +%Y%m%d%H%M%S; }
+
+require_separate_checkout() {
+  # -ef is supported by the macOS/Linux shells and catches case-equivalent paths.
+  # shellcheck disable=SC3013
+  if config_real=$(CDPATH='' cd -P -- "$xdg_config_home" 2>/dev/null && pwd -P) &&
+    { [ "$config_real" = "$repo_dir" ] || [ "$config_real" -ef "$repo_dir" ]; }; then
+    printf 'error: XDG_CONFIG_HOME is the repository checkout; install and update require a checkout separate from XDG_CONFIG_HOME.\n' >&2
+    exit 1
+  fi
+}
 
 backup_path() {
   path=$1
@@ -273,6 +289,8 @@ ensure_homebrew() {
 
 # Links land first so a brew-phase failure leaves a partially-usable setup.
 install_dotfiles() {
+  require_separate_checkout
+
   mkdir -p \
     "$xdg_config_home" \
     "$xdg_data_home" \
@@ -524,6 +542,7 @@ update_dotfiles() {
     return 0
   fi
 
+  require_separate_checkout
   git_require_repo
 
   branch=$(git -C "$repo_dir" symbolic-ref --quiet --short HEAD || true)
@@ -738,7 +757,7 @@ print_link_state() {
     fi
   elif [ -e "$dest" ]; then
     if dest_real=$(resolve_path "$dest") && [ "$dest_real" = "$src_real" ]; then
-      printf 'ok (in place)\n'
+      printf 'in place (not a managed link; install/update require a separate checkout)\n'
     else
       printf 'exists but is not a symlink\n'
     fi

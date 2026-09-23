@@ -1,5 +1,11 @@
 # Non-admin macOS users install casks into their user Applications dir.
-if [[ "$OSTYPE" == darwin* ]] && ! id -Gn | grep -qw admin; then
+if [[ "$OSTYPE" == darwin* ]] && ! (
+  admin_groups=$(id -Gn 2>/dev/null) || exit 1
+  case " $admin_groups " in
+    *' admin '*) exit 0 ;;
+    *) exit 1 ;;
+  esac
+); then
   cask_appdir=$(
     # Shellwords treats operators and substitutions literally, unlike a shell lexer.
     rest=${HOMEBREW_CASK_OPTS-} word='' quote='' explicit=0

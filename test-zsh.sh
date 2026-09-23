@@ -10,6 +10,51 @@ setopt errexit pipefail
 repo=${0:A:h}
 ruby_bin=${commands[ruby]-}
 zsh_bin=${commands[zsh]}
+if [[ ${1:-} == --glance-child ]]; then
+  test_root=$2
+  root=$test_root/home/code/owner/repo
+  fpath=(${(M)fpath:#*/share/zsh/*})
+  fpath=(${fpath:#*site-functions*})
+  autoload -Uz add-zsh-hook
+  path=()
+  fail() { print -ru2 -- "FAIL: git-glance hook: $*"; exit 1; }
+  [[ -o interactive && $ZSH_SUBSHELL == 0 && -t 1 ]] || fail 'top-level interactive terminal required'
+  git() {
+    [[ $* == 'rev-parse --show-toplevel' ]] || fail "unexpected git arguments: $*"
+    [[ $PWD == "$root" || $PWD == "$root/"* ]] || return 1
+    print -r -- "$root"
+  }
+  tput() {
+    case $* in
+      lines) print 1 ;;
+      'cup 0 0') print CUP ;;
+      *) fail "unexpected tput arguments: $*" ;;
+    esac
+  }
+  git-glance() { print CARD; }
+  builtin cd "$test_root/outside"
+  config=$(<"$repo/zsh/.zshrc")
+  [[ $config == *$'\n[[ -o interactive ]] || return\n'* ]] || fail 'interactive startup guard'
+  [[ $config == *$'\n# Auto git-glance '*$'\n# ---- Prompt ----\n'* ]] || fail 'hook block boundaries'
+  config=${config#*$'\n# Auto git-glance '}
+  config=${config#*$'\n'}
+  eval "${config%%$'\n# ---- Prompt ----\n'*}"
+  [[ ${chpwd_functions[(Ie)_git-glance-chpwd]} != 0 ]] || fail 'native chpwd registration'
+  print BEGIN
+  output=$(builtin cd "$root"; print -r -- pure)
+  [[ $output == pure ]] || fail "command substitution polluted: ${(qqqq)output}"
+  (builtin cd "$root") > "$test_root/glance-output"
+  [[ ! -s $test_root/glance-output ]] || fail 'redirected subshell emitted a card'
+  (builtin cd "$root")
+  builtin cd "$root" > "$test_root/glance-output"
+  [[ ! -s $test_root/glance-output ]] || fail 'redirected top-level emitted a card'
+  builtin cd "$root"
+  builtin cd "$root/nested dir"
+  builtin cd "$test_root/outside"
+  builtin cd "$root"
+  print END
+  exit 0
+fi
 for file in "$repo"/zsh/{homebrew.zsh,.zprofile,.zshrc,functions/{fzfe,fzfv,github-open,github-view,help,keys}} "$repo/test-zsh.sh"; do
   zsh -n "$file"
 done
@@ -70,6 +115,10 @@ recorded() {
     fi
   done < "$repo/GUIDE.md"
   expect "${(j: :)topics}" "${(j: :)guide_topics}" 'guide topic contract'
+
+  arg='caller sentinel'
+  keys --plain files > "$test_root/keys-section" || fail 'keys global argument isolation status'
+  expect 'caller sentinel' "$arg" 'keys leaves global arg unchanged'
 
   keys_output=$(print -r -- '' | keys) || fail 'piped keys without dependencies'
   keys_all=$(keys all) || fail 'keys all without dependencies'
@@ -142,6 +191,31 @@ recorded() {
       [[ $output != *"$private_path"* ]] || fail 'keys exposes a private machine path'
     done
   done
+)
+
+# Exercise native chpwd dispatch in a fresh interactive shell, not a harness subshell.
+(
+  zmodload zsh/zpty
+  zmodload zsh/zselect
+  trap 'zpty -d 2>/dev/null || true' EXIT
+  typeset -a child_command=(/usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
+    TERM=xterm-256color "$zsh_bin" -dfi "$repo/test-zsh.sh" --glance-child "$test_root")
+  zpty -b glance "${(@q)child_command}"
+  transcript=''
+  deadline=$(( SECONDS + 10 ))
+  while (( SECONDS < deadline )); do
+    if zpty -r glance chunk; then
+      transcript+=$chunk
+    elif ! zpty -t glance; then
+      break
+    else
+      zselect -t 1 || true
+    fi
+  done
+  (( SECONDS < deadline )) || fail "git-glance PTY timeout: ${(qqqq)transcript}"
+  expect $'BEGIN\n\nCUP\nCARD\n\nCUP\nCARD\nEND\n' "${transcript//$'\r'/}" \
+    'git-glance emits only for top-level terminal repository transitions'
+  print -r -- 'ok: native git-glance chpwd isolation and top-level terminal cards (PTY)'
 )
 
 # Source only the editor, renderer and listing aliases, never startup or local config.
@@ -230,12 +304,7 @@ done
     print -r -- "$*" >> "$test_root/policy-id"
     expect '-Gn' "$*" 'group lookup arguments'
     print -r -- "$groups"
-  }
-  grep() {
-    expect '-qw admin' "$*" 'whole-word admin lookup'
-    local line
-    IFS= read -r line
-    [[ " $line " == *" admin "* ]]
+    return "${id_rc:-0}"
   }
   mkdir() { mkdir_args+=("$@"); }
 
@@ -279,6 +348,13 @@ done
     done
   done
 
+  (
+    OSTYPE=darwin groups='staff admin' id_rc=1
+    unset HOMEBREW_CASK_OPTS
+    source "$repo/zsh/homebrew.zsh"
+    expect "'--appdir=$HOME/Applications'" "$HOMEBREW_CASK_OPTS" 'failed group lookup does not grant admin status'
+  )
+
   # Ruby is a test-only oracle for Homebrew's Shellwords and Config.env selection.
   if [[ -n $ruby_bin ]]; then
   PATH=/usr/bin:/bin "$ruby_bin" -rshellwords -ropen3 - "$repo" "$test_root" "$zsh_bin" <<'RUBY'
@@ -287,7 +363,7 @@ installer = File.read("#{repo}/install.sh")[/^ensure_homebrew_cask_appdir\(\) \{
 abort 'missing installer cask function' unless installer
 policies = {
   '/bin/sh' => "#{installer}\nis_darwin() { return 0; }; is_admin() { return 1; }; policy() { ensure_homebrew_cask_appdir; }",
-  zsh => 'OSTYPE=darwin; id() { printf "staff\\n"; }; grep() { return 1; }; policy() { source "$1/zsh/homebrew.zsh"; }',
+  zsh => 'OSTYPE=darwin; id() { printf "staff\\n"; }; policy() { source "$1/zsh/homebrew.zsh"; }',
 }
 installer_body = installer[/^  cask_appdir=\$\(\n.*?^  mkdir -p "\$HOME\/Applications"/m]
 abort 'runtime cask policies drifted' unless installer_body && File.read("#{repo}/zsh/homebrew.zsh").include?(installer_body)

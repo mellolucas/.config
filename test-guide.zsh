@@ -6,8 +6,8 @@ setopt errexit pipefail
 script=${${(%):-%x}:A}
 repo=${script:h}
 if [[ ${1:-} == --child ]]; then
-  mode=$2 COLUMNS=$3 selection_topic=$4
-  shift 4
+  mode=$2 COLUMNS=$3 selection_topic=$4 repo=$5
+  shift 5
   fpath=("$repo/zsh/functions")
   autoload -Uz keys
   path=()
@@ -144,7 +144,7 @@ check() {
 
   local -a child_command=(/usr/bin/env -i HOME="$test_root" ZDOTDIR="$test_root" \
     LC_ALL=C TERM=xterm-256color "$zsh_bin" -f -c \
-    'source "$1" --child "${@:2}"' guide-child "$script" "$mode" "$width" "$selected" "$@")
+    'source "$1" --child "${@:2}"' guide-child "$script" "$mode" "$width" "$selected" "$repo" "$@")
   # zpty joins its command arguments for evaluation; preserve spaces and empties.
   zpty -b guide "${(@q)child_command}"
   while (( SECONDS < deadline )); do
@@ -186,5 +186,26 @@ for width in 40 80 120; do
   check cancel "$width" files
   check no-match "$width" files
   check picker-error "$width" files
+done
+
+# A separate source tree exercises multi-digit label counts without changing the guide.
+fixture_repo="$test_root/guide fixture"
+zf_mkdir -p "$fixture_repo/zsh/functions"
+print -r -- "$(<"$repo/zsh/functions/keys")" > "$fixture_repo/zsh/functions/keys"
+repo=${fixture_repo:A}
+topics=() labels=() pages=() titles=()
+all=$'# Fixture guide\n'
+print -rn -- "$all" > "$repo/GUIDE.md"
+for number in {1..12}; do
+  topic="topic$number"
+  topics+=("$topic")
+  titles[$topic]="Task $number"
+  pages[$topic]="# Task $number"$'\n\n'"Intent $number"$'\n\n'"Body $number"$'\n'
+  labels+=("$topic"$'\t'"Task $number - Intent $number")
+  print -r -- "## Topic$number: Task $number"$'\n\n'"Intent $number"$'\n\n'"Body $number" >> "$repo/GUIDE.md"
+done
+picker=${picker%%FZF:INPUT*}$'FZF:INPUT\n'"${(F)labels}"$'\nFZF:END\n'
+for topic in "${topics[@]}"; do
+  check picker 80 "$topic"
 done
 print -r -- "ok: $checks hermetic keys reader/picker PTY checks (widths 40/80/120)"
