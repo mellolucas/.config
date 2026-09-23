@@ -38,12 +38,17 @@ Use Tab to discover topics, workspace flags, and lifecycle commands. Native edit
 ```sh
 dotfiles status   # Inspect the configuration repository
 dotfiles doctor   # Check the environment
+dotfiles check-updates # Fetch repository metadata and inspect managed packages
 dotfiles update   # Update the repository and apply the Brewfile
 dotfiles bundle   # Apply packages without updating the repository
 dotfiles help     # Full lifecycle usage
 ```
 
 Homebrew owns Brewfile-managed tools, including OpenCode; OpenCode only notifies about updates. Applying the Brewfile can download and upgrade packages, but does not update macOS or pin package versions.
+
+`dotfiles check-updates` is explicit, not a startup hook. It fetches the configured Git remote and reports incoming/local commits without merging or changing the checkout. It then runs `brew bundle check --global --verbose`, with automatic metadata refresh disabled and outdated checks enabled. Homebrew metadata freshness is reported as unknown; run `brew update` explicitly for a fresh catalogue before checking again. No Bundle install/upgrade command is invoked, but Brewfile Ruby and package-manager extensions can perform their own work or access the network; this is not an offline sandbox.
+
+Exit status is 0 when Git inspection completed and the evaluated Brewfile is satisfied, even if repository commits are available; 1 means inspection was incomplete or Homebrew reported unmet dependencies/an error. Read the two sections independently. A failed fetch never claims the repository is current.
 
 Normal incoming updates require a clean, fast-forwardable checkout. An already-current or locally-ahead checkout is reapplied without altering local edits. Both update modes refuse incoming tracked paths that collide with ignored local content. `dotfiles update --discard` is an explicit destructive alternative, not a routine repair command; `--yes` skips its confirmation.
 
@@ -56,6 +61,8 @@ Keep machine-specific settings in ignored overrides, using the tracked example t
 - `homebrew/local.Brewfile`
 
 These paths are relative to `$XDG_CONFIG_HOME`. The Git identity template includes the SSH commit-signing runbook.
+
+Use sparse overrides rather than copying every default. For example, set `DOTFILES_WORKSPACE_AGENT_CMD='kiro-cli chat'` in `zsh/local.zsh`, or use `workspace --agent 'kiro-cli chat'` for one launch. The template lists the supported pane defaults. New defaults apply when no override is set; updates do not rewrite local files. There is no central settings format or automatic session-start update policy.
 
 Non-admin macOS casks default to `$HOME/Applications`. An explicit override takes precedence: inside `HOMEBREW_CASK_OPTS`, use `--appdir=/path`, quoting paths with spaces, rather than `--appdir /path`.
 

@@ -1,5 +1,16 @@
 # Machine-local zsh overrides (copy to `local.zsh`; sourced last by .zshrc).
-# Untracked by design — env exports, XDG redirections, aliases, functions.
+# Untracked by design. Set only overrides; unset values use repository defaults.
+# XDG roots must be set before shell startup, not in this late interactive file.
+
+# Workspace defaults; command-line flags override these for one invocation.
+# export DOTFILES_WORKSPACE_AGENT_CMD='kiro-cli chat'
+# export DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
+# export DOTFILES_WORKSPACE_MIDDLE_TOP_CMD='' # Leave the top shell at its prompt
+# export DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD=''
+
+# EDITOR accepts quoted executable/argument words, not shell expressions.
+# export EDITOR='nvim --clean'
+# export VISUAL="$EDITOR"
 
 # export SOME_TOOL_HOME="$XDG_CONFIG_HOME/some-tool"
 # export AWS_CONFIG_FILE="$XDG_CONFIG_HOME/aws/config"

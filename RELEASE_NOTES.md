@@ -12,6 +12,9 @@ framework or generated keymap layer.
 - One lifecycle CLI for installation, package application, updates, diagnostics,
   status, and owned-link removal. Links land before provisioning; conflicting
   paths are backed up without overwriting earlier backups.
+- `dotfiles check-updates` explicitly fetches repository status and performs a
+  native Brewfile check without applying updates. Package metadata freshness is
+  reported separately; no startup update hook or shared settings format is added.
 - Updates reject unsafe repository states and incoming paths that would replace
   ignored local content. Git operations are isolated from inherited repository
   selectors, and inspection failures stop updates.

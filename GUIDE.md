@@ -301,16 +301,23 @@ Inspect and update the environment through its single lifecycle entry point.
 
 - `dotfiles status` shows configuration repository state.
 - `dotfiles doctor` reports environment health and next steps.
+- `dotfiles check-updates` fetches repository metadata and checks managed packages without applying updates.
 - `dotfiles help` describes lifecycle commands.
 - `help COMMAND` opens command or builtin documentation; simple literal aliases work too.
 
 ### Update deliberately
+
+Start with `dotfiles check-updates` when you want to inspect availability. Git counts follow a successful fetch; Homebrew uses available metadata without an automatic refresh, so its freshness is unknown. `brew update` explicitly refreshes Homebrew's catalogue without upgrading packages. Bundle checks may access external services and evaluate your Brewfile, but do not invoke Bundle installation. Nothing runs automatically when a shell starts.
 
 `dotfiles update`
 
 This updates the configuration repository and applies its Brewfile. Homebrew owns package installation and updates, including OpenCode. `dotfiles bundle` applies packages without updating the repository. These commands can download and upgrade tools, not macOS itself.
 
 If incoming changes conflict with local work, stop and inspect it. `dotfiles update --discard` is an explicit destructive choice, not a routine repair command.
+
+### Set a personal default
+
+Add only the settings you want to override in `$XDG_CONFIG_HOME/zsh/local.zsh`. For example, `export DOTFILES_WORKSPACE_AGENT_CMD='kiro-cli chat'` chooses your usual workspace agent. A workspace flag still wins for one invocation. Consult `zsh/local.zsh.example` for pane defaults; use the Git and Homebrew local templates for those applications. Updates do not append defaults to your local files.
 
 ### Keep a task awake
 
