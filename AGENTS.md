@@ -38,6 +38,13 @@ Operating rules for anyone (human or agent) working on this dotfiles repository.
 - Generated runtime files (e.g. opencode's `package.json`/`node_modules`) are
   ignored explicitly in the repo `.gitignore` — never tracked, never relied on
   to ignore themselves.
+- Review new tool integration: when adding a package or configuration domain,
+  verify native config/storage paths, required runtimes, platform support, and
+  Homebrew update ownership. Review XDG placement, theme, keybindings, completion,
+  generated-file ignores, and user guidance where relevant; add only settings
+  that improve the intended workflow. No config file is a valid outcome.
+  Shared packages support the default environment or an explicitly approved
+  general-use role; personal/project-specific choices remain local.
 - Commit style: small, cohesive conventional commits,
   `type(scope): lowercase summary`, scope = domain directory
   (e.g. `chore(zsh): ...`, `fix(ghostty): ...`).

@@ -21,6 +21,9 @@ framework or generated keymap layer.
 - Homebrew manages Brewfile packages, including OpenCode. OpenCode reports
   available updates without installing them itself. No shared version pin or
   alternate OpenCode installation is introduced.
+- Go and Bun are explicit shared runtimes; their existing storage settings are
+  left intact. The local Brewfile template offers commented opt-in agent,
+  infrastructure, and personal-application examples.
 - Ghostty owns Option-based terminal navigation; Neovim retains native window
   controls and normal-mode directional fallback. Shell vi editing retains
   native command-mode behavior with usable insert-mode Backspace.

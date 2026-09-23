@@ -46,6 +46,8 @@ dotfiles help     # Full lifecycle usage
 
 Homebrew owns Brewfile-managed tools, including OpenCode; OpenCode only notifies about updates. Applying the Brewfile can download and upgrade packages, but does not update macOS or pin package versions.
 
+The shared baseline includes Go for the enabled Go language server and Bun for AI-related utilities. macOS also includes the conditional App Store CLI, Container, and Obsidian as intentional general-use tools. Container-based project environments are future work, not configured automatically. Use the commented local Brewfile template for alternative agents and project-specific tools.
+
 `dotfiles check-updates` is explicit, not a startup hook. It fetches the configured Git remote and reports incoming/local commits without merging or changing the checkout. It then runs `brew bundle check --global --verbose`, with automatic metadata refresh disabled and outdated checks enabled. Homebrew metadata freshness is reported as unknown; run `brew update` explicitly for a fresh catalogue before checking again. No Bundle install/upgrade command is invoked, but Brewfile Ruby and package-manager extensions can perform their own work or access the network; this is not an offline sandbox.
 
 Exit status is 0 when Git inspection completed and the evaluated Brewfile is satisfied, even if repository commits are available; 1 means inspection was incomplete or Homebrew reported unmet dependencies/an error. Read the two sections independently. A failed fetch never claims the repository is current.
