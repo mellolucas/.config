@@ -1,6 +1,7 @@
 theme = dark:Catppuccin Mocha,light:Catppuccin Latte
 
 window-save-state = always
+auto-update = off
 
 # Left Option sends Alt; right Option retains native macOS character input.
 macos-option-as-alt = left

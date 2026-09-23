@@ -10,7 +10,7 @@ brew "git-delta"
 brew "glow"
 
 cask "ghostty" if OS.mac?
-brew "container" if OS.mac?
+brew "container" if OS.mac? && Hardware::CPU.arm? && MacOS.version >= :tahoe
 
 brew "lua-language-server"
 brew "biome"
