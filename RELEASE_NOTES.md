@@ -50,8 +50,9 @@ framework or generated keymap layer.
 - Left Option sends Alt in Ghostty; right Option retains macOS character input
   where explicit shortcuts do not take precedence. Keyboard layouts need a live check.
 - Eza listings `l` and `ll` include Git fields in long view and automatic
-  hyperlinks. `lll` opts into directory totals/LOC; `lc` summarizes code by
-  language. Native `ls` remains available; recursive scans stay on demand.
+  hyperlinks. `ll` also inspects repository-root entries; `llt` and `lld` provide
+  shallow, ignore-aware trees, with `lld` showing only directories. `lll` opts
+  into totals/LOC; `lc` summarizes code by language. Native `ls` remains available.
 - Workspace command flags select editor, agent, and middle-pane commands per
   invocation. Terminal-size queries are bounded and restore terminal settings.
 - `ggg` appends an eza code summary below the Git card and is the workspace's
@@ -78,8 +79,8 @@ framework or generated keymap layer.
   provisioning; start a fresh login shell with `exec zsh -l` afterward.
 - Use `workspace` instead of `dotfiles workspace` or `dotfiles code`.
   For example: `workspace --agent 'kiro-cli chat' DIR`.
-- Use `l`/`ll` and explicit flags for sorting, inodes, and trees. For example:
-  `ll --sort=age`, `ll --inode`, `l --tree --level=2`. `lll` is the totals/LOC
+- Use `l`/`ll` and explicit flags for sorting and inodes; `llt`/`lld` are shallow
+  trees. For example: `ll --sort=age`, `ll --inode`. `lll` is the totals/LOC
   listing and `lc` is the language summary, not alternative sort orders.
 - Use Option-B for Ghostty scrollback browsing and Option-direction chords for
   terminal panes. Native Neovim Ctrl-W commands operate on editor windows.

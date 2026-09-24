@@ -58,6 +58,14 @@ List what is nearby, search filenames with a preview, then open the right file.
 
 Directories appear first, with automatic terminal hyperlinks and Git status in long view. Use `ll --sort=age` for newest first within the groups, `ll --inode` for inodes, or `l --tree --level=2` for a bounded tree. Type `ll --` then Tab to discover more options.
 
+`ll` also uses `--git-repos` to show status for entries that are repository roots. Inspecting many repositories can take time; `--no-git` disables both repository and file Git fields. Group display stays opt-in with `ll --group --smart-group`; smart grouping suppresses matching owner/group names, not your usual login group.
+
+**Shallow trees**
+
+`llt` runs `ll --tree --git-ignore --level=2`. `lld` adds `--only-dirs` for a directory-only view. Ignore rules reduce clutter where applicable; they are not a guarantee that generated directories are excluded everywhere.
+
+For totals and LOC, use `llt --total-size --loc=both` or `lld --total-size --loc=both`. The depth limit bounds the displayed tree, not the recursive work needed for totals, code counts, or repository status.
+
 **Directory totals and lines of code**
 
 `lll` adds `--total-size --loc=both` to `ll`. This deeper listing can scan directories and file contents; use it when you need those counts, not for every navigation step.

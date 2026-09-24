@@ -131,8 +131,10 @@ fi
 
 if command -v eza >/dev/null 2>&1; then
   alias l='eza --all --group-directories-first --icons=auto --git --hyperlink=auto'
-  alias ll='l --long --binary --time-style=relative'
+  alias ll='l --long --binary --time-style=relative --git-repos'
   alias lll='ll --total-size --loc=both'
+  alias llt='ll --tree --git-ignore --level=2'
+  alias lld='llt --only-dirs'
   alias lc='eza --code=both'
 fi
 

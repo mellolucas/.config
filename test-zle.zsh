@@ -291,6 +291,8 @@ for mode in native fzf; do
     # ll already supplies --time-style, which _arguments excludes as a duplicate.
     complete 'eza option value through nested ll alias' 'll --time=mod' 'll --time=modified '
     complete 'eza option through nested lll alias' 'lll --ino' 'lll --inode '
+    complete 'eza option through llt alias' 'llt --ino' 'llt --inode '
+    complete 'eza option through nested lld alias' 'lld --ino' 'lld --inode '
     complete 'eza option through lc alias' 'lc --no-quo' 'lc --no-quotes '
   fi
   zpty -d shell

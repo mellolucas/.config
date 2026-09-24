@@ -422,16 +422,18 @@ for os in darwin23 linux-gnu; do
           COLUMNS=90
           source /dev/stdin <<< "$alias_block"
 
-          for name in ls lli llli lllt llt lt; do
+          for name in ls lli llli lllt llld lt; do
             (( ! ${+aliases[$name]} )) || fail "$label unexpected $name alias"
           done
           eval 'ls -l "directory with spaces"'
           expect $'ls\n-l\ndirectory with spaces' "$(recorded)" "$label explicit native listing"
           if (( has_eza )); then
-            for listing in l ll lll; do
+            for listing in l ll lll llt lld; do
               expected=$'eza\n--all\n--group-directories-first\n--icons=auto\n--git\n--hyperlink=auto'
-              [[ $listing == l ]] || expected+=$'\n--long\n--binary\n--time-style=relative'
+              [[ $listing == l ]] || expected+=$'\n--long\n--binary\n--time-style=relative\n--git-repos'
               [[ $listing != lll ]] || expected+=$'\n--total-size\n--loc=both'
+              [[ $listing != (llt|lld) ]] || expected+=$'\n--tree\n--git-ignore\n--level=2'
+              [[ $listing != lld ]] || expected+=$'\n--only-dirs'
               eval "$listing"' "directory with spaces"'
               expect "$expected"$'\ndirectory with spaces' "$(recorded)" "$label $listing defaults"
               for flags in --inode --sort=age --tree --level=2 --icons=never --total-size --no-git --hyperlink=never \
@@ -446,7 +448,7 @@ for os in darwin23 linux-gnu; do
             expect $'eza\n--code=both\n--\ndirectory with spaces\nsecond directory' \
               "$(recorded)" "$label code summary forwards paths without listing flags"
           else
-            for name in l ll lll lc; do
+            for name in l ll lll llt lld lc; do
               (( ! ${+aliases[$name]} )) || fail "$label $name dependency guard"
             done
           fi
@@ -714,7 +716,7 @@ editor() { record editor "$@"; }
   eza() { record eza "$@"; }
   source /dev/stdin <<< "$alias_block"
   help ll 'directory name'
-  expect $'eza\n--all\n--group-directories-first\n--icons=auto\n--git\n--hyperlink=auto\n--long\n--binary\n--time-style=relative\ndirectory name\n--help' "$(recorded)" 'help listing alias chain'
+  expect $'eza\n--all\n--group-directories-first\n--icons=auto\n--git\n--hyperlink=auto\n--long\n--binary\n--time-style=relative\n--git-repos\ndirectory name\n--help' "$(recorded)" 'help listing alias chain'
   alias gs='git status --ignored'
   git() { record git "$@"; }
   help gs
