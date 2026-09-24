@@ -276,6 +276,8 @@ Resume a repository, review your work, and compare before sharing it.
 
 Read the branch, working-tree state, upstream difference, and recent commits. Remote information is only as fresh as the last fetch. `gs` shows status, including ignored files.
 
+On a top-level terminal, the card starts on a clean screen while retaining earlier output in scrollback. Captured or redirected cards do not clear the terminal.
+
 `ggg` (`git-glance --code`) appends a language/line-count summary for the repository root, even when called from a subdirectory. Missing eza leaves the card available with a warning; a failed scan reports its error. Plain `gg` and automatic repository-entry cards do not scan code. Workspace startup explicitly chooses `ggg` in its middle-top pane.
 
 ### Review what you changed

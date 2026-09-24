@@ -25,13 +25,6 @@ if [[ ${1:-} == --glance-child ]]; then
     [[ $PWD == "$root" || $PWD == "$root/"* ]] || return 1
     print -r -- "$root"
   }
-  tput() {
-    case $* in
-      lines) print 1 ;;
-      'cup 0 0') print CUP ;;
-      *) fail "unexpected tput arguments: $*" ;;
-    esac
-  }
   git-glance() { (( $# == 0 )) || fail 'automatic card must stay plain'; print CARD; }
   builtin cd "$test_root/outside"
   config=$(<"$repo/zsh/.zshrc")
@@ -53,6 +46,63 @@ if [[ ${1:-} == --glance-child ]]; then
   builtin cd "$root/nested dir"
   builtin cd "$test_root/outside"
   builtin cd "$root"
+  print END
+  exit 0
+fi
+if [[ ${1:-} == --glance-render-child ]]; then
+  test_root=$2
+  mode=$3
+  root=$test_root/home/code/owner/repo
+  fail() { print -ru2 -- "FAIL: git-glance renderer: $*"; exit 1; }
+  [[ -o interactive && $ZSH_SUBSHELL == 0 && -t 1 ]] || fail 'top-level interactive terminal required'
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+  export GLANCE_CALL="$test_root/glance-call" GLANCE_TPUT_CALL="$test_root/glance-tput-call"
+  path=("$test_root/git-bin" "$test_root/eza-bin" "$test_root/tput-bin")
+  fpath=("$repo/zsh/functions")
+  autoload -Uz git-glance
+  config=$(<"$repo/zsh/.zshrc")
+  guard=$'if command -v git-glance >/dev/null 2>&1; then\n  alias gg='
+  git_aliases=${config#*$'\n'${guard}}
+  [[ $git_aliases != "$config" ]] || fail 'git alias conditional boundary'
+  source /dev/stdin <<< "$guard${git_aliases%%$'\nfi\n'*}"$'\nfi'
+  builtin cd "$root/nested dir"
+  case $mode in
+    missing) path=("$test_root/git-bin" "$test_root/eza-bin") ;;
+    invalid-term) export TERM=dotfiles-invalid-term 2>/dev/null ;;
+    zero) export GLANCE_ROWS=0 ;;
+    negative) export GLANCE_ROWS=-1 ;;
+    nondigits) export GLANCE_ROWS=oops ;;
+    empty) export GLANCE_ROWS='' ;;
+    cup-failure) export GLANCE_CUP_RC=1 ;;
+  esac
+  git-glance > "$test_root/glance-render-card" || fail 'baseline card status'
+  : > "$GLANCE_TPUT_CALL"
+  : > "$GLANCE_CALL"
+  # Controlled login/command-echo bytes avoid sourcing startup files or driving ZLE.
+  print -rl -- 'LOGIN OUTPUT' "$ $mode"
+  case $mode in
+    gg|ggg) eval "$mode" || fail "$mode status" ;;
+    substitution)
+      exec 3>&1
+      output=$(
+        [[ $ZSH_SUBSHELL -gt 0 && -t 3 ]] || fail 'terminal substitution required'
+        git-glance >&3 || exit 1
+      ) || fail 'substitution status'
+      exec 3>&-
+      [[ -z $output ]] || fail 'substitution captured terminal output'
+      ;;
+    redirected)
+      git-glance > "$test_root/glance-output" || fail 'redirected status'
+      [[ $(<"$test_root/glance-output") == $(<"$test_root/glance-render-card") ]] || fail 'redirected card changed'
+      ;;
+    help) git-glance --help || fail 'help status' ;;
+    invalid) if git-glance --invalid 2>&1; then fail 'invalid argument accepted'; fi ;;
+    outside)
+      builtin cd "$test_root/outside"
+      if git-glance 2>&1; then fail 'outside repository accepted'; fi
+      ;;
+    *) git-glance || fail "$mode fallback status" ;;
+  esac
   print END
   exit 0
 fi
@@ -263,11 +313,29 @@ STUB
 
 # Exercise native chpwd dispatch in a fresh interactive shell, not a harness subshell.
 (
+  /bin/mkdir -p "$test_root/tput-bin"
+  /bin/cat > "$test_root/tput-bin/tput" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$*" >> "$GLANCE_TPUT_CALL"
+if [ "$TERM" = dotfiles-invalid-term ]; then
+  printf 'tput: unknown terminal\n' >&2
+  exit 1
+fi
+case "$*" in
+  lines) printf '%s\n' "${GLANCE_ROWS-3}" ;;
+  'cup 0 0') printf '\033[H'; exit "${GLANCE_CUP_RC:-0}" ;;
+  *) exit 99 ;;
+esac
+STUB
+  /bin/chmod +x "$test_root/tput-bin/tput"
   zmodload zsh/zpty
   zmodload zsh/zselect
   trap 'zpty -d 2>/dev/null || true' EXIT
+  for mode in hook gg ggg substitution redirected help invalid outside missing invalid-term zero negative nondigits empty cup-failure; do
+  child=--glance-render-child
+  [[ $mode != hook ]] || child=--glance-child
   typeset -a child_command=(/usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
-    TERM=xterm-256color "$zsh_bin" -dfi "$repo/test-zsh.sh" --glance-child "$test_root")
+    TERM=xterm-256color "$zsh_bin" -dfi "$repo/test-zsh.sh" "$child" "$test_root" "$mode")
   zpty -b glance "${(@q)child_command}"
   transcript=''
   deadline=$(( SECONDS + 10 ))
@@ -280,10 +348,48 @@ STUB
       zselect -t 1 || true
     fi
   done
-  (( SECONDS < deadline )) || fail "git-glance PTY timeout: ${(qqqq)transcript}"
-  expect $'BEGIN\n\nCUP\nCARD\n\nCUP\nCARD\nEND\n' "${transcript//$'\r'/}" \
-    'git-glance emits only for top-level terminal repository transitions'
+  (( SECONDS < deadline )) || fail "git-glance $mode PTY timeout: ${(qqqq)transcript}"
+  zpty -d glance
+  transcript=${transcript//$'\r'/}
+  [[ $transcript != *$'\e[3J'* && $transcript != *$'\e[2J'* ]] || fail "$mode erased scrollback or display"
+  if [[ $mode == hook ]]; then
+    expect $'BEGIN\nCARD\nCARD\nEND\n' "$transcript" \
+      'git-glance emits only for top-level terminal repository transitions'
+    continue
+  fi
+  card=''
+  IFS= read -r -d '' card < "$test_root/glance-render-card" || [[ -n $card ]]
+  [[ $card == *owner/repo*'never fetched'*branch*worktree* ]] || fail "$mode baseline repository card"
+  expected=$'LOGIN OUTPUT\n'"$ $mode"$'\n'
+  tput_calls=''
+  case $mode in
+    gg|ggg)
+      expected+=$'\n\n\n\e[H'"$card"
+      [[ $mode != ggg ]] || expected+=$'CODE SUMMARY\n'
+      tput_calls=$'lines\ncup 0 0'
+      ;;
+    redirected) ;;
+    help) expected+=$'usage: git-glance [--code]\nPrint a repository card; --code appends an eza language summary of its root.\n' ;;
+    invalid) expected+=$'git-glance: unknown argument: --invalid\n' ;;
+    outside) expected+=$'git-glance: not inside a git repository\n' ;;
+    *)
+      expected+=$card
+      case $mode in
+        invalid-term|zero|negative|nondigits|empty) tput_calls=lines ;;
+        cup-failure) tput_calls=$'lines\ncup 0 0' ;;
+      esac
+      ;;
+  esac
+  expect "$expected"$'END\n' "$transcript" "git-glance $mode terminal rendering order"
+  expect "$tput_calls" "$(recorded glance-tput-call)" "git-glance $mode capability calls"
+  if [[ $mode == ggg ]]; then
+    expect $'--code=both\n--\n'"$root" "$(recorded glance-call)" 'PTY code summary invoked once'
+  else
+    [[ ! -s $test_root/glance-call ]] || fail "$mode unexpectedly invoked eza"
+  fi
+  done
   print -r -- 'ok: native git-glance chpwd isolation and top-level terminal cards (PTY)'
+  print -r -- 'ok: git-glance soft-clear ordering, capture guards, arguments, and capability fallbacks (PTY)'
 )
 
 # Source only the editor, renderer and listing aliases, never startup or local config.

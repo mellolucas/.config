@@ -104,6 +104,16 @@ for name in $others[1,4]; do
 done
 
 local -i pad=$(( 80 - ${#repo} - ${#fetched} ))
+# Push earlier output into scrollback; captured cards must not control the terminal.
+if [[ $ZSH_SUBSHELL == 0 && -t 1 ]] && (( ${+commands[tput]} )); then
+  local canvas_rows canvas_home
+  if canvas_rows=$(command tput lines 2>/dev/null) &&
+    [[ $canvas_rows == <-> ]] && (( canvas_rows > 0 )) &&
+    canvas_home=$(command tput cup 0 0 2>/dev/null); then
+    printf '\n%.0s' {1..$canvas_rows}
+    print -rn -- "$canvas_home"
+  fi
+fi
 print -P -- "\n%F{blue}${repo//\%/%%}%f${(l:pad:):-}%F{8}${fetched}%f"
 print -P -- "%F{8}${(l:80::─:):-}%f"
 [[ -n $op ]] && print -P -- "%F{red}⚠ $op in progress%f"
