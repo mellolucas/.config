@@ -133,8 +133,10 @@ if command -v bat >/dev/null 2>&1; then
 fi
 
 if command -v eza >/dev/null 2>&1; then
-  alias l='eza --all --group-directories-first --icons=auto'
+  alias l='eza --all --group-directories-first --icons=auto --git --hyperlink=auto'
   alias ll='l --long --binary --time-style=relative'
+  alias lll='ll --total-size --loc=both'
+  alias lc='eza --code=both'
 fi
 
 if [[ $OSTYPE == darwin* ]] && command -v caffeinate >/dev/null 2>&1; then

@@ -54,7 +54,17 @@ List what is nearby, search filenames with a preview, then open the right file.
 
 `ll`
 
-Directories appear first. Use `ll --sort=age` for newest first within the groups, `ll --inode` for inodes, or `l --tree --level=2` for a bounded tree. Type `ll --` then Tab to discover more options.
+Directories appear first, with automatic terminal hyperlinks and Git status in long view. Use `ll --sort=age` for newest first within the groups, `ll --inode` for inodes, or `l --tree --level=2` for a bounded tree. Type `ll --` then Tab to discover more options.
+
+**Directory totals and lines of code**
+
+`lll` adds `--total-size --loc=both` to `ll`. This deeper listing can scan directories and file contents; use it when you need those counts, not for every navigation step.
+
+**Code summary by language**
+
+`lc` runs `eza --code=both`, a recursive language/line-count summary rather than an interactive explorer. Pass a directory to inspect another project. Counts cover recognized languages, not every repository file. Both `lll` and `lc` require an eza version supporting these options (verified with 0.23.5); explicit `=both` retains the default output while keeping native zsh completion unambiguous.
+
+Keep the workspace's lower-middle shell blank by default. For an occasional startup summary, use `workspace --middle-bottom lc`.
 
 ### Search and preview
 
@@ -74,7 +84,7 @@ Type to filter filenames. Use the arrow keys to choose a result. The preview fol
 
 To insert paths into a command, change directory with a picker, or recall a command from history, open `keys shell`. Use `v .` to explore the current directory in the default editor's netrw browser.
 
-**Remember:** directory totals require `ll --total-size` and may take time. Icons can be disabled with `--icons=never`. Native `ls` remains available when eza is absent. Ctrl+U/D are preview controls only in `fzfv`, not ordinary fzf.
+**Remember:** directory totals and code summaries may take time. Disable icons with `--icons=never`, Git fields with `--no-git`, or hyperlinks with `--hyperlink=never`. Native `ls` remains available when eza is absent. Ctrl+U/D are preview controls only in `fzfv`, not ordinary fzf.
 
 ## Shell: Work at the shell prompt
 

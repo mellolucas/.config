@@ -249,18 +249,19 @@ for os in darwin23 linux-gnu; do
           COLUMNS=90
           source /dev/stdin <<< "$alias_block"
 
-          for name in ls lc lli llli lll lllt llt lt; do
+          for name in ls lli llli lllt llt lt; do
             (( ! ${+aliases[$name]} )) || fail "$label unexpected $name alias"
           done
           eval 'ls -l "directory with spaces"'
           expect $'ls\n-l\ndirectory with spaces' "$(recorded)" "$label explicit native listing"
           if (( has_eza )); then
-            for listing in l ll; do
-              expected=$'eza\n--all\n--group-directories-first\n--icons=auto'
-              [[ $listing != ll ]] || expected+=$'\n--long\n--binary\n--time-style=relative'
+            for listing in l ll lll; do
+              expected=$'eza\n--all\n--group-directories-first\n--icons=auto\n--git\n--hyperlink=auto'
+              [[ $listing == l ]] || expected+=$'\n--long\n--binary\n--time-style=relative'
+              [[ $listing != lll ]] || expected+=$'\n--total-size\n--loc=both'
               eval "$listing"' "directory with spaces"'
               expect "$expected"$'\ndirectory with spaces' "$(recorded)" "$label $listing defaults"
-              for flags in --inode --sort=age --tree --level=2 --icons=never --total-size \
+              for flags in --inode --sort=age --tree --level=2 --icons=never --total-size --no-git --hyperlink=never \
                 '--inode --sort=age --tree --level=2 --icons=never --total-size'; do
                 args=(${=flags})
                 eval "$listing"' "${args[@]}" "directory with spaces" "second directory"'
@@ -268,8 +269,11 @@ for os in darwin23 linux-gnu; do
                   "$(recorded)" "$label $listing forwards $flags"
               done
             done
+            eval 'lc -- "directory with spaces" "second directory"'
+            expect $'eza\n--code=both\n--\ndirectory with spaces\nsecond directory' \
+              "$(recorded)" "$label code summary forwards paths without listing flags"
           else
-            for name in l ll; do
+            for name in l ll lll lc; do
               (( ! ${+aliases[$name]} )) || fail "$label $name dependency guard"
             done
           fi
@@ -537,7 +541,7 @@ editor() { record editor "$@"; }
   eza() { record eza "$@"; }
   source /dev/stdin <<< "$alias_block"
   help ll 'directory name'
-  expect $'eza\n--all\n--group-directories-first\n--icons=auto\n--long\n--binary\n--time-style=relative\ndirectory name\n--help' "$(recorded)" 'help listing alias chain'
+  expect $'eza\n--all\n--group-directories-first\n--icons=auto\n--git\n--hyperlink=auto\n--long\n--binary\n--time-style=relative\ndirectory name\n--help' "$(recorded)" 'help listing alias chain'
   alias gs='git status --ignored'
   git() { record git "$@"; }
   help gs
