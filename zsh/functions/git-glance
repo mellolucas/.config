@@ -1,6 +1,20 @@
 # vim: ft=zsh
 
 emulate -L zsh
+
+local -i show_code=0
+local option
+for option in "$@"; do
+  case $option in
+    --code) show_code=1 ;;
+    -h|--help)
+      print -r -- 'usage: git-glance [--code]'
+      print -r -- 'Print a repository card; --code appends an eza language summary of its root.'
+      return 0 ;;
+    *) print -r -u2 -- "git-glance: unknown argument: $option"; return 1 ;;
+  esac
+done
+
 zmodload -F zsh/stat b:zstat
 zmodload -F zsh/datetime p:EPOCHSECONDS
 
@@ -102,3 +116,11 @@ if git rev-parse -q --verify HEAD >/dev/null 2>&1; then
   git --no-pager log -3 --pretty=truncated
 fi
 print
+
+if (( show_code )); then
+  if (( ${+commands[eza]} )); then
+    command eza --code=both -- "$toplevel"
+  else
+    print -u2 -- 'git-glance: eza unavailable; code summary skipped'
+  fi
+fi

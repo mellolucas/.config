@@ -1,5 +1,5 @@
 #!/bin/sh
-# Hermetic policy and function checks: external commands are shell stubs.
+# Hermetic policy and function checks: isolated Git and stubbed external tools.
 if [ -z "${ZSH_VERSION:-}" ]; then
   exec zsh -f "$0" "$@"
 fi
@@ -10,6 +10,7 @@ setopt errexit pipefail
 repo=${0:A:h}
 ruby_bin=${commands[ruby]-}
 zsh_bin=${commands[zsh]}
+git_bin=${commands[git]}
 if [[ ${1:-} == --glance-child ]]; then
   test_root=$2
   root=$test_root/home/code/owner/repo
@@ -31,7 +32,7 @@ if [[ ${1:-} == --glance-child ]]; then
       *) fail "unexpected tput arguments: $*" ;;
     esac
   }
-  git-glance() { print CARD; }
+  git-glance() { (( $# == 0 )) || fail 'automatic card must stay plain'; print CARD; }
   builtin cd "$test_root/outside"
   config=$(<"$repo/zsh/.zshrc")
   [[ $config == *$'\n[[ -o interactive ]] || return\n'* ]] || fail 'interactive startup guard'
@@ -55,7 +56,7 @@ if [[ ${1:-} == --glance-child ]]; then
   print END
   exit 0
 fi
-for file in "$repo"/zsh/{homebrew.zsh,.zprofile,.zshrc,functions/{fzfe,fzfv,github-open,github-view,help,keys}} "$repo/test-zsh.sh"; do
+for file in "$repo"/zsh/{homebrew.zsh,.zprofile,.zshrc,functions/{fzfe,fzfv,git-glance,github-open,github-view,help,keys}} "$repo/test-zsh.sh"; do
   zsh -n "$file"
 done
 
@@ -75,7 +76,7 @@ autoload -Uz run-help
 autoload +X run-help
 fpath=("$repo/zsh/functions")
 autoload -Uz fzfe fzfv github-open github-view help keys
-# No unstubbed executable can run after setup.
+# Individual checks opt into isolated executables as needed.
 path=()
 
 fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
@@ -86,6 +87,72 @@ recorded() {
   IFS= read -r -d '' content < "$test_root/${1:-call}" || [[ -n $content ]]
   print -rn -- "$content"
 }
+
+(
+  for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+  export GLANCE_CALL="$test_root/glance-call"
+  /bin/mkdir -p "$test_root/git-bin" "$test_root/eza-bin"
+  /bin/ln -s "$git_bin" "$test_root/git-bin/git"
+  /bin/cat > "$test_root/eza-bin/eza" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$@" >> "$GLANCE_CALL"
+printf 'CODE SUMMARY\n'
+exit "${EZA_RC:-0}"
+STUB
+  /bin/chmod +x "$test_root/eza-bin/eza"
+  path=("$test_root/git-bin" "$test_root/eza-bin")
+  git init -q --template= "$root"
+  autoload -Uz git-glance
+  config=$(<"$repo/zsh/.zshrc")
+  guard=$'if command -v git-glance >/dev/null 2>&1; then\n  alias gg='
+  git_aliases=${config#*$'\n'${guard}}
+  [[ $git_aliases != "$config" ]] || fail 'git alias conditional boundary'
+  git_aliases=$guard${git_aliases%%$'\nfi\n'*}$'\nfi'
+  source /dev/stdin <<< "$git_aliases"
+  expect git-glance "$aliases[gg]" 'gg stays plain'
+  expect 'git-glance --code' "$aliases[ggg]" 'ggg code alias'
+  builtin cd "$root/nested dir"
+  before=$PWD
+  eval gg > "$test_root/glance-card" || fail 'plain git-glance status'
+  card=$(<"$test_root/glance-card")
+  [[ $card == *owner/repo*'never fetched'*branch*worktree* ]] || fail 'baseline repository card'
+  [[ ! -e $GLANCE_CALL ]] || fail 'plain card invoked eza'
+  expect "$before" "$PWD" 'plain card preserves cwd'
+  eval ggg > "$test_root/glance-output" || fail 'code git-glance status'
+  expect $'--code=both\n--\n'"$root" "$(recorded glance-call)" 'eza receives absolute root, not nested cwd'
+  expect "$card"$'\n\nCODE SUMMARY' "$(<"$test_root/glance-output")" 'code summary below unchanged card'
+  expect "$before" "$PWD" 'code card preserves cwd'
+  path=("$test_root/git-bin")
+  git-glance --code > "$test_root/glance-output" 2> "$test_root/glance-error" || fail 'missing eza succeeds'
+  expect "$card" "$(<"$test_root/glance-output")" 'missing eza retains card'
+  expect 'git-glance: eza unavailable; code summary skipped' "$(recorded glance-error)" 'missing eza warning'
+  path=("$test_root/git-bin" "$test_root/eza-bin")
+  result=0
+  EZA_RC=23 git-glance --code > "$test_root/glance-output" || result=$?
+  expect 23 "$result" 'eza failure propagates'
+  expect "$before" "$PWD" 'fallback and failure preserve cwd'
+  : > "$GLANCE_CALL"
+  builtin cd "$test_root/outside"
+  if git-glance --code > "$test_root/glance-output" 2> "$test_root/glance-error"; then fail 'outside repo accepted'; fi
+  expect 'git-glance: not inside a git repository' "$(recorded glance-error)" 'outside repo diagnostic'
+  [[ ! -s $GLANCE_CALL && ! -s $test_root/glance-output ]] || fail 'outside repo emitted card or invoked eza'
+  git() { print called >> "$test_root/glance-git"; return 99; }
+  for args in --invalid positional '--code extra'; do
+    if git-glance ${=args} > "$test_root/glance-output" 2> "$test_root/glance-error"; then fail "accepted $args"; fi
+    [[ $(recorded glance-error) == 'git-glance: unknown argument: '* ]] || fail "invalid argument diagnostic: $args"
+  done
+  for flag in -h --help; do
+    output=$(git-glance "$flag") || fail "git-glance $flag status"
+    [[ $output == 'usage: git-glance [--code]'* ]] || fail "git-glance $flag usage"
+  done
+  [[ ! -e $test_root/glance-git && ! -s $GLANCE_CALL ]] || fail 'argument parsing invoked git or eza'
+  unfunction git-glance
+  unalias gg ggg
+  source /dev/stdin <<< "$git_aliases"
+  (( ! ${+aliases[gg]} && ! ${+aliases[ggg]} )) || fail 'git aliases dependency guard'
+  print -r -- 'ok: isolated git-glance cards, code summary, arguments, and aliases'
+)
 
 (
   topics=(workspace files shell panes reading documents editor git agents maintain)

@@ -5,7 +5,7 @@ emulate -L zsh
 local editor=${DOTFILES_WORKSPACE_EDITOR_CMD:-nvim .}
 local agent=${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}
 # Empty middle commands skip their pane's startup command.
-local middle_top=${DOTFILES_WORKSPACE_MIDDLE_TOP_CMD-gg}
+local middle_top=${DOTFILES_WORKSPACE_MIDDLE_TOP_CMD-ggg}
 local middle_bottom=${DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD:-}
 local dir=$PWD option value
 local -a directories=()
@@ -46,8 +46,8 @@ Environment:
   DOTFILES_WORKSPACE_AGENT_CMD='ocode'
       Command started in the right pane.
 
-  DOTFILES_WORKSPACE_MIDDLE_TOP_CMD='gg'
-      Command started in the middle-top pane. Empty skips. Defaults to gg.
+  DOTFILES_WORKSPACE_MIDDLE_TOP_CMD='ggg'
+      Command started in the middle-top pane. Empty skips. Defaults to ggg.
 
   DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD=''
       Command started in the middle-bottom pane. Empty skips.

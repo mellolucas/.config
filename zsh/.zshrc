@@ -159,6 +159,7 @@ alias cmdvs='where'
 
 if command -v git-glance >/dev/null 2>&1; then
   alias gg='git-glance'
+  alias ggg='git-glance --code'
 fi
 
 alias g='git'

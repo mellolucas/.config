@@ -54,6 +54,9 @@ framework or generated keymap layer.
   language. Native `ls` remains available; recursive scans stay on demand.
 - Workspace command flags select editor, agent, and middle-pane commands per
   invocation. Terminal-size queries are bounded and restore terminal settings.
+- `ggg` appends an eza code summary below the Git card and is the workspace's
+  middle-top default. Plain `gg` and automatic repository-entry cards stay
+  summary-free; select `--middle-top gg` to skip the workspace scan.
 - Markdown source/preview toggling preserves the editing view; saved-file diffs
   use native decoding. Shell Markdown uses native less folding/chopping, and
   fzfv previews use Option-T to toggle wrapping and Ctrl-U/D for half-page

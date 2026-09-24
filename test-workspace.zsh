@@ -74,7 +74,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   code=${code/$executable_check/'[[ 1 == 1 ]]'}
   functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
-  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode gg '' 0 0)
+  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode ggg '' 0 0)
   dispatch() {
     local actual
     actual=$(workspace "$@" 3>&1 < /dev/null) || fail "dispatch: ${(qqq)@}"
@@ -91,6 +91,11 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   dispatch
   dispatch --
   dispatch -- "$PWD"
+  export DOTFILES_WORKSPACE_MIDDLE_TOP_CMD=gg
+  expected[5]=gg
+  dispatch
+  unset DOTFILES_WORKSPACE_MIDDLE_TOP_CMD
+  expected[5]=ggg
   export DOTFILES_WORKSPACE_EDITOR_CMD='' DOTFILES_WORKSPACE_AGENT_CMD=''
   dispatch
   export DOTFILES_WORKSPACE_EDITOR_CMD='env editor --wait' DOTFILES_WORKSPACE_AGENT_CMD='env agent chat'

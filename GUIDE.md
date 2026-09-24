@@ -24,6 +24,8 @@ Open a project with an editor, two shells, and your preferred agent.
 
 Replace `DIR` with your project directory. Quote a command when it includes arguments. The left pane is the editor, the middle panes are shells, and the right pane is the agent. Focus starts in the larger middle-bottom shell, ready for your next command.
 
+The middle-top shell runs `ggg`: the Git card followed by an eza language summary. This scans the repository and can take time on large projects. Use `workspace --middle-top gg` for only the card, or `workspace --middle-top ''` for a blank top shell.
+
 ### Make it yours
 
 Use `--editor CMD`, `--middle-top CMD`, or `--middle-bottom CMD` to override other pane commands. An empty middle command, such as `--middle-top ''`, leaves a shell prompt. Flags override environment defaults for this launch only.
@@ -273,6 +275,8 @@ Resume a repository, review your work, and compare before sharing it.
 `gg`
 
 Read the branch, working-tree state, upstream difference, and recent commits. Remote information is only as fresh as the last fetch. `gs` shows status, including ignored files.
+
+`ggg` (`git-glance --code`) appends a language/line-count summary for the repository root, even when called from a subdirectory. Missing eza leaves the card available with a warning; a failed scan reports its error. Plain `gg` and automatic repository-entry cards do not scan code. Workspace startup explicitly chooses `ggg` in its middle-top pane.
 
 ### Review what you changed
 
