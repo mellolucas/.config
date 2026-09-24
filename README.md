@@ -50,6 +50,8 @@ Use Homebrew for Brewfile package upgrades. Ghostty's automatic updater is disab
 
 The shared baseline includes Go for the enabled Go language server and Bun for AI-related utilities. macOS also includes the conditional App Store CLI and Obsidian; Container is included on Apple silicon with macOS 26+. Container-based project environments are future work, not configured automatically. Container upgrades may interrupt its running services. Use the commented local Brewfile template for alternative agents and project-specific tools.
 
+Native agent choices include OpenCode, Copilot CLI (macOS cask), Claude Code's latest channel, and Codex. Claude Code 2.1.277+ reads `AGENTS.md` when no `CLAUDE.md` exists, except on Bedrock, Vertex, and Foundry; no parallel instruction file is maintained. Homebrew remains the executable owner. Copilot's targeted `greedy: true` declaration permits cask upgrades despite its self-updater metadata; native Bundle checks may not report that greedy upgrade eligibility.
+
 For a run that skips upgrades of already-installed Bundle entries, use `HOMEBREW_BUNDLE_NO_UPGRADE=1 dotfiles install`; add `HOMEBREW_NO_AUTO_UPDATE=1` to suppress Homebrew's automatic catalogue refresh. This is not links-only or offline: missing packages and their dependencies may still be installed or upgraded. Native Neovim packages and project-selected Go toolchains have separate lifecycles; Go may download a required toolchain without replacing its Homebrew installation.
 
 `dotfiles check-updates` is explicit, not a startup hook. It fetches the configured Git remote and reports incoming/local commits without merging or changing the checkout. It then runs `brew bundle check --global --verbose`, with automatic metadata refresh disabled and outdated checks enabled. Homebrew metadata freshness is reported as unknown; run `brew update` explicitly for a fresh catalogue before checking again. No Bundle install/upgrade command is invoked, but Brewfile Ruby and package-manager extensions can perform their own work or access the network; this is not an offline sandbox.
@@ -69,6 +71,10 @@ Keep machine-specific settings in ignored overrides, using the tracked example t
 These paths are relative to `$XDG_CONFIG_HOME`. The Git identity template includes the SSH commit-signing runbook.
 
 Use sparse overrides rather than copying every default. For example, set `DOTFILES_WORKSPACE_AGENT_CMD='kiro-cli chat'` in `zsh/local.zsh`, or use `workspace --agent 'kiro-cli chat'` for one launch. The template lists the supported pane defaults. New defaults apply when no override is set; updates do not rewrite local files. There is no central settings format or automatic session-start update policy.
+
+Agent preferences are an exception to layered overrides: these tools rewrite their native settings files. The tracked `copilot/`, `claude/`, and `codex/` domains contain baseline templates only. Installation seeds missing private settings, never overwrites existing files, and never migrates existing homes. New homes use XDG data (plus supported cache/state locations); existing native homes and explicit environment overrides are preserved. `keys agents` explains the defaults and scope. When templates change, adoption into existing settings is a deliberate local action.
+
+Run `dotfiles install` after updating to create the new domain links and private directories before first use of a new agent. This applies the Brewfile as usual; it is not a links-only command. Restart a login shell afterward. Agent-home environment variables must be consistent across CLI, IDE, and GUI launch paths; these dotfiles do not inject them into the macOS GUI session.
 
 Non-admin macOS casks default to `$HOME/Applications`. An explicit override takes precedence: inside `HOMEBREW_CASK_OPTS`, use `--appdir=/path`, quoting paths with spaces, rather than `--appdir /path`.
 

@@ -88,7 +88,7 @@ recorded() {
 }
 
 (
-  topics=(workspace files shell panes reading documents editor git maintain)
+  topics=(workspace files shell panes reading documents editor git agents maintain)
   typeset -A sections titles intents topic_outputs
   intents=(
     workspace 'workspace --agent'
@@ -99,6 +99,7 @@ recorded() {
     documents 'mdv FILE'
     editor 'Space e e'
     git 'gds'
+    agents 'workspace --agent copilot'
     maintain 'dotfiles doctor'
   )
   current=''
