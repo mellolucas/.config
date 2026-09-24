@@ -24,6 +24,9 @@ brew "gopls"
 brew "bun"
 brew "gh"
 brew "opencode"
+cask "copilot-cli", greedy: true if OS.mac?
+cask "claude-code@latest"
+cask "codex"
 
 cask "obsidian" if OS.mac?
 

@@ -1,0 +1,3 @@
+check_for_update_on_startup = false
+cli_auth_credentials_store = "auto"
+file_opener = "none"

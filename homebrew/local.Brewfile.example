@@ -1,9 +1,8 @@
 # Optional machine/project tools. Copy to local.Brewfile and enable what you use.
-# Go, Bun, OpenCode, and the shared editor tools are already in the main Brewfile.
+# Go, Bun, OpenCode, Copilot, Claude Code, Codex and editor tools are shared.
 
 # Alternative workspace agents (workspace --agent 'kiro-cli chat')
 # cask "kiro-cli" if OS.mac?
-# cask "copilot-cli" if OS.mac?
 
 # Cloud and infrastructure projects
 # brew "awscli"
