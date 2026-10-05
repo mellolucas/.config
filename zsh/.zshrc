@@ -46,7 +46,7 @@ bindkey -v
 # Erase across vi insertion boundaries and logical newlines in insert mode.
 bindkey -M viins '^?' backward-delete-char
 bindkey -M viins '^H' backward-delete-char
-# 10ms for snappy insert/vicmd switching; no multi-key vicmd sequences exist
+# 10ms for snappy insert/vicmd switching; terminals send Alt chords as one burst
 KEYTIMEOUT=1
 
 setopt interactive_comments
@@ -65,9 +65,9 @@ if [[ "${(L)TERM_PROGRAM}" == "ghostty" ]]; then
   bindkey -M viins -s '^[l' ''
 fi
 
-# Fuzzy finding (ctrl-r history, ctrl-t files, alt-c dirs)
+# Fuzzy finding (ctrl-r history, ctrl-t files, alt-c dirs); fzf < 0.48 lacks --zsh
 if command -v fzf >/dev/null 2>&1; then
-  source <(fzf --zsh)
+  source <(fzf --zsh 2>/dev/null)
 fi
 
 # Auto git-glance in the top-level shell when entering a different repo

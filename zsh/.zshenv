@@ -7,6 +7,8 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 [ -r "$XDG_CONFIG_HOME/zsh/agents.sh" ] && . "$XDG_CONFIG_HOME/zsh/agents.sh"
 
 export ZDOTDIR="${ZDOTDIR:-$XDG_CONFIG_HOME/zsh}"
+# Debian/Ubuntu's global zshrc runs its own compinit unless skipped; .zshrc owns it
+skip_global_compinit=1
 
 # Apple Terminal session restore writes .zsh_sessions into ZDOTDIR (= this repo)
 [[ "$OSTYPE" == darwin* ]] && export SHELL_SESSIONS_DISABLE=1
