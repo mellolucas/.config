@@ -606,8 +606,10 @@ RUBY
   # Check wiring as text: executing profiles could evaluate a real brew binary.
   [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nsource "$ZDOTDIR/homebrew.zsh"\n'* ]] ||
     fail '.zprofile must source the cask policy'
-  [[ $'\n'$(<"$repo/zsh/.zshrc")$'\n' == *$'\n[[ -o login ]] || source "$ZDOTDIR/homebrew.zsh"\n'* ]] ||
-    fail '.zshrc must source the cask policy only for non-login shells'
+  [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nif [[ -o login || -z $HOMEBREW_PREFIX ]]; then\n'* ]] ||
+    fail '.zprofile must rerun shellenv for login shells and initialize other shells once'
+  [[ $'\n'$(<"$repo/zsh/.zshrc")$'\n' == *$'\n[[ -o login ]] || source "$ZDOTDIR/.zprofile"\n'* ]] ||
+    fail '.zshrc must run session setup for non-login shells'
 )
 
 git() {

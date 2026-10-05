@@ -2,7 +2,8 @@
 [[ -o interactive ]] || return
 
 # ---- Environment ----
-[[ -o login ]] || source "$ZDOTDIR/homebrew.zsh"
+# Non-login shells (most Linux terminals) still need the session setup
+[[ -o login ]] || source "$ZDOTDIR/.zprofile"
 
 fpath=("$ZDOTDIR/functions" $fpath)
 fns=("$ZDOTDIR/functions"/*(.N:t))
