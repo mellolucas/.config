@@ -990,6 +990,8 @@ doctor_dotfiles() {
   fi
 
   for path in \
+    "$HOME/.zshrc" \
+    "$HOME/.zprofile" \
     "$HOME/.zcompdump" \
     "$HOME/.viminfo" \
     "$HOME/.lesshst" \
@@ -998,10 +1000,15 @@ doctor_dotfiles() {
     "$HOME/.zsh_history"
   do
     printf 'legacy %s: ' "$path"
-    if [ -e "$path" ]; then
-      printf 'present\n'
-    else
+    if [ ! -e "$path" ]; then
       printf 'absent\n'
+    else
+      case "$path" in
+        */.zshrc|*/.zprofile)
+          printf 'present; ignored while this repo sets ZDOTDIR; move wanted lines to %s\n' \
+            "$xdg_config_home/zsh/local.zsh" ;;
+        *) printf 'present\n' ;;
+      esac
     fi
   done
 
