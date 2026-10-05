@@ -60,7 +60,7 @@
   pager = "if command -v delta >/dev/null; then delta; else less; fi"
 
 [delta]
-  syntax-theme = Catppuccin Mocha
+  syntax-theme = ansi # Terminal palette colors follow the terminal's light/dark theme
   side-by-side = true
   line-numbers-left-format = ""
   line-numbers-right-format = "│{nm:<2}┊{np:>2}│"
