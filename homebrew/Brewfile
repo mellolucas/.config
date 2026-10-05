@@ -22,11 +22,9 @@ brew "go"
 brew "gopls"
 
 brew "bun"
-brew "gh"
+brew "gh" # also runs Copilot CLI through `gh copilot`
 brew "opencode"
-cask "copilot-cli", greedy: true if OS.mac?
-cask "claude-code@latest"
-cask "codex"
+cask "claude-code"
 
 cask "obsidian" if OS.mac?
 

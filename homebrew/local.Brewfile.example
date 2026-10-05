@@ -1,8 +1,12 @@
 # Optional machine/project tools. Copy to local.Brewfile and enable what you use.
-# Go, Bun, OpenCode, Copilot, Claude Code, Codex and editor tools are shared.
+# Go, Bun, OpenCode, Claude Code and editor tools are shared.
 
 # Alternative workspace agents (workspace --agent 'kiro-cli chat')
 # cask "kiro-cli" if OS.mac?
+# Codex: macOS blocks the unnotarized cask until approved in Privacy & Security;
+# the npm package is not quarantined
+# cask "codex"
+# npm "@openai/codex"
 
 # Cloud and infrastructure projects
 # brew "awscli"
