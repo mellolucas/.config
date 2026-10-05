@@ -1,2 +1,2 @@
---theme="Catppuccin Mocha"
-
+# Terminal palette colors follow the terminal's light/dark theme
+--theme=ansi
