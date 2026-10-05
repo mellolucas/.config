@@ -287,107 +287,18 @@ ensure_homebrew() {
   }
 }
 
-# Resolve components before mkdir, including symlink ancestors and missing suffixes.
-# Runtime overrides are honored by shells; installation requires separate storage.
-require_private_agent_path() (
-  config_resolved=
-  for remaining in "$xdg_config_home" "$1"; do
-    case "$remaining" in
-      /*) ;;
-      *) printf 'error: agent runtime/config path must be absolute: %s\n' "$remaining" >&2; exit 1 ;;
-    esac
-    resolved=/ hops=0
-    while :; do
-      if [ -n "$config_resolved" ]; then
-        # Check before following links so a config domain cannot redirect outside.
-        # shellcheck disable=SC3013
-        if [ "$resolved" = "$config_resolved" ] || [ "$resolved" -ef "$config_resolved" ]; then
-          printf 'error: agent runtime path overlaps XDG_CONFIG_HOME: %s\n' "$1" >&2
-          exit 1
-        fi
-        # shellcheck disable=SC3013
-        if [ "$resolved" = "$repo_dir" ] || [ "$resolved" -ef "$repo_dir" ]; then
-          printf 'error: agent runtime path resolves inside checkout: %s\n' "$1" >&2
-          exit 1
-        fi
-      fi
-      [ -n "$remaining" ] || break
-      component=${remaining%%/*}
-      remaining=${remaining#"$component"}
-      remaining=${remaining#/}
-      case "$component" in
-        ''|.) continue ;;
-        ..) resolved=${resolved%/*}; resolved=${resolved:-/} ;;
-        *) resolved=${resolved%/}/$component ;;
-      esac
-      if [ -L "$resolved" ]; then
-        hops=$((hops + 1))
-        [ "$hops" -le 40 ] || {
-          printf 'error: agent runtime symlink cycle: %s\n' "$1" >&2; exit 1
-        }
-        target=$(readlink "$resolved") || exit 1
-        resolved=${resolved%/*}
-        case "$target" in /*) resolved=/ ;; esac
-        remaining=$target${remaining:+/$remaining}
-        continue
-      fi
-      if [ -d "$resolved" ]; then
-        resolved=$(CDPATH='' cd -P -- "$resolved" && pwd -P) || exit 1
-      fi
-    done
-    config_resolved=$resolved
-  done
-)
-
-validate_agent_homes() (
-  for agent_path in "${COPILOT_HOME-$HOME/.copilot}" \
-    "${CLAUDE_CONFIG_DIR-$HOME/.claude}" "${CODEX_HOME-$HOME/.codex}"; do
-    require_private_agent_path "$agent_path" || exit 1
-  done
-  if [ "${COPILOT_CACHE_HOME+x}" = x ]; then
-    require_private_agent_path "$COPILOT_CACHE_HOME" || exit 1
-  fi
-  if [ "${CODEX_SQLITE_HOME+x}" = x ]; then
-    require_private_agent_path "$CODEX_SQLITE_HOME" || exit 1
-  fi
-)
-
-prepare_agent_homes() (
-  validate_agent_homes || exit 1
-  umask 077
-  for agent in copilot claude codex; do
-    settings=settings.json
-    case "$agent" in
-      copilot) agent_home=${COPILOT_HOME-$HOME/.copilot} ;;
-      claude) agent_home=${CLAUDE_CONFIG_DIR-$HOME/.claude} ;;
-      codex) agent_home=${CODEX_HOME-$HOME/.codex}; settings=config.toml ;;
-    esac
-    # Explicit aliases to a legacy directory must not seed preferences either.
-    # shellcheck disable=SC3013
-    if [ "$agent_home" = "$HOME/.$agent" ] || [ "$agent_home" -ef "$HOME/.$agent" ]; then
-      printf 'note: preserving legacy %s home; settings not seeded\n' "$agent"
-      continue
-    fi
-    if [ ! -e "$agent_home/$settings" ] && [ ! -L "$agent_home/$settings" ]; then
-      mkdir -p "$agent_home" || exit 1
-      # Noclobber also protects a destination created since the existence check.
-      (set -C; cat < "$repo_dir/$agent/$settings.example" > "$agent_home/$settings") || exit 1
-      printf 'seeded %s/%s\n' "$agent_home" "$settings"
-    fi
-  done
-  if [ "${COPILOT_CACHE_HOME+x}" = x ]; then mkdir -p "$COPILOT_CACHE_HOME" || exit 1; fi
-  if [ "${CODEX_SQLITE_HOME+x}" = x ]; then mkdir -p "$CODEX_SQLITE_HOME" || exit 1; fi
-)
-
 # Links land first so a brew-phase failure leaves a partially-usable setup.
 install_dotfiles() {
   require_separate_checkout
-  # Export defaults to package hooks as well as settings preparation.
-  # shellcheck source=zsh/agents.sh
-  . "$repo_dir/zsh/agents.sh"
-  validate_agent_homes || exit 1
 
-  mkdir -p "$xdg_config_home" "$user_bin_home"
+  mkdir -p \
+    "$xdg_config_home" \
+    "$xdg_data_home" \
+    "$xdg_state_home" \
+    "$xdg_cache_home" \
+    "$user_bin_home" \
+    "$xdg_state_home/zsh" \
+    "$xdg_cache_home/zsh"
 
   managed_dirs | while IFS= read -r src; do
     name=${src##*/}
@@ -401,9 +312,6 @@ install_dotfiles() {
   fi
 
   link_path "$installer" "$user_bin_home/dotfiles"
-
-  prepare_agent_homes || exit 1
-  mkdir -p "$xdg_data_home" "$xdg_state_home/zsh" "$xdg_cache_home/zsh"
 
   ensure_homebrew
   bundle_dotfiles
@@ -428,11 +336,6 @@ bundle_dotfiles() {
     exit 1
   }
 
-  # Direct bundle invocations need the same homes as install's package hooks.
-  # shellcheck source=zsh/agents.sh
-  . "$repo_dir/zsh/agents.sh"
-  validate_agent_homes || exit 1
-  prepare_agent_homes || exit 1
   ensure_homebrew_cask_appdir
 
   printf 'running brew bundle --global (%s)\n' "$brewfile"

@@ -17,15 +17,9 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 unset GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR
 unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_TEMPLATE_DIR
-unset COPILOT_HOME COPILOT_CACHE_HOME CLAUDE_CONFIG_DIR CODEX_HOME CODEX_SQLITE_HOME
-unset COPILOT_AUTO_UPDATE DISABLE_AUTOUPDATER
 mkdir -p "$HOME" "$test_root/repo/zsh" "$test_root/bin"
 cp "$repo/install.sh" "$test_root/repo/install.sh"
-cp "$repo/zsh/.zshenv" "$repo/zsh/agents.sh" "$test_root/repo/zsh/"
-for agent in copilot claude codex; do
-  mkdir "$test_root/repo/$agent"
-  cp "$repo/$agent/"*.example "$test_root/repo/$agent/"
-done
+cp "$repo/zsh/.zshenv" "$test_root/repo/zsh/"
 
 # Load function definitions without the CLI dispatcher.
 test "$(grep -c '^# CLI dispatcher\.$' "$repo/install.sh")" = 1
@@ -42,107 +36,15 @@ bundle_dotfiles() { :; }
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 check() { "$@" || fail "$*"; }
 
-# The shared environment is quiet, does not create directories, and needs no PATH.
-cat > "$test_root/agent-env.sh" <<'EOF'
-set -eu
-PATH=''
-. "$HELPER"
-[ "$COPILOT_HOME" = "$XDG_DATA_HOME/copilot" ]
-[ "$CLAUDE_CONFIG_DIR" = "$XDG_DATA_HOME/claude" ]
-[ "$CODEX_HOME" = "$XDG_DATA_HOME/codex" ]
-[ "$COPILOT_CACHE_HOME" = "$XDG_CACHE_HOME/copilot" ]
-[ "$CODEX_SQLITE_HOME" = "$XDG_STATE_HOME/codex" ]
-[ "$COPILOT_AUTO_UPDATE" = false ]
-[ "$DISABLE_AUTOUPDATER" = 1 ]
-. "$HELPER"
-[ ! -e "$XDG_DATA_HOME" ]
-[ ! -e "$XDG_CACHE_HOME" ]
-[ ! -e "$XDG_STATE_HOME" ]
-EOF
-check env HELPER="$repo/zsh/agents.sh" sh "$test_root/agent-env.sh" > "$test_root/env.log" 2>&1
-check test ! -s "$test_root/env.log"
-mkdir -p "$XDG_CONFIG_HOME"
-ln -s "$repo_dir/zsh" "$XDG_CONFIG_HOME/zsh"
-check env HELPER="$repo/zsh/.zshenv" zsh -f "$test_root/agent-env.sh" > "$test_root/env.log" 2>&1
-check test ! -s "$test_root/env.log"
-rm "$XDG_CONFIG_HOME/zsh"
+# The zsh entrypoint is quiet, needs no PATH, and creates nothing.
 # shellcheck disable=SC2016
-check env ENTRYPOINT="$repo/zsh/.zshenv" zsh -f -c '
+check env -u ZDOTDIR ENTRYPOINT="$repo/zsh/.zshenv" zsh -f -c '
   PATH=""
   . "$ENTRYPOINT"
-  [[ ${COPILOT_HOME+x}${CLAUDE_CONFIG_DIR+x}${CODEX_HOME+x} == "" ]]
+  [[ $ZDOTDIR == "$XDG_CONFIG_HOME/zsh" ]]
 ' > "$test_root/env.log" 2>&1
 check test ! -s "$test_root/env.log"
-
-for legacy in directory file symlink dangling claude-json claude-json-link; do
-  (
-    export HOME="$test_root/legacy-$legacy"
-    mkdir -p "$HOME"
-    case "$legacy" in
-      directory) mkdir "$HOME/.copilot" "$HOME/.claude" "$HOME/.codex" ;;
-      file) touch "$HOME/.copilot" "$HOME/.claude" "$HOME/.codex" ;;
-      symlink|dangling)
-        if [ "$legacy" = symlink ]; then mkdir "$HOME/target"; fi
-        for agent in copilot claude codex; do ln -s "$HOME/target" "$HOME/.$agent"; done ;;
-      claude-json) touch "$HOME/.claude.json" ;;
-      claude-json-link) ln -s "$HOME/missing" "$HOME/.claude.json" ;;
-    esac
-    # shellcheck source=zsh/agents.sh
-    . "$repo/zsh/agents.sh"
-    check test "${CLAUDE_CONFIG_DIR+x}" != x
-    case "$legacy" in
-      claude-json*) ;;
-      *)
-        check test "${COPILOT_HOME+x}${CODEX_HOME+x}${COPILOT_CACHE_HOME+x}${CODEX_SQLITE_HOME+x}" = ''
-        ;;
-    esac
-    prepare_agent_homes > "$test_root/legacy.log"
-    check grep -Fq 'preserving legacy claude home' "$test_root/legacy.log"
-    check test ! -e "$HOME/.claude/settings.json"
-    check test ! -e "$HOME/.copilot/settings.json"
-    check test ! -e "$HOME/.codex/config.toml"
-    if [ "$legacy" = symlink ]; then check test -z "$(ls -A "$HOME/target")"; fi
-    if [ "$legacy" = directory ]; then
-      (
-        ln -s "$HOME/.copilot" "$HOME/copilot-alias"
-        COPILOT_HOME="$HOME/copilot-alias"
-        prepare_agent_homes > "$test_root/legacy-alias.log"
-        check grep -Fq 'preserving legacy copilot home' "$test_root/legacy-alias.log"
-        check test ! -e "$HOME/.copilot/settings.json"
-      )
-    fi
-    # Explicit values win even in the presence of legacy data.
-    export COPILOT_HOME="$HOME/custom copilot" CLAUDE_CONFIG_DIR="$HOME/custom claude"
-    export CODEX_HOME="$HOME/custom codex" COPILOT_CACHE_HOME="$HOME/custom cache"
-    export CODEX_SQLITE_HOME="$HOME/custom state" COPILOT_AUTO_UPDATE=true DISABLE_AUTOUPDATER=0
-    . "$repo/zsh/agents.sh"
-    check test "$COPILOT_HOME" = "$HOME/custom copilot"
-    check test "$CLAUDE_CONFIG_DIR" = "$HOME/custom claude"
-    check test "$CODEX_HOME" = "$HOME/custom codex"
-    check test "$COPILOT_CACHE_HOME" = "$HOME/custom cache"
-    check test "$CODEX_SQLITE_HOME" = "$HOME/custom state"
-    check test "$COPILOT_AUTO_UPDATE" = true
-    check test "$DISABLE_AUTOUPDATER" = 0
-    prepare_agent_homes > "$test_root/custom.log"
-    check cmp "$repo/copilot/settings.json.example" "$COPILOT_HOME/settings.json"
-    check cmp "$repo/claude/settings.json.example" "$CLAUDE_CONFIG_DIR/settings.json"
-    check cmp "$repo/codex/config.toml.example" "$CODEX_HOME/config.toml"
-  )
-done
-# Explicit empty values remain explicit; no secondary storage defaults for custom homes.
-(
-  export COPILOT_HOME='' CLAUDE_CONFIG_DIR='' CODEX_HOME=''
-  export COPILOT_AUTO_UPDATE='' DISABLE_AUTOUPDATER=''
-  . "$repo/zsh/agents.sh"
-  check test "$COPILOT_HOME$CLAUDE_CONFIG_DIR$CODEX_HOME$COPILOT_AUTO_UPDATE$DISABLE_AUTOUPDATER" = ''
-  check test "${COPILOT_CACHE_HOME+x}${CODEX_SQLITE_HOME+x}" = ''
-)
-(
-  export COPILOT_CACHE_HOME="$HOME/selected-cache" CODEX_SQLITE_HOME="$HOME/selected-state"
-  . "$repo/zsh/agents.sh"
-  check test "$COPILOT_CACHE_HOME" = "$HOME/selected-cache"
-  check test "$CODEX_SQLITE_HOME" = "$HOME/selected-state"
-)
+check test ! -e "$XDG_CONFIG_HOME"
 
 # Only id is stubbed: group matching uses the real shell implementation.
 (
@@ -167,8 +69,6 @@ exit 1
 EOF
 chmod +x "$test_root/cli-bin/brew"
 run_cli() (
-  unset COPILOT_HOME COPILOT_CACHE_HOME CLAUDE_CONFIG_DIR CODEX_HOME CODEX_SQLITE_HOME
-  unset COPILOT_AUTO_UPDATE DISABLE_AUTOUPDATER
   env HOME="$test_root/cli-home" XDG_CONFIG_HOME="$test_root/cli-home/config" \
     XDG_DATA_HOME="$test_root/cli-home/data" XDG_STATE_HOME="$test_root/cli-home/state" \
     XDG_CACHE_HOME="$test_root/cli-home/cache" PATH="$test_root/cli-bin:$PATH" \
@@ -243,38 +143,8 @@ check grep -Fq 'exec zsh -l' "$test_root/install.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
 check test -L "$HOME/.local/bin/dotfiles"
-for agent in copilot claude codex; do
-  settings=settings.json
-  if [ "$agent" = codex ]; then settings=config.toml; fi
-  check test -L "$XDG_CONFIG_HOME/$agent"
-  check test ! -L "$XDG_DATA_HOME/$agent/$settings"
-  check cmp "$repo/$agent/$settings.example" "$XDG_DATA_HOME/$agent/$settings"
-  if mode=$(stat -f '%Lp' "$XDG_DATA_HOME/$agent/$settings" 2>/dev/null); then
-    check test "$mode" = 600
-    check test "$(stat -f '%Lp' "$XDG_DATA_HOME/$agent")" = 700
-  else
-    check test "$(stat -c '%a' "$XDG_DATA_HOME/$agent/$settings")" = 600
-    check test "$(stat -c '%a' "$XDG_DATA_HOME/$agent")" = 700
-  fi
-done
-check test -d "$XDG_CACHE_HOME/copilot"
-check test -d "$XDG_STATE_HOME/codex"
-printf 'private settings\n' > "$XDG_DATA_HOME/copilot/settings.json"
-chmod 640 "$XDG_DATA_HOME/copilot/settings.json"
-rm "$XDG_DATA_HOME/claude/settings.json" "$XDG_DATA_HOME/codex/config.toml"
-ln -s "$XDG_DATA_HOME/copilot/settings.json" "$XDG_DATA_HOME/claude/settings.json"
-ln -s "$HOME/missing-config" "$XDG_DATA_HOME/codex/config.toml"
 install_dotfiles >> "$test_root/install.log"
 check test ! -e "$XDG_CONFIG_HOME/zsh.backup.20000101000000"
-check test "$(cat "$XDG_DATA_HOME/copilot/settings.json")" = 'private settings'
-check test -L "$XDG_DATA_HOME/claude/settings.json"
-check test -L "$XDG_DATA_HOME/codex/config.toml"
-check test ! -e "$HOME/missing-config"
-if mode=$(stat -f '%Lp' "$XDG_DATA_HOME/copilot/settings.json" 2>/dev/null); then
-  check test "$mode" = 640
-else
-  check test "$(stat -c '%a' "$XDG_DATA_HOME/copilot/settings.json")" = 640
-fi
 
 printf 'foreign\n' > "$test_root/foreign"
 ln -s "$test_root/foreign" "$XDG_CONFIG_HOME/foreign"
@@ -285,228 +155,34 @@ check test ! -e "$HOME/.zshenv"
 check test ! -L "$HOME/.local/bin/dotfiles"
 check test -L "$XDG_CONFIG_HOME/foreign"
 check test -f "$test_root/foreign"
-for agent in copilot claude codex; do
-  check test ! -L "$XDG_CONFIG_HOME/$agent"
-  check test -d "$XDG_DATA_HOME/$agent"
-done
-check test "$(cat "$XDG_DATA_HOME/copilot/settings.json")" = 'private settings'
-check test -L "$XDG_DATA_HOME/claude/settings.json"
-check test -L "$XDG_DATA_HOME/codex/config.toml"
 uninstall_dotfiles >> "$test_root/uninstall.log"
 
-# Reject checkout aliases, nonexistent descendants, and unsafe cache/state overrides.
-ln -s "$repo_dir" "$test_root/repo-alias"
-ln -s 'repo-alias' "$test_root/repo-chain"
-ln -s "$repo_dir/missing-parent" "$test_root/repo-dangling"
-ln -s "$test_root/cycle" "$test_root/cycle"
-for unsafe in "$repo_dir" "$repo_dir/private/child" "$test_root/repo-alias/private/child" \
-  "$test_root/repo-chain/private" "$test_root/repo-dangling/child" \
-  "$test_root/missing/../repo/private" "$test_root/cycle/child" '' relative; do
-  for variable in COPILOT_HOME CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_CACHE_HOME CODEX_SQLITE_HOME; do
-    if run_cli env "$variable=$unsafe" sh "$installer" install > "$test_root/unsafe.log" 2>&1; then
-      fail "unsafe $variable accepted: $unsafe"
-    fi
-    check grep -Fq 'error: agent runtime' "$test_root/unsafe.log"
-    check test ! -e "$repo_dir/private"
-    check test ! -e "$repo_dir/missing-parent"
-    check test ! -e "$test_root/cli-home/data"
-    check test ! -e "$test_root/cli-home/state"
-    check test ! -e "$test_root/cli-home/cache"
-    check test ! -e "$test_root/cli-home/provision.log"
-  done
-done
-for variable in XDG_DATA_HOME XDG_CACHE_HOME XDG_STATE_HOME; do
-  if run_cli env "$variable=$test_root/repo-alias/new-runtime" \
-    sh "$installer" install > "$test_root/unsafe.log" 2>&1; then
-    fail "unsafe default $variable accepted"
-  fi
-  check grep -Fq 'error: agent runtime path resolves inside checkout:' "$test_root/unsafe.log"
-  check test ! -e "$repo_dir/new-runtime"
-  check test ! -e "$test_root/cli-home/data"
-  check test ! -e "$test_root/cli-home/provision.log"
-done
-check test ! -e "$test_root/cli-home/config"
-
-# Preflight must preserve all domain destinations, including live runtime homes.
-mkdir "$test_root/cli-home/config"
-for domain in copilot claude codex zsh; do
-  mkdir "$test_root/cli-home/config/$domain"
-  printf 'private\n' > "$test_root/cli-home/config/$domain/data"
-done
-ln -s "$test_root/cli-home/config" "$test_root/config-runtime-alias"
-cp -R "$test_root/cli-home/config" "$test_root/config-before"
-for variable in COPILOT_HOME CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_CACHE_HOME CODEX_SQLITE_HOME \
-  XDG_DATA_HOME XDG_CACHE_HOME XDG_STATE_HOME; do
-  for runtime in "$test_root/cli-home/config/copilot" "$test_root/cli-home/config/claude" \
-    "$test_root/cli-home/config/codex" "$test_root/config-runtime-alias/zsh/custom"; do
-    if run_cli env "$variable=$runtime" sh "$installer" install > "$test_root/preflight.log" 2>&1; then
-      fail "config runtime accepted: $variable=$runtime"
-    fi
-    check grep -Fq 'agent runtime path overlaps XDG_CONFIG_HOME:' "$test_root/preflight.log"
-    check diff -r "$test_root/config-before" "$test_root/cli-home/config"
-    check test ! -L "$test_root/cli-home/.zshenv"
-    check test ! -L "$test_root/cli-home/.local/bin/dotfiles"
-    check test ! -e "$test_root/cli-home/provision.log"
-  done
-done
-rm -r "$test_root/cli-home/config"
-mkdir "$test_root/cli-home/config" "$test_root/outside-runtime"
-printf 'private\n' > "$test_root/outside-runtime/data"
-ln -s "$test_root/outside-runtime" "$test_root/cli-home/config/copilot"
-ln -s "$repo_dir/zsh" "$test_root/cli-home/config/zsh"
-for variable in COPILOT_HOME CLAUDE_CONFIG_DIR CODEX_HOME COPILOT_CACHE_HOME CODEX_SQLITE_HOME XDG_DATA_HOME; do
-  for domain in copilot zsh; do
-    if run_cli env "$variable=$test_root/cli-home/config/$domain/custom" \
-      sh "$installer" install > "$test_root/preflight.log" 2>&1; then
-      fail "symlink domain accepted: $variable/$domain"
-    fi
-    check grep -Fq 'agent runtime path overlaps XDG_CONFIG_HOME:' "$test_root/preflight.log"
-    check test "$(readlink "$test_root/cli-home/config/copilot")" = "$test_root/outside-runtime"
-    check test "$(readlink "$test_root/cli-home/config/zsh")" = "$repo_dir/zsh"
-    check test "$(ls -A "$test_root/cli-home/config")" = "copilot
-zsh"
-    check test "$(cat "$test_root/outside-runtime/data")" = private
-    check test ! -e "$test_root/outside-runtime/custom"
-    check test ! -e "$repo_dir/zsh/custom"
-  done
-done
-rm -r "$test_root/cli-home/config"
-mkdir "$test_root/config-target"
-ln -s "$test_root/config-target" "$test_root/cli-home/config"
-for runtime in "$test_root/config-target/missing/child" "$test_root/cli-home/config/missing/child"; do
-  if run_cli env COPILOT_HOME="$runtime" sh "$installer" install > "$test_root/preflight.log" 2>&1; then
-    fail 'physical config alias accepted'
-  fi
-  check grep -Fq 'agent runtime path overlaps XDG_CONFIG_HOME:' "$test_root/preflight.log"
-  check test -z "$(ls -A "$test_root/config-target")"
-done
-rm "$test_root/cli-home/config"
-if run_cli env COPILOT_HOME="$test_root/cli-home/config/not-created/child" \
-  sh "$installer" install > "$test_root/preflight.log" 2>&1; then
-  fail 'nonexistent config subtree accepted'
-fi
-check grep -Fq 'agent runtime path overlaps XDG_CONFIG_HOME:' "$test_root/preflight.log"
-check test ! -e "$test_root/cli-home/config"
-
-# A template open failure must not leave an empty settings file; symlinks skip input.
-for failure in missing unreadable; do
-  template="$repo_dir/copilot/settings.json.example"
-  mv "$template" "$test_root/saved-template"
-  if [ "$failure" = unreadable ]; then
-    cp "$test_root/saved-template" "$template"
-    chmod 000 "$template"
-  fi
-  if [ ! -r "$template" ]; then
-    if (COPILOT_HOME="$test_root/seed-$failure"; prepare_agent_homes) > "$test_root/seed.log" 2>&1; then
-      fail "$failure template accepted"
-    fi
-    check test ! -e "$test_root/seed-$failure/settings.json"
-    ln -s "$test_root/missing-settings" "$test_root/seed-$failure/settings.json"
-    (COPILOT_HOME="$test_root/seed-$failure"; prepare_agent_homes) > "$test_root/seed.log"
-    check test -L "$test_root/seed-$failure/settings.json"
-    check test ! -e "$test_root/missing-settings"
-  fi
-  mv -f "$test_root/saved-template" "$template"
-done
-
-# Exercise native dispatch and exported storage without invoking real Homebrew.
+# Exercise native dispatch without invoking real Homebrew.
 mkdir "$test_root/package-bin"
 cat > "$test_root/package-bin/brew" <<'EOF'
 #!/bin/sh
 set -eu
 printf 'invoked\n' >> "$HOME/brew.log"
 [ "$*" = 'bundle --global' ]
-if [ "$scenario" = legacy ]; then
-  [ "${COPILOT_HOME+x}${CLAUDE_CONFIG_DIR+x}${CODEX_HOME+x}${COPILOT_CACHE_HOME+x}${CODEX_SQLITE_HOME+x}" = '' ]
-else
-  [ "$COPILOT_HOME" = "$selected/copilot" ]
-  [ "$CLAUDE_CONFIG_DIR" = "$selected/claude" ]
-  [ "$CODEX_HOME" = "$selected/codex" ]
-  [ "$COPILOT_CACHE_HOME" = "$XDG_CACHE_HOME/copilot" ]
-  [ "$CODEX_SQLITE_HOME" = "$XDG_STATE_HOME/codex" ]
-fi
-[ "$COPILOT_AUTO_UPDATE" = "$expected_update" ]
-[ "$DISABLE_AUTOUPDATER" = "$expected_disable" ]
 EOF
 printf '#!/bin/sh\nprintf "Linux\\n"\n' > "$test_root/package-bin/uname"
 chmod +x "$test_root/package-bin/brew" "$test_root/package-bin/uname" "$installer"
-for scenario in fresh explicit legacy unsafe-config unsafe-checkout install; do
+for operation in bundle install; do
   (
-    unset COPILOT_HOME COPILOT_CACHE_HOME CLAUDE_CONFIG_DIR CODEX_HOME CODEX_SQLITE_HOME
-    unset COPILOT_AUTO_UPDATE DISABLE_AUTOUPDATER
-    export scenario HOME="$test_root/package-$scenario" PATH="$test_root/package-bin:$PATH"
+    export HOME="$test_root/package-$operation" PATH="$test_root/package-bin:$PATH"
     export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
     export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
     export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
-    export selected="$XDG_DATA_HOME" expected_update=false expected_disable=1
     mkdir "$HOME"
     printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
-    operation=bundle
-    case "$scenario" in
-      explicit)
-        selected="$HOME/custom data"
-        export COPILOT_HOME="$selected/copilot" CLAUDE_CONFIG_DIR="$selected/claude" CODEX_HOME="$selected/codex"
-        export COPILOT_CACHE_HOME="$XDG_CACHE_HOME/copilot" CODEX_SQLITE_HOME="$XDG_STATE_HOME/codex"
-        export COPILOT_AUTO_UPDATE=true DISABLE_AUTOUPDATER=0
-        expected_update=true expected_disable=0 ;;
-      legacy)
-        for agent in copilot claude codex; do mkdir "$HOME/.$agent"; done
-        printf 'private\n' > "$HOME/.copilot/settings.json"
-        printf 'auth\n' > "$HOME/.claude.json" ;;
-      unsafe-config) export CODEX_SQLITE_HOME="$XDG_CONFIG_HOME/zsh/private" ;;
-      unsafe-checkout) export COPILOT_HOME="$repo_dir/private" ;;
-      install) operation=install ;;
-    esac
-    case "$scenario" in
-      unsafe-*)
-        if "$installer" bundle > "$HOME/dispatch.log" 2>&1; then fail "$scenario bundle accepted"; fi
-        check grep -Fq 'error: agent runtime path' "$HOME/dispatch.log"
-        for path in "$HOME/brew.log" "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" \
-          "$XDG_STATE_HOME" "$HOME/.zshenv" "$HOME/.local" "$repo_dir/private"; do
-          check test ! -e "$path"
-          check test ! -L "$path"
-        done
-        exit 0 ;;
-    esac
     "$installer" "$operation" > "$HOME/dispatch.log" 2>&1
-    if [ "$scenario" != legacy ]; then
-      for agent in copilot claude codex; do
-        settings=settings.json
-        if [ "$agent" = codex ]; then settings=config.toml; fi
-        check cmp "$repo_dir/$agent/$settings.example" "$selected/$agent/$settings"
-        check test ! -L "$selected/$agent/$settings"
-        if mode=$(stat -f '%Lp' "$selected/$agent/$settings" 2>/dev/null); then
-          check test "$mode" = 600
-          check test "$(stat -f '%Lp' "$selected/$agent")" = 700
-        else
-          check test "$(stat -c '%a' "$selected/$agent/$settings")" = 600
-          check test "$(stat -c '%a' "$selected/$agent")" = 700
-        fi
-      done
-      printf 'private\n' > "$selected/copilot/settings.json"
-    fi
     "$installer" "$operation" >> "$HOME/dispatch.log" 2>&1
     check test "$(cat "$HOME/brew.log")" = "invoked
 invoked"
-    if [ "$scenario" = legacy ]; then
-      check test "$(cat "$HOME/.copilot/settings.json")" = private
-      check test "$(cat "$HOME/.claude.json")" = auth
-      check test -z "$(ls -A "$HOME/.claude")"
-      check test -z "$(ls -A "$HOME/.codex")"
-      check test ! -e "$XDG_DATA_HOME"
-      check test ! -e "$XDG_CACHE_HOME"
-      check test ! -e "$XDG_STATE_HOME"
-    else
-      check test "$(cat "$selected/copilot/settings.json")" = private
-    fi
     if [ "$operation" = install ]; then
       check test -L "$HOME/.zshenv"
       check test -L "$HOME/.local/bin/dotfiles"
-      for domain in copilot claude codex zsh; do check test -L "$XDG_CONFIG_HOME/$domain"; done
-      check test "$(ls -A "$XDG_CONFIG_HOME")" = "claude
-codex
-copilot
-zsh"
+      check test "$(ls -A "$XDG_CONFIG_HOME")" = zsh
       if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail 'reinstall made backups'; fi
     else
       check test ! -e "$XDG_CONFIG_HOME"
@@ -515,16 +191,6 @@ zsh"
     fi
   )
 done
-
-# Existing outside symlink ancestors are safe, and settings remain regular copies.
-(
-  mkdir "$HOME/private-agent-data"
-  ln -s "$HOME/private-agent-data" "$HOME/agent-alias"
-  COPILOT_HOME="$HOME/agent-alias/new/home"
-  prepare_agent_homes > "$test_root/alias.log"
-  check test -f "$HOME/private-agent-data/new/home/settings.json"
-  check test ! -L "$COPILOT_HOME/settings.json"
-)
 
 printf 'older\n' > "$test_root/conflict.backup.20000101000000"
 printf 'newer\n' > "$test_root/conflict"
