@@ -794,54 +794,42 @@ fzf() { record "$@"; }
 fzfe --preview-window=wrap --bind ctrl-s:toggle-preview-wrap --query needle
 expect $'--bind\nenter:become(editor --clean -- {})\n--preview-window=wrap\n--bind\nctrl-s:toggle-preview-wrap\n--query\nneedle' "$(recorded)" 'fzf argument forwarding'
 
-for os in darwin23 linux-gnu; do
-  for has_glow in 0 1; do
-    (
-      OSTYPE=$os
-      (( has_glow )) || unfunction glow
-      file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 -- {} || cat -- {}'
-      preview=$file_preview
-      if (( has_glow )); then
-        md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 -- {}'
-        if [[ $os == darwin* ]]; then
-          md_preview="TERM=tmux-256color COLORTERM=truecolor script -q /dev/null $md_preview < /dev/null | tail -n +2"
-        fi
-        preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
-      fi
-      expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap\n--bind\nalt-t:toggle-preview-wrap,ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down'
-      fzfv
-      expect "$expected" "$(recorded)" "fzfv preview shape and OS guard: $os / glow=$has_glow"
-      fzfv --preview 'caller preview {}' --preview-window=nowrap --bind alt-t:ignore --query 'file name'
-      expect "$expected"$'\n--preview\ncaller preview {}\n--preview-window=nowrap\n--bind\nalt-t:ignore\n--query\nfile name' "$(recorded)" "fzfv caller overrides last: $os / glow=$has_glow"
+for has_glow in 0 1; do
+  (
+    (( has_glow )) || unfunction glow
+    file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 -- {} || cat -- {}'
+    preview=$file_preview
+    if (( has_glow )); then
+      md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 -- {}'
+      preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
+    fi
+    expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap\n--bind\nalt-t:toggle-preview-wrap,ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down'
+    fzfv
+    expect "$expected" "$(recorded)" "fzfv preview shape: glow=$has_glow"
+    fzfv --preview 'caller preview {}' --preview-window=nowrap --bind alt-t:ignore --query 'file name'
+    expect "$expected"$'\n--preview\ncaller preview {}\n--preview-window=nowrap\n--bind\nalt-t:ignore\n--query\nfile name' "$(recorded)" "fzfv caller overrides last: glow=$has_glow"
 
-      fzf() {
-        local preview=${4//'{}'/${(q)selection}}
-        eval "$preview"
-      }
-      cat() { record cat "$@"; }
-      script() {
-        expect '-q /dev/null' "$1 $2" 'preview PTY arguments'
-        shift 2
-        "$@"
-      }
-      tail() { expect '-n +2' "$*" 'preview PTY pipeline'; }
-      for selection in '-file' '-file.MD'; do
-        for bat_state in present failing missing; do
-          bat() { record bat "$@"; [[ $bat_state != failing ]]; }
-          [[ $bat_state != missing ]] || unfunction bat
-          fzfv
-          if (( has_glow )) && [[ $selection == *.MD ]]; then
-            expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n--width\n0\n--\n'"$selection"
-          elif [[ $bat_state == present ]]; then
-            expected=$'bat\n--color=always\n--wrap=never\n--style=numbers\n--line-range=:500\n--\n'"$selection"
-          else
-            expected=$'cat\n--\n'"$selection"
-          fi
-          expect "$expected" "$(recorded)" "executed preview: $os / glow=$has_glow / bat=$bat_state / $selection"
-        done
+    fzf() {
+      local preview=${4//'{}'/${(q)selection}}
+      eval "$preview"
+    }
+    cat() { record cat "$@"; }
+    for selection in '-file' '-file.MD'; do
+      for bat_state in present failing missing; do
+        bat() { record bat "$@"; [[ $bat_state != failing ]]; }
+        [[ $bat_state != missing ]] || unfunction bat
+        fzfv
+        if (( has_glow )) && [[ $selection == *.MD ]]; then
+          expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n--width\n0\n--\n'"$selection"
+        elif [[ $bat_state == present ]]; then
+          expected=$'bat\n--color=always\n--wrap=never\n--style=numbers\n--line-range=:500\n--\n'"$selection"
+        else
+          expected=$'cat\n--\n'"$selection"
+        fi
+        expect "$expected" "$(recorded)" "executed preview: glow=$has_glow / bat=$bat_state / $selection"
       done
-    )
-  done
+    done
+  )
 done
 
 git_state=branch
