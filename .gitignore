@@ -26,11 +26,3 @@ homebrew/trust.json*
 
 # opencode session artifacts (plans, scratch); never tracked
 /.opencode/
-
-# Agent config domains contain templates only; runtime homes stay outside Git.
-/claude/*
-!/claude/settings.json.example
-/codex/*
-!/codex/config.toml.example
-/copilot/*
-!/copilot/settings.json.example
