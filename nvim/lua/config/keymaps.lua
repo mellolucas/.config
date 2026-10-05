@@ -30,8 +30,8 @@ map("n", "<leader>td", function()
   vim.diagnostic.config({ virtual_text = not config.virtual_text })
 end, { desc = "Toggle inline diagnostics" })
 -- Markdown preview: swaps the current window between markdown source and a glow
--- render of the file on disk. term=true: a real pty, since glow only colors a tty.
--- Explicit --style (aliases don't reach jobs); --width = min(window, glow.yaml's 120).
+-- render of the file on disk. term=true: a terminal buffer displays glow's ANSI colors.
+-- Explicit --style (aliases don't reach jobs); --width = min(window, 120), glow.yaml's width.
 map("n", "<leader>tm", function()
   local paired = vim.b.tm_source
   if paired then
@@ -179,6 +179,10 @@ map("n", "<A-h>", "<C-w>h", { desc = "Go to left window" })
 map("n", "<A-j>", "<C-w>j", { desc = "Go to lower window" })
 map("n", "<A-k>", "<C-w>k", { desc = "Go to upper window" })
 map("n", "<A-l>", "<C-w>l", { desc = "Go to right window" })
+-- Unmapped, other modes would read a pane-edge chord as Esc+motion.
+for _, key in ipairs({ "h", "j", "k", "l" }) do
+  map({ "i", "v", "c" }, "<A-" .. key .. ">", "<Nop>", { desc = "Ignore pane-edge Option chord" })
+end
 
 -- ---- Terminal Mode ----
 map("t", "<Esc><Esc>", [[<C-\><C-n>]], {

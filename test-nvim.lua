@@ -43,6 +43,19 @@ local toggle = fn.maparg(" tm", "n", false, true).callback
 assert(type(toggle) == "function")
 assert(fn.maparg(" tm", "t") == "")
 
+-- Pane-edge Option chords navigate in normal mode and stay inert elsewhere.
+local typing = api.nvim_create_buf(false, true)
+api.nvim_win_set_buf(0, typing)
+vim.o.showmode = false
+api.nvim_feedkeys(api.nvim_replace_termcodes("iabc<M-h><M-j><M-k><M-l>def<Esc>", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "abcdef")
+for _, key in ipairs({ "h", "j", "k", "l" }) do
+  assert(fn.maparg("<M-" .. key .. ">", "n") == "<C-W>" .. key)
+  for _, mode in ipairs({ "v", "c" }) do
+    assert(fn.maparg("<M-" .. key .. ">", mode) == "<Nop>")
+  end
+end
+
 local source = api.nvim_create_buf(true, false)
 api.nvim_buf_set_name(source, "/virtual/preview.md")
 local lines = {}
