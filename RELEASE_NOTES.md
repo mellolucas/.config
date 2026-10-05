@@ -9,13 +9,10 @@ framework or generated keymap layer.
 
 ### Highlights
 
-- Homebrew agent choices include Copilot CLI, Claude Code's latest channel, and
-  Codex. Private homes and create-if-absent settings templates keep credentials,
-  trust paths, and sessions outside the tracked configuration. Existing native
-  homes are preserved; no automatic migration or preference merging is performed.
-- Claude Code uses `AGENTS.md` directly from 2.1.277 onward; no duplicate
-  instruction asset is introduced. Copilot live-data migration and executable
-  reconciliation remain machine-local operations, not repository prerequisites.
+- Claude Code is a shared Homebrew package and reads `AGENTS.md` directly.
+  Copilot CLI runs through `gh copilot`; Codex is an optional local entry.
+  Their casks are unnotarized, so macOS blocks them. Agents keep their native
+  homes and settings; nothing is seeded or relocated.
 
 - One lifecycle CLI for installation, package application, updates, diagnostics,
   status, and owned-link removal. Links land before provisioning; conflicting

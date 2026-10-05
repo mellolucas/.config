@@ -216,7 +216,7 @@ STUB
     documents 'mdv FILE'
     editor 'Space e e'
     git 'gds'
-    agents 'workspace --agent copilot'
+    agents "workspace --agent 'gh copilot'"
     maintain 'dotfiles doctor'
   )
   current=''

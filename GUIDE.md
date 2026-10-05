@@ -323,30 +323,18 @@ Use the same terminal workspace with different native coding agents, without sha
 
 ### Choose for this launch
 
-- `workspace --agent opencode` uses the existing default agent.
-- `workspace --agent copilot` uses GitHub Copilot CLI.
+- `workspace` starts the default agent, OpenCode.
 - `workspace --agent claude` uses Claude Code.
-- `workspace --agent codex` uses Codex CLI.
+- `workspace --agent 'gh copilot'` uses GitHub Copilot CLI; gh downloads it on first use, or runs a `copilot` already on your PATH.
+- `workspace --agent codex` uses Codex CLI once you enable it in the local Brewfile.
 
 You can also run each command directly. Installing a CLI does not provide a subscription, API credits, or login. Authenticate through the tool's native flow; never put tokens in shared configuration.
 
-### Keep preferences private
-
-Fresh installations use `$XDG_DATA_HOME/copilot`, `$XDG_DATA_HOME/claude`, and `$XDG_DATA_HOME/codex` as private mixed configuration/runtime homes. Copilot cache and Codex SQLite state use their supported XDG cache/state overrides. The installer copies small preferences from the tracked templates only when the destination settings file is absent.
-
-Existing native homes are left in place, including Claude's separate `.claude.json`. No authentication, session history, or preferences are migrated automatically. Explicit home variables win; installation refuses runtime paths inside the checkout or `$XDG_CONFIG_HOME`. Local settings are writable and private: updates do not overwrite them or merge newly added defaults. Inspect the templates when you want to adopt a later preference.
-
 ### Know the defaults
 
-Fresh Claude preferences select manual permissions. Fresh Copilot preferences disable automatic updates and the animated banner. Fresh Codex preferences disable startup update checking, avoid editor-specific file links, and prefer the OS credential store with a private-file fallback where unavailable. Models, themes, trust decisions, and broad permissions stay native or personal.
+Each agent keeps its native home and settings (`~/.claude`, `~/.copilot`, `~/.codex`); nothing is seeded or relocated. Homebrew updates OpenCode and Claude Code; Copilot CLI updates itself. To keep a relocated home for shell launches, export its variable, such as `CLAUDE_CONFIG_DIR`, in `zsh/local.zsh`; GUI and IDE launches still use the native home.
 
-Shell defaults disable Copilot and Claude background updates, while explicit environment overrides remain possible. Homebrew owns executable updates. Do not use `gh copilot` to bootstrap an absent CLI: it can download a separate installation; when `copilot` is already on PATH, gh reuses it.
-
-**Instructions:** keep repository guidance in `AGENTS.md`. Claude Code requires 2.1.277+ to discover it when no `CLAUDE.md` exists; the shared `claude-code@latest` channel provides that support. This discovery is not yet supported on Bedrock, Vertex, or Foundry. Other repositories should define their own rules rather than inheriting this repository's commit identity globally.
-
-**Scope:** these defaults apply to zsh-launched commands and installer preparation. GUI applications or IDE extensions started elsewhere may not inherit the home variables. Keep launches consistent; do not point a second client at another home and assume its sessions are shared. Uninstall preserves private agent data.
-
-Home selection is evaluated on shell startup: if another client creates a native home later, that home takes precedence over an existing XDG default. To fix a deliberate selection, export its home variable in the parent environment. If changing a home after `.zshenv` (for example in `zsh/local.zsh`), also set or unset its separate cache/state override; those variables do not automatically follow a later home change.
+**Instructions:** keep repository guidance in `AGENTS.md`; Claude Code reads it directly when no `CLAUDE.md` exists. Other repositories should define their own rules rather than inheriting this repository's commit identity globally.
 
 ## Maintain: Maintain the setup
 
@@ -366,7 +354,7 @@ Start with `dotfiles check-updates` when you want to inspect availability. Git c
 
 `dotfiles update`
 
-This updates the configuration repository and applies its Brewfile. Use Homebrew for package upgrades, including OpenCode. Ghostty automatic updates are disabled; turn off Obsidian's automatic updates in its General settings on each machine. `dotfiles bundle` prepares missing private agent settings and applies packages without updating the repository or deploying config links. These commands can download and upgrade tools, not macOS itself.
+This updates the configuration repository and applies its Brewfile. Use Homebrew for package upgrades, including OpenCode. Ghostty automatic updates are disabled; turn off Obsidian's automatic updates in its General settings on each machine. `dotfiles bundle` applies packages without updating the repository or deploying config links. These commands can download and upgrade tools, not macOS itself.
 
 `HOMEBREW_BUNDLE_NO_UPGRADE=1 dotfiles install` skips normal upgrades of installed entries, but can still install missing packages and change dependencies. It is not an offline or links-only mode. Neovim's native package lock and project-selected Go toolchains remain separate from Brewfile updates.
 
