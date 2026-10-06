@@ -74,13 +74,13 @@ setopt ignoreeof
 setopt complete_in_word # Complete at the cursor, not the end of the word
 
 # ---- Integrations ----
-# Single-split alt+hjkl passes through Ghostty; without these no-ops, insert mode would drop into vicmd via the ESC fallback
-if [[ "${(L)TERM_PROGRAM}" == "ghostty" ]]; then
-  bindkey -M viins -s '^[h' ''
-  bindkey -M viins -s '^[j' ''
-  bindkey -M viins -s '^[k' ''
-  bindkey -M viins -s '^[l' ''
-fi
+# Option+h/j/k/l pass through Ghostty at pane edges, over SSH too, where
+# TERM_PROGRAM is not sent; without these no-ops, insert mode would drop into
+# vicmd via the ESC fallback
+bindkey -M viins -s '^[h' ''
+bindkey -M viins -s '^[j' ''
+bindkey -M viins -s '^[k' ''
+bindkey -M viins -s '^[l' ''
 
 # Fuzzy finding (ctrl-r history, ctrl-t files, alt-c dirs); fzf < 0.48 lacks --zsh
 if command -v fzf >/dev/null 2>&1; then
