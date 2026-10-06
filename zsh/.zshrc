@@ -88,7 +88,12 @@ if command -v fzf >/dev/null 2>&1; then
   if [[ -z $FZF_DEFAULT_OPTS_FILE && -r $XDG_CONFIG_HOME/fzf/fzfrc ]]; then
     export FZF_DEFAULT_OPTS_FILE=$XDG_CONFIG_HOME/fzf/fzfrc
   fi
-  source <(fzf --zsh 2>/dev/null)
+  # Key bindings need a terminal (without one, fzf's script prints zle errors);
+  # command mode keeps vi redo on Ctrl+R
+  if [[ -t 0 ]]; then
+    source <(fzf --zsh 2>/dev/null)
+    bindkey -M vicmd '^R' redo
+  fi
 fi
 
 # Auto git-glance in the top-level shell when entering a different repo

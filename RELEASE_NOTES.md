@@ -38,7 +38,8 @@
 - Option+Left and Option+Right jump words at the prompt and in Neovim instead
   of dropping into vi command mode or Neovim's normal mode. At the prompt,
   Option+Backspace deletes a word, Ctrl+W and Ctrl+U reach past where typing
-  began, and words end at punctuation as in Neovim.
+  began, words end at punctuation as in Neovim, and Ctrl+R in command mode is
+  vi's redo (fzf's history search keeps Ctrl+R while typing).
 - Browse mode also scrolls with the Up and Down arrows, keeps the Option pane
   chords, and Option+b leaves it again; Ghostty's own Cmd+Option and Cmd+Ctrl
   arrow chords move between and resize panes.

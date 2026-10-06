@@ -236,6 +236,8 @@ for mode in native fzf; do
   expect 'Ctrl+W deletes past where typing began' 'one ' main
   snapshot $'\x18\x12one two\ea\x15'
   expect 'Ctrl+U deletes past where typing began' '' main
+  snapshot $'\x18\x12abc\exu\x12'
+  expect 'Ctrl+R redoes in command mode' ab vicmd
   snapshot $'\x18\x12\x18\x07'
   expect 'completion does not leak globdots into ordinary expansion' glob/visible
   zpty -d shell
