@@ -2,6 +2,7 @@
 local api = vim.api
 local fn = vim.fn
 local real_jobstart, real_jobstop = fn.jobstart, fn.jobstop
+local real_executable = fn.executable
 local notifications, jobs, timers = {}, {}, {}
 local start_result, readable = 1, 1
 
@@ -613,4 +614,22 @@ fn.environ = real_environ
 fn.delete(directory, "rf")
 assert(ok, err)
 
-print("Markdown preview, DiffSaved, and GitDiff tests passed")
+-- :grep runs grepprg through the shell: an unmatched zsh glob would silently
+-- empty the results, and nested repositories' .git folders must stay out.
+fn.executable = real_executable
+if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
+  dofile("nvim/lua/config/options.lua")
+  vim.o.shell = "zsh"
+  local tree = fn.tempname()
+  fn.mkdir(tree .. "/repo/.git", "p")
+  fn.writefile({ "needle" }, tree .. "/repo/.git/config")
+  fn.writefile({ "needle" }, tree .. "/file")
+  vim.cmd.cd(tree)
+  vim.cmd("silent grep! needle")
+  local found = vim.tbl_map(function(entry) return fn.bufname(entry.bufnr) end, fn.getqflist())
+  vim.cmd.cd(cwd)
+  fn.delete(tree, "rf")
+  assert(vim.deep_equal(found, { "file" }), ":grep results: " .. vim.inspect(found))
+end
+
+print("Markdown preview, DiffSaved, GitDiff, and :grep tests passed")
