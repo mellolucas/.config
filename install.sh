@@ -219,27 +219,11 @@ link_npm_global_config() {
   link_path "$repo_dir/homebrew/npmrc" "$npmrc"
 }
 
-ensure_macos_command_line_tools() {
-  is_darwin || return 0
-  xcode-select -p >/dev/null 2>&1 && return 0
-
-  printf 'macOS Command Line Tools are missing.\n'
-  printf 'Starting installer with: xcode-select --install\n'
-  xcode-select --install >/dev/null 2>&1 || true
-
-  printf '\nAfter the installer finishes, rerun:\n'
-  printf '  dotfiles install   (or: ./install.sh install)\n'
-  exit 1
-}
-
 ensure_homebrew() {
   if brew_bin >/dev/null 2>&1; then
     printf 'ok: Homebrew already installed\n'
     return 0
   fi
-
-  # Xcode CLT is needed only to install Homebrew; working brew implies usable tooling.
-  ensure_macos_command_line_tools
 
   command -v curl >/dev/null 2>&1 || {
     printf 'error: curl is required to install Homebrew\n' >&2

@@ -15,7 +15,7 @@ Keep the checkout separate from `$XDG_CONFIG_HOME` (normally `~/.config`). From 
 exec zsh -l
 ```
 
-Installation links each configuration directory into `$XDG_CONFIG_HOME`, adds the `~/.zshenv` entrypoint and the `dotfiles` command, then ensures Homebrew and applies the Brewfile. Bootstrapping Homebrew needs curl and bash, plus the Xcode Command Line Tools on macOS. Conflicting files are moved to timestamped backups, never overwritten, and rerunning is safe.
+Installation links each configuration directory into `$XDG_CONFIG_HOME`, adds the `~/.zshenv` entrypoint and the `dotfiles` command, then ensures Homebrew and applies the Brewfile. Bootstrapping Homebrew needs curl and bash; on macOS, Homebrew's installer adds the Xcode Command Line Tools itself. Conflicting files are moved to timestamped backups, never overwritten, and rerunning is safe.
 
 ## Find your flow
 

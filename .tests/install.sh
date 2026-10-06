@@ -138,7 +138,6 @@ rmdir "$test_root/cli-home/config"
   # shellcheck source=/dev/null
   . "$test_root/library.sh"
   brew_bin() { return 1; }
-  ensure_macos_command_line_tools() { :; }
   curl() {
     # shellcheck disable=SC2016
     printf '%s\n' 'printf "bootstrap NONINTERACTIVE=%s\n" "${NONINTERACTIVE-unset}"'
