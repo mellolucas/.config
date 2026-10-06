@@ -53,7 +53,7 @@ Notes:
 - Non-admin macOS users get casks in `~/Applications`; an explicit `--appdir=` in `HOMEBREW_CASK_OPTS` wins.
 - Git 2.35 or newer is required for the `zdiff3` merge conflict style.
 - Homebrew's `python3` refuses global `pip install`; use `python3 -m venv` for packages. Plain `python` is not linked.
-- OpenCode saves settings changed in its interface to the tracked `opencode/cli.json`; commit or discard them like any edit. Its `service.json` holds a per-machine password and stays ignored.
+- OpenCode saves settings changed in its interface to the tracked `opencode/cli.json`; commit or discard them like any edit, or keep machine-only ones in `OPENCODE_CLI_CONFIG_CONTENT` (JSON, exported in `zsh/local.zsh`). Its `service.json` holds a per-machine password and stays ignored.
 
 ## Development
 
