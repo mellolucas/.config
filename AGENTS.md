@@ -6,9 +6,14 @@ Operating rules for anyone (human or agent) working on this dotfiles repository.
 
 - **Minimal**: prefer consolidated defaults over customization. Every dependency,
   command, file, or option must clearly improve day-to-day workflow or robustness
-  over sensible defaults. Never add for the sake of it.
+  over sensible defaults. Never add for the sake of it. Weigh each change's
+  ongoing cost (code, tests, docs) against its daily benefit; for edge cases
+  that need deliberate misconfiguration, document the limitation instead of
+  coding around it.
 - **XDG-first**: configs live under `$XDG_CONFIG_HOME`; state, cache, and data go
   to their XDG homes. `$HOME` stays nearly empty (only the `.zshenv` symlink).
+  Tools without XDG support keep their native homes rather than being relocated
+  by shared configuration.
 - **Native-first**: prefer app-native config locations and mechanisms
   (e.g. `vim.pack` and native LSP in nvim, `vcs_info` for the prompt, Ghostty key
   tables, `brew bundle --global`). No frameworks, no plugin managers.
@@ -40,11 +45,15 @@ Operating rules for anyone (human or agent) working on this dotfiles repository.
   to ignore themselves.
 - Review new tool integration: when adding a package or configuration domain,
   verify native config/storage paths, required runtimes, platform support, and
-  Homebrew update ownership. Review XDG placement, theme, keybindings, completion,
-  generated-file ignores, and user guidance where relevant; add only settings
-  that improve the intended workflow. No config file is a valid outcome.
-  Shared packages support the default environment or an explicitly approved
-  general-use role; personal/project-specific choices remain local.
+  Homebrew update ownership, and install and launch the real package on macOS
+  first (Gatekeeper and self-updaters only show up at runtime). Review XDG
+  placement, theme, keybindings, completion, generated-file ignores, and user
+  guidance where relevant; add only settings that improve the intended
+  workflow. No config file is a valid outcome. Shared packages support the
+  default environment or an explicitly approved general-use role;
+  personal/project-specific choices remain local.
+- `zsh/homebrew.sh` is shared by shell startup (`.zprofile`) and `install.sh`;
+  keep it POSIX sh so both can source it.
 - Commit style: small, cohesive conventional commits,
   `type(scope): lowercase summary`, scope = domain directory
   (e.g. `chore(zsh): ...`, `fix(ghostty): ...`).
@@ -58,17 +67,11 @@ Deliberate duplication that must stay behavior-identical across copies:
    program. Its four `performable:alt+h/j/k/l` navigation binds pair with
    nvim's `<A-h/j/k/l>` window maps in `nvim/lua/config/keymaps.lua` — the
    normal-mode pass-through layer when no Ghostty split exists in that
-   direction. The matching insert-mode no-op bindings in `zsh/.zshrc` prevent
+   direction; nvim's insert, visual, and command-line modes ignore those
+   chords. The matching insert-mode no-op bindings in `zsh/.zshrc` prevent
    those pass-through chords from dropping the shell into vi command mode.
    Ghostty takes precedence over internal editor windows. Change all three
    together.
-2. **Non-admin cask `--appdir`** logic exists in two places, one per
-   invocation path:
-   - `zsh/homebrew.zsh` — sourced by login and interactive shells (direct `brew` use)
-   - `install.sh` — `install`/`bundle` from non-login contexts
-   Both must keep the same guard against a pre-existing `--appdir` so they
-   compose in any order. Casks for non-admin users default to
-   `$HOME/Applications`; an explicit `--appdir` takes precedence.
 
 ## Agent working rules
 
@@ -85,30 +88,27 @@ Deliberate duplication that must stay behavior-identical across copies:
   conflict with the proposed policy, explain the limitation and whether a
   restarted session with refreshed instructions is needed; editing this file
   does not override instructions already loaded into the session.
-- Checkpoint at the start of work and at every phase boundary: run
-  `git stash push -u -m "checkpoint: <description>"` followed by
-  `git stash apply`, and copy any machine-local (ignored) file about to change
-  to `<name>.backup.<timestamp>` — stashes exclude ignored files. Keep only
-  the most recent backup per file. In
-  multi-agent sessions the orchestrator owns checkpoints and commits;
-  subagents never mutate git state.
+- Commits are the revert history. Before changing uncommitted work, checkpoint
+  it with `git stash push -u -m "checkpoint: <description>"` followed by
+  `git stash apply`; skip this on a clean tree, where `git stash apply` would
+  restore an older stash. Copy any machine-local (ignored) file about to change
+  to `<name>.backup.<timestamp>` first — stashes exclude ignored files — and
+  keep only the most recent backup per file. In multi-agent sessions the
+  orchestrator owns checkpoints and commits; subagents never mutate git state.
+- Host operations need the user's approval for each operation: installing,
+  upgrading, or uninstalling packages and migrating user data. Fetch and verify
+  a replacement before removing what is installed, never interrupt a package
+  transaction with a timeout, and never use `--zap`.
+- When another model reviews, give it the full diff and room to challenge
+  earlier decisions; report every finding and its disposition to the user.
 - Report-first (user approves before execution): anything that replaces or
   deletes a deliberate artifact, changes a daily interaction, or crosses
   domain boundaries. Everything else: decide autonomously, report rationale.
-- Verify before declaring done:
-  - `sh -n install.sh` (and `shellcheck install.sh` when available)
-  - `for file in zsh/.zshrc zsh/.zprofile zsh/.zshenv zsh/*.zsh zsh/functions/*; do zsh -n "$file" || break; done`
-  - `sh test-install.sh` for isolated lifecycle regression checks (no provisioning)
-  - `sh test-zsh.sh` for isolated helper regression checks (no network or applications)
-  - `zsh -f test-zle.zsh` for isolated completion and vi-editing PTY checks
-  - `zsh -f test-workspace.zsh` for terminal-query PTY checks (no workspace applications)
-  - `zsh -f test-guide.zsh` for isolated field-guide reader and picker PTY checks
-  - `nvim --headless "+lua vim.print('ok')" +q` for nvim config health
-  - `nvim --headless -u NONE -l test-nvim.lua` for isolated Markdown preview checks
-  - `git config --file git/config --list` for git config syntax
-  - `sh test-git.sh` for isolated viewer, clone-argument, and tag-preservation checks
-  - `biome lint opencode/*.jsonc` for opencode config (JSONC) syntax
-  - `ghostty +validate-config` when ghostty/ changed
+- Verify before declaring done (validation never provisions packages):
+  - `sh .tests/run` — all isolated suites plus syntax, lint, and config
+    checks; checks whose tools are missing are reported as skipped
+  - `./install.sh link` on a real host when lifecycle code changed —
+    idempotence without touching packages; `nvim --headless +q` there when
+    nvim/ changed
   - `rg -n "that fix|now that|previously|no longer|used to" <changed files>` —
     review hits for changeset narration in comments
-  - Re-run `./install.sh install` to confirm idempotence when it changed
