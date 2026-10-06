@@ -24,7 +24,7 @@
   },
   "h2": {
     "prefix": "▓▓▓▓ ",
-    "color": "3"
+    "color": "4"
   },
   "h3": {
     "prefix": "▓▓▓▓▓ ",
@@ -35,12 +35,10 @@
     "color": "6"
   },
   "h5": {
-    "prefix": "▓▓▓▓▓▓▓ ",
-    "color": "4"
+    "prefix": "▓▓▓▓▓▓▓ "
   },
   "h6": {
-    "prefix": "▓▓▓▓▓▓▓▓ ",
-    "color": "5"
+    "prefix": "▓▓▓▓▓▓▓▓ "
   },
   "text": {},
   "strikethrough": {
@@ -84,7 +82,7 @@
   "code": {
     "prefix": " ",
     "suffix": " ",
-    "color": "5"
+    "color": "6"
   },
   "code_block": {
     "margin": 2,
