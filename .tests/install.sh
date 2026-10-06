@@ -242,6 +242,7 @@ $npm_update"
     else
       check test -L "$HOME/.zshenv"
       check test -L "$HOME/.local/bin/dotfiles"
+      # shellcheck disable=SC2012 # fixture names are plain words
       check test "$(ls -A "$XDG_CONFIG_HOME" | tr '\n' ' ')" = 'homebrew zsh '
       check test -d "$XDG_DATA_HOME/codex"
       check test -d "$XDG_STATE_HOME/codex"
