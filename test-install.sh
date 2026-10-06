@@ -167,7 +167,7 @@ printf 'invoked\n' >> "$HOME/brew.log"
 EOF
 printf '#!/bin/sh\nprintf "Linux\\n"\n' > "$test_root/package-bin/uname"
 chmod +x "$test_root/package-bin/brew" "$test_root/package-bin/uname" "$installer"
-for operation in bundle install; do
+for operation in bundle install link; do
   (
     export HOME="$test_root/package-$operation" PATH="$test_root/package-bin:$PATH"
     export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
@@ -177,17 +177,21 @@ for operation in bundle install; do
     printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
     "$installer" "$operation" > "$HOME/dispatch.log" 2>&1
     "$installer" "$operation" >> "$HOME/dispatch.log" 2>&1
-    check test "$(cat "$HOME/brew.log")" = "invoked
-invoked"
-    if [ "$operation" = install ]; then
-      check test -L "$HOME/.zshenv"
-      check test -L "$HOME/.local/bin/dotfiles"
-      check test "$(ls -A "$XDG_CONFIG_HOME")" = zsh
-      if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail 'reinstall made backups'; fi
+    if [ "$operation" = link ]; then
+      check test ! -e "$HOME/brew.log"
     else
+      check test "$(cat "$HOME/brew.log")" = "invoked
+invoked"
+    fi
+    if [ "$operation" = bundle ]; then
       check test ! -e "$XDG_CONFIG_HOME"
       check test ! -L "$HOME/.zshenv"
       check test ! -e "$HOME/.local/bin/dotfiles"
+    else
+      check test -L "$HOME/.zshenv"
+      check test -L "$HOME/.local/bin/dotfiles"
+      check test "$(ls -A "$XDG_CONFIG_HOME")" = zsh
+      if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail "repeated $operation made backups"; fi
     fi
   )
 done

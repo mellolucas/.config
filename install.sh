@@ -223,8 +223,8 @@ ensure_homebrew() {
   }
 }
 
-# Links land first so a brew-phase failure leaves a partially-usable setup.
-install_dotfiles() {
+# Links only: no Homebrew bootstrap or package changes.
+link_dotfiles() {
   require_separate_checkout
 
   mkdir -p \
@@ -248,7 +248,11 @@ install_dotfiles() {
   fi
 
   link_path "$installer" "$user_bin_home/dotfiles"
+}
 
+# Links land first so a brew-phase failure leaves a partially-usable setup.
+install_dotfiles() {
+  link_dotfiles
   ensure_homebrew
   bundle_dotfiles
 
@@ -887,10 +891,11 @@ uninstall_dotfiles() {
 
 usage() {
   cat <<EOF
-usage: dotfiles [install|bundle|update|check-updates|status|doctor|uninstall|help]
+usage: dotfiles [install|link|bundle|update|check-updates|status|doctor|uninstall|help]
 
 commands:
   install     link configs into XDG_CONFIG_HOME, ensure Homebrew, brew bundle
+  link        link configs into XDG_CONFIG_HOME without touching packages
   bundle      run brew bundle for this dotfiles Brewfile
   update      fetch upstream, fast-forward when clean, then reinstall
   check-updates  fetch and compare dotfiles; run brew bundle check (no arguments)
@@ -941,6 +946,7 @@ fi
 
 case "$cmd" in
   install) require_no_args install "$@"; install_dotfiles ;;
+  link) require_no_args link "$@"; link_dotfiles; printf '\ndone.\n' ;;
   bundle) require_no_args bundle "$@"; bundle_dotfiles ;;
   update) update_dotfiles "$@" ;;
   check-updates) require_no_args check-updates "$@"; check_updates ;;

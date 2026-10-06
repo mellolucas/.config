@@ -3,6 +3,7 @@
 if (( CURRENT == 2 )); then
   local -a subcommands=(
     'install:Link configuration and provision Homebrew packages'
+    'link:Link configuration without touching packages'
     'bundle:Apply Homebrew packages (may upgrade tools)'
     'update:Update the repository and configuration'
     'check-updates:Fetch repository status and check Brewfile without applying updates'
