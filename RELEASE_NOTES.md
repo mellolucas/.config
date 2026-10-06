@@ -35,6 +35,8 @@
 - `dotfiles link` and `uninstall` remove the links left behind by
   configuration folders this repository no longer has.
 - Node and Python are shared runtimes alongside Go and Bun.
+- ShellCheck joins the Brewfile: bash-language-server uses it for shell
+  diagnostics in Neovim, and `.tests/run` lints with it.
 - New helpers: `workspace` flags, `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
   `Space g d`, and `Space e r`.
 - Interactive non-login shells (common on Linux) now set up Homebrew too.

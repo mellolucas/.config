@@ -16,6 +16,7 @@ brew "lua-language-server"
 brew "biome"
 brew "yaml-language-server"
 brew "bash-language-server"
+brew "shellcheck" # bash-language-server's linter; .tests/run lints with it too
 brew "typescript-language-server"
 brew "basedpyright"
 brew "go"
