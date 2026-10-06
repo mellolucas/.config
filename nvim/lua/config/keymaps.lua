@@ -166,6 +166,9 @@ map("n", "<leader>ee", vim.cmd.Explore, {
 })
 map("n", "<leader>er", vim.cmd.Rexplore, { desc = "Return to explorer" })
 
+-- Find: <leader>f* (fuzzy 'findfunc' in config.commands)
+map("n", "<leader>ff", ":find ", { desc = "Find a file by fuzzy name" })
+
 -- Git: <leader>g*
 map("n", "<leader>gd", "<cmd>GitDiff<CR>", { desc = "Diff saved file against index" })
 

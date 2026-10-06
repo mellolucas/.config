@@ -303,7 +303,8 @@ assert(#notifications == 0, "late exit duplicated timeout warning")
 fn.jobstart = real_jobstart
 
 -- Saved comparisons use native decoding, including explicitly selected encodings.
-dofile("nvim/lua/config/commands.lua")
+fn.executable = real_executable
+local commands = dofile("nvim/lua/config/commands.lua")
 local directory = fn.tempname()
 fn.mkdir(directory, "p")
 local ok, err = pcall(function()
@@ -638,9 +639,19 @@ if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   vim.cmd.cd(tree)
   vim.cmd("silent grep! needle")
   local found = vim.tbl_map(function(entry) return fn.bufname(entry.bufnr) end, fn.getqflist())
+  assert(vim.deep_equal(found, { "file" }), ":grep results: " .. vim.inspect(found))
+  -- :find matches fuzzily over the same files, listed once per command line.
+  assert(vim.o.findfunc == "v:lua.require'config.commands'.find_files")
+  assert(fn.maparg(" ff", "n") == ":find ")
+  assert(vim.deep_equal(commands.find_files("fle", true), { "file" }))
+  fn.writefile({}, tree .. "/second")
+  assert(vim.deep_equal(commands.find_files("", true), { "file" }), "file list not cached")
+  api.nvim_exec_autocmds("CmdlineEnter", { pattern = ":" })
+  local listed = commands.find_files("", true)
+  table.sort(listed)
+  assert(vim.deep_equal(listed, { "file", "second" }), "file list not refreshed: " .. vim.inspect(listed))
   vim.cmd.cd(cwd)
   fn.delete(tree, "rf")
-  assert(vim.deep_equal(found, { "file" }), ":grep results: " .. vim.inspect(found))
 end
 
-print("Markdown preview, DiffSaved, GitDiff, focus background query, and :grep tests passed")
+print("Markdown preview, DiffSaved, GitDiff, focus background query, :grep, and :find tests passed")

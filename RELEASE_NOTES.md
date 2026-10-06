@@ -42,7 +42,8 @@
 - ShellCheck joins the Brewfile: bash-language-server uses it for shell
   diagnostics in Neovim, and `.tests/run` lints with it.
 - New helpers: `workspace` flags, `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
-  `Space g d`, and `Space e r`.
+  `Space g d`, `Space e r`, and `Space f f`, which makes `:find` a fuzzy file
+  picker over the files `rg` lists.
 - Interactive non-login shells (common on Linux) now set up Homebrew too.
 - Option+Left and Option+Right jump words at the prompt and in Neovim instead
   of dropping into vi command mode or Neovim's normal mode. At the prompt,

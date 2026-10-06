@@ -145,3 +145,23 @@ vim.api.nvim_create_user_command("DiffSaved", function()
 end, {
   desc = "Diff current buffer with saved file",
 })
+
+-- Fuzzy :find over the files rg lists, with the shell's ignore rules
+-- (:help fuzzy-file-picker). The list is read once per command line.
+local find_cache
+local function find_files(arg)
+  find_cache = find_cache or vim.fn.systemlist({ "rg", "--files", "--hidden", "--follow", "--glob=!.git" })
+  return arg == "" and find_cache or vim.fn.matchfuzzy(find_cache, arg)
+end
+
+if vim.fn.executable("rg") == 1 then
+  vim.o.findfunc = "v:lua.require'config.commands'.find_files"
+  vim.api.nvim_create_autocmd("CmdlineEnter", {
+    pattern = ":",
+    callback = function()
+      find_cache = nil
+    end,
+  })
+end
+
+return { find_files = find_files }

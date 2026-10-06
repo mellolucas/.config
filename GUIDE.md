@@ -125,6 +125,7 @@ Render Markdown and read long text comfortably.
 | Press | Result |
 | --- | --- |
 | `Space e e` / `Space e r` | Open the file explorer / return to it |
+| `Space f f` | Find a file by fuzzy name: type part of it, `Tab` completes, `Enter` opens |
 | `Space b l` / `Space b -` | List buffers / switch to the previous one |
 | `Space b w w` / `Space b w q` | Save / save and quit |
 | `Space q q` / `Space q !` | Quit / quit without saving |
