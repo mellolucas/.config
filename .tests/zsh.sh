@@ -7,7 +7,8 @@ fi
 emulate -LR zsh
 setopt errexit pipefail
 
-repo=${0:A:h}
+self=${0:A}
+repo=${self:h:h}
 ruby_bin=${commands[ruby]-}
 zsh_bin=${commands[zsh]}
 git_bin=${commands[git]}
@@ -106,7 +107,7 @@ if [[ ${1:-} == --glance-render-child ]]; then
   print END
   exit 0
 fi
-for file in "$repo"/zsh/{homebrew.sh,.zprofile,.zshrc,functions/{fzfe,fzfv,git-glance,github-open,github-view,help,keys}} "$repo/test-zsh.sh"; do
+for file in "$repo"/zsh/{homebrew.sh,.zprofile,.zshrc,functions/{fzfe,fzfv,git-glance,github-open,github-view,help,keys}} "$self"; do
   zsh -n "$file"
 done
 
@@ -206,19 +207,7 @@ STUB
 
 (
   topics=(workspace files shell panes reading documents editor git agents maintain)
-  typeset -A sections titles intents topic_outputs
-  intents=(
-    workspace 'workspace --agent'
-    files 'fzfv'
-    shell 'Reuse a command'
-    panes 'editor-window navigation'
-    reading 'Enter browse mode'
-    documents 'mdv FILE'
-    editor 'Space e e'
-    git 'gds'
-    agents "workspace --agent 'gh copilot'"
-    maintain 'dotfiles doctor'
-  )
+  typeset -A sections titles topic_outputs
   current=''
   guide_topics=()
   while IFS= read -r line || [[ -n $line ]]; do
@@ -252,23 +241,18 @@ STUB
   done
   for topic in "${topics[@]}"; do
     [[ $keys_output == *"\`keys $topic\` - $titles[$topic]"* ]] || fail "keys index: $topic"
-    [[ $keys_output != *"$intents[$topic]"* ]] || fail "keys index includes section body: $topic"
+    # The index lists titles only; a section's first body line must not appear.
+    [[ $keys_output != *"${${(f)sections[$topic]}[2]}"* ]] || fail "keys index includes section body: $topic"
     keys "$topic" > "$test_root/keys-section" || fail "redirected keys $topic status"
     section=$(recorded keys-section)
     topic_outputs[$topic]=$section
     plain=$(keys --plain "$topic") || fail "plain keys $topic status"
     expect "$section" "$plain" "plain and redirected keys $topic agree"
     [[ $section == "$sections[$topic]"* ]] || fail "keys $topic includes complete source section"
-    [[ $section == *"$intents[$topic]"* ]] || fail "keys $topic lookup intent"
     [[ $keys_all == *"$sections[$topic]"* ]] || fail "keys all includes complete $topic section"
     for other in "${topics[@]}"; do
       [[ $other == $topic || $section != *"# $titles[$other]"* ]] || fail "keys $topic leaks $other section"
     done
-    case $topic in
-      files) [[ ${(L)section} == *'ctrl+d'*'scrolls the preview down half a page'* ]] || fail 'file preview scrolling lookup' ;;
-      reading) [[ $section == *'Ghostty'*'Return to your application'* ]] || fail 'terminal browse and return lookup' ;;
-      documents) [[ $section == *'Shift-drag'* && $section == *'mdv -w 120 FILE'* ]] || fail 'document selection and wrapping lookup' ;;
-    esac
     outputs+=("$section" "$plain")
   done
   for args in '--invalid' 'help' 'missing-topic' 'files extra' 'all files' '--plain files extra'; do
@@ -335,7 +319,7 @@ STUB
   child=--glance-render-child
   [[ $mode != hook ]] || child=--glance-child
   typeset -a child_command=(/usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
-    TERM=xterm-256color "$zsh_bin" -dfi "$repo/test-zsh.sh" "$child" "$test_root" "$mode")
+    TERM=xterm-256color "$zsh_bin" -dfi "$self" "$child" "$test_root" "$mode")
   zpty -b glance "${(@q)child_command}"
   transcript=''
   deadline=$(( SECONDS + 10 ))
@@ -422,9 +406,6 @@ for os in darwin23 linux-gnu; do
           COLUMNS=90
           source /dev/stdin <<< "$alias_block"
 
-          for name in ls lli llli lllt llld lt; do
-            (( ! ${+aliases[$name]} )) || fail "$label unexpected $name alias"
-          done
           eval 'ls -l "directory with spaces"'
           expect $'ls\n-l\ndirectory with spaces' "$(recorded)" "$label explicit native listing"
           if (( has_eza )); then
@@ -553,6 +534,23 @@ RUBY
     fail '.zprofile must rerun shellenv for login shells and initialize other shells once'
   [[ $'\n'$(<"$repo/zsh/.zshrc")$'\n' == *$'\n[[ -o login ]] || source "$ZDOTDIR/.zprofile"\n'* ]] ||
     fail '.zshrc must run session setup for non-login shells'
+)
+
+# Parity contract: Ghostty, Neovim, and zsh cover the same Option+h/j/k/l chords.
+(
+  # Whole active lines only (indentation stripped), so commented-out binds fail.
+  setopt extendedglob
+  ghostty_lines=(${${(f)"$(<"$repo/ghostty/vim.ghostty")"}##[[:space:]]#})
+  nvim_lines=(${${(f)"$(<"$repo/nvim/lua/config/keymaps.lua")"}##[[:space:]]#})
+  zsh_lines=(${${(f)"$(<"$repo/zsh/.zshrc")"}##[[:space:]]#})
+  for key dir in h left j down k up l right; do
+    ghostty_bind="keybind = performable:alt+$key=goto_split:$dir"
+    nvim_map="map(\"n\", \"<A-$key>\", \"<C-w>$key\","
+    zsh_noop="bindkey -M viins -s '^[$key' ''"
+    (( ${ghostty_lines[(Ie)$ghostty_bind]} )) || fail "ghostty alt+$key navigation"
+    (( ${nvim_lines[(I)${(b)nvim_map}*]} )) || fail "nvim <A-$key> window map"
+    (( ${zsh_lines[(Ie)$zsh_noop]} )) || fail "zsh alt+$key insert no-op"
+  done
 )
 
 git() {

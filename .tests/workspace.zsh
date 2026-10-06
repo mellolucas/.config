@@ -3,7 +3,8 @@
 emulate -LR zsh
 setopt errexit pipefail
 
-repo=${0:A:h}
+self=${0:A}
+repo=${self:h:h}
 if [[ ${1:-} == --child ]]; then
   mode=$2
   code=$(<"$repo/zsh/functions/workspace")
@@ -66,7 +67,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
     DOTFILES_WORKSPACE_MIDDLE_TOP_CMD DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD
-  export DOTFILES_WORKSPACE_SCRIPT=$repo/test-workspace.zsh
+  export DOTFILES_WORKSPACE_SCRIPT=$self
   code=$(<"$repo/zsh/functions/workspace")
   local platform_check='[[ $OSTYPE == darwin* ]]' executable_check='[[ -x /usr/bin/osascript ]]'
   [[ $code == *$platform_check* && $code == *$executable_check* ]] || fail 'platform fixture'
@@ -181,7 +182,7 @@ for mode in valid noncanonical echo-off queued fragmented leading-zero wrong-cod
     other-terminal non-tty; do
   transcript=''
   expected=0:0
-  zpty -b terminal zsh -f "$0" --child "$mode"
+  zpty -b terminal zsh -f "$self" --child "$mode"
   if [[ $mode == (setup-error|other-terminal|non-tty) ]]; then
     wait_for READY
   else

@@ -80,7 +80,8 @@ if [[ $1 == --child ]]; then
 fi
 
 setopt errexit pipefail
-repo=${0:A:h}
+self=${0:A}
+repo=${self:h:h}
 zsh_bin=${commands[zsh]}
 fzf_bin=${commands[fzf]-}
 eza_bin=${commands[eza]-}
@@ -188,7 +189,7 @@ for mode in native fzf; do
   fi
   [[ $mode != fzf ]] || ln -s "$fzf_bin" "$HOME/bin/fzf"
   zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
-    "$zsh_bin" -dfi "$repo/test-zle.zsh" --child "$repo" "${(j.:.)native_fpath}"
+    "$zsh_bin" -dfi "$self" --child "$repo" "${(j.:.)native_fpath}"
   wait_for 'ZLE-READY'
   (( ++checks ))
   if [[ $transcript != *'EXPANSION:glob/visible:END-EXPANSION'* ]]; then
@@ -226,7 +227,7 @@ for mode in native fzf; do
   zpty -d shell
   zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
     "$zsh_bin" -dfi
-  zpty -w shell "source ${(q)repo}/test-zle.zsh --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --commands"
+  zpty -w shell "source ${(q)self} --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --commands"
   wait_for 'ZLE-READY'
   for helper in workspace dotscode; do
     for option in agent editor middle-top middle-bottom; do
@@ -309,7 +310,7 @@ if [[ -n $fzf_bin ]]; then
   ln -s "${commands[awk]}" "$HOME/bin/awk"
   zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
     "$zsh_bin" -dfi
-  zpty -w shell "source ${(q)repo}/test-zle.zsh --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --widgets"
+  zpty -w shell "source ${(q)self} --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --widgets"
   wait_for 'ZLE-READY'
   snapshot $'zle-test-command \x14'
   expect_widget 'Ctrl+T inserts multiple shell-quoted paths without execution' \

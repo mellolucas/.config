@@ -1,4 +1,4 @@
--- Run with: nvim --headless -u NONE -l test-nvim.lua
+-- Run from the repository root: nvim --headless -u NONE -l .tests/nvim.lua
 local api = vim.api
 local fn = vim.fn
 local real_jobstart, real_jobstop = fn.jobstart, fn.jobstop

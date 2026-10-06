@@ -1,0 +1,62 @@
+#!/bin/sh
+# Every isolated check: no provisioning, network, or workspace applications.
+# Runs from anywhere; checks whose tools are missing are reported as skipped.
+set -u
+# Deterministic permissions: zsh refuses group-writable completion directories.
+umask 022
+repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P) || exit 1
+cd "$repo" || exit 1
+failures=0
+missing=
+
+check() {
+  label=$1
+  shift
+  if output=$("$@" 2>&1); then
+    printf 'ok    %s\n' "$label"
+    printf '%s\n' "$output" | sed -n 's/^SKIP: /      skip: /p'
+  else
+    failures=$((failures + 1))
+    printf 'FAIL  %s\n' "$label"
+    printf '%s\n' "$output" | tail -n 20 | sed 's/^/      /'
+  fi
+}
+
+# Runs a check only when every listed tool (space-separated) is installed.
+with() {
+  tools=$1 absent=
+  shift
+  for tool in $tools; do
+    command -v "$tool" >/dev/null 2>&1 || absent="$absent $tool"
+  done
+  if [ -z "$absent" ]; then
+    check "$@"
+    return
+  fi
+  for tool in $absent; do
+    case " $missing " in
+      *" $tool "*) ;;
+      *) missing="$missing $tool" ;;
+    esac
+  done
+}
+
+check 'installer syntax' sh -n install.sh
+with shellcheck 'shellcheck' shellcheck install.sh zsh/homebrew.sh .tests/run .tests/install.sh .tests/git.sh
+# shellcheck disable=SC2016 # zsh, not sh, expands the loop
+with zsh 'zsh syntax' zsh -fc 'for f in zsh/.zshenv zsh/.zprofile zsh/.zshrc zsh/*.sh zsh/functions/*; do zsh -n "$f" || exit 1; done'
+with git 'git config' git config --file git/config --list
+with ghostty 'ghostty config' ghostty +validate-config --config-file=ghostty/config.ghostty
+with biome 'opencode config' biome lint opencode/opencode.jsonc opencode/tui.jsonc
+with 'zsh git' 'lifecycle' sh .tests/install.sh
+with git 'git helpers' sh .tests/git.sh
+with 'zsh git' 'zsh helpers' sh .tests/zsh.sh
+with zsh 'line editor' zsh -f .tests/zle.zsh
+with zsh 'workspace' zsh -f .tests/workspace.zsh
+with zsh 'field guide' zsh -f .tests/guide.zsh
+with 'nvim git' 'nvim commands' nvim --headless -u NONE -l .tests/nvim.lua
+
+if [ -n "$missing" ]; then
+  printf 'skipped (missing):%s\n' "$missing"
+fi
+[ "$failures" -eq 0 ]

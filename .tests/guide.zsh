@@ -4,7 +4,7 @@ emulate -LR zsh
 setopt errexit pipefail
 
 script=${${(%):-%x}:A}
-repo=${script:h}
+repo=${script:h:h}
 if [[ ${1:-} == --child ]]; then
   mode=$2 COLUMNS=$3 selection_topic=$4 repo=$5
   shift 5

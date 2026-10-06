@@ -4,7 +4,7 @@
 # shellcheck disable=SC2030,SC2031
 set -eu
 
-repo=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
+repo=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 test_root=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-git.XXXXXX")
 test_root=$(CDPATH='' cd -- "$test_root" && pwd -P)
 trap 'rm -rf "$test_root"' EXIT
