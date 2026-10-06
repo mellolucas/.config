@@ -18,3 +18,9 @@ export PYTHON_HISTORY="${PYTHON_HISTORY:-$XDG_STATE_HOME/python_history}"
 export GOPATH="${GOPATH:-$XDG_DATA_HOME/go}"
 export GOMODCACHE="${GOMODCACHE:-$XDG_CACHE_HOME/go/mod}"
 export GOBIN="${GOBIN:-$HOME/.local/bin}"
+
+# macOS defaults these to ~/Library; each value is the tool's own Linux
+# default and moves the whole category. Other ~/Library defaults stay.
+export GOCACHE="${GOCACHE:-$XDG_CACHE_HOME/go-build}"
+export HOMEBREW_CACHE="${HOMEBREW_CACHE:-$XDG_CACHE_HOME/Homebrew}"
+export HOMEBREW_LOGS="${HOMEBREW_LOGS:-$XDG_CACHE_HOME/Homebrew/Logs}"

@@ -23,6 +23,9 @@
   homes live in `~/.local/share`, Codex's database in `~/.local/state`, npm,
   Node, Python, and Go keep config, history, and caches in the XDG homes, and
   `go install` targets `~/.local/bin`.
+- Homebrew's downloads and logs and Go's build cache move from `~/Library` to
+  their Linux locations in `~/.cache`; other command-line tools keep macOS's
+  `~/Library` defaults.
 - `dotfiles doctor` lists hidden entries in `$HOME` outside the XDG layout,
   replacing its fixed list of legacy files.
 - Node and Python are shared runtimes alongside Go and Bun.
@@ -55,6 +58,8 @@
   have one. `~/.npm` only holds npm's cache and can be deleted, as can `~/go`
   once nothing you keep lives there (`GOMODCACHE=~/go/pkg/mod go clean
   -modcache` clears its read-only module cache).
+- `~/Library/Caches/Homebrew`, `~/Library/Logs/Homebrew`, and
+  `~/Library/Caches/go-build` only hold caches and logs and can be deleted.
 
 ### Validation
 
