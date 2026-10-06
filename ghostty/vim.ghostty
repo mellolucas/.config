@@ -19,6 +19,8 @@ keybind = alt+q=close_surface
 keybind = alt+b=activate_key_table:browse
 keybind = browse/k=scroll_page_lines:-1
 keybind = browse/j=scroll_page_lines:1
+keybind = browse/arrow_up=scroll_page_lines:-1
+keybind = browse/arrow_down=scroll_page_lines:1
 keybind = browse/ctrl+u=scroll_page_fractional:-0.5
 keybind = browse/ctrl+d=scroll_page_fractional:0.5
 keybind = browse/ctrl+b=scroll_page_up

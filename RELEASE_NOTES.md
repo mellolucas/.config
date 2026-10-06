@@ -37,6 +37,8 @@
 - Interactive non-login shells (common on Linux) now set up Homebrew too.
 - Option+Left and Option+Right jump words at the prompt and in Neovim instead
   of dropping into vi command mode or Neovim's normal mode.
+- Browse mode also scrolls with the Up and Down arrows; Ghostty's own
+  Cmd+Option and Cmd+Ctrl arrow chords move between and resize panes.
 - OpenCode 2: interface settings live in `opencode/cli.json`, replacing
   `tui.jsonc`; updates use the `update` key, and the background server's
   `service.json` stays machine-local.

@@ -73,9 +73,11 @@ Ghostty owns these chords in every program.
 | `Option+=` | Equalize sizes |
 | `Option+z` | Zoom the current pane (press again to return) |
 | `Option+q` | Close the current pane |
+| `Cmd+Option+arrows` / `Cmd+Ctrl+arrows` | Move / resize with arrow keys (Ghostty's defaults) |
 
 - At an edge, `Option+h/j/k/l` reaches Neovim, which moves between its windows (normal mode).
-- `Ctrl+W h/j/k/l` always means Neovim windows; `Option+q` closes a terminal pane, not a buffer.
+- `Ctrl+W h/j/k/l` or `Ctrl+W` arrows always mean Neovim windows; `Option+q` closes a terminal pane, not a buffer.
+- `Option+←` / `Option+→` jump words, never panes.
 
 ## Reading: Read terminal output
 
@@ -84,7 +86,7 @@ Ghostty's browse mode scrolls and copies terminal history without touching the r
 | Press | Result |
 | --- | --- |
 | `Option+b` | Enter browse mode |
-| `j` / `k` | Line down / up |
+| `j` / `k` or `↓` / `↑` | Line down / up |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` | Full page down / up |
 | `gg` / `G` | Top / bottom |
