@@ -39,6 +39,9 @@
   of dropping into vi command mode or Neovim's normal mode.
 - Browse mode also scrolls with the Up and Down arrows; Ghostty's own
   Cmd+Option and Cmd+Ctrl arrow chords move between and resize panes.
+- fzf takes its colors from the terminal palette (`fzf/fzfrc`), so it follows
+  Catppuccin Mocha and Latte like the rest; the `keys` picker uses the same
+  colors and still ignores personal fzf options.
 - OpenCode 2: interface settings live in `opencode/cli.json`, replacing
   `tui.jsonc`; updates use the `update` key, and the background server's
   `service.json` stays machine-local.

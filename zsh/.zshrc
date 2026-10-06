@@ -73,6 +73,10 @@ fi
 
 # Fuzzy finding (ctrl-r history, ctrl-t files, alt-c dirs); fzf < 0.48 lacks --zsh
 if command -v fzf >/dev/null 2>&1; then
+  # fzf refuses to start when its options file is missing
+  if [[ -z $FZF_DEFAULT_OPTS_FILE && -r $XDG_CONFIG_HOME/fzf/fzfrc ]]; then
+    export FZF_DEFAULT_OPTS_FILE=$XDG_CONFIG_HOME/fzf/fzfrc
+  fi
   source <(fzf --zsh 2>/dev/null)
 fi
 

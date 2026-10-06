@@ -109,7 +109,7 @@ for topic in "${topics[@]}"; do
 done
 index+=$'\n`keys all` reads everything. `keys --plain` needs no viewer.\n'
 navigation=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task; `q` leaves the reader.\n'
-picker=$'FZF:ARGS:--layout=reverse|--no-multi|--wrap|--delimiter=\t|--with-nth=2..|--prompt=Find a task > |--header=Working here\nEnter reads a page. Esc returns to the shell.\nFZF:ENV::/dev/null\nFZF:INPUT\n'
+picker=$'FZF:ARGS:--layout=reverse|--no-multi|--wrap|--delimiter=\t|--with-nth=2..|--prompt=Find a task > |--header=Working here\nEnter reads a page. Esc returns to the shell.\nFZF:ENV::'"$repo"$'/fzf/fzfrc\nFZF:INPUT\n'
 picker+="${(F)labels}"$'\nFZF:END\n'
 
 checks=0
@@ -211,7 +211,7 @@ for number in {1..12}; do
   labels+=("$topic"$'\t'"Task $number - Intent $number")
   print -r -- "## Topic$number: Task $number"$'\n\n'"Intent $number"$'\n\n'"Body $number" >> "$repo/GUIDE.md"
 done
-picker=${picker%%FZF:INPUT*}$'FZF:INPUT\n'"${(F)labels}"$'\nFZF:END\n'
+picker=${picker%%FZF:ENV*}"FZF:ENV::$repo/fzf/fzfrc"$'\nFZF:INPUT\n'"${(F)labels}"$'\nFZF:END\n'
 for topic in "${topics[@]}"; do
   check picker 80 "$topic"
 done

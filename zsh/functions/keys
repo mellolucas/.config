@@ -63,7 +63,8 @@ if (( usage )); then
 fi
 if [[ -z $topic && -t 0 && -t 1 ]] && (( ! plain )) && command -v fzf >/dev/null 2>&1; then
   local selection result=0
-  selection=$(print -rl -- "${labels[@]}" | FZF_DEFAULT_OPTS= FZF_DEFAULT_OPTS_FILE=/dev/null \
+  # Only the repository's fzf options (colors); personal ones could reshape the picker
+  selection=$(print -rl -- "${labels[@]}" | FZF_DEFAULT_OPTS= FZF_DEFAULT_OPTS_FILE=$repo/fzf/fzfrc \
     fzf --layout=reverse --no-multi --wrap --delimiter=$'\t' --with-nth=2.. \
       --prompt='Find a task > ' --header=$'Working here\nEnter reads a page. Esc returns to the shell.') || result=$?
   case $result in
