@@ -63,8 +63,10 @@
   -modcache` clears its read-only module cache).
 - `~/Library/Caches/Homebrew`, `~/Library/Logs/Homebrew`, and
   `~/Library/Caches/go-build` only hold caches and logs and can be deleted.
-- An existing `$(brew --prefix)/etc/npmrc` is moved to a timestamped backup
-  when the installer links its own; carry any settings you need into
+- An existing plain `$(brew --prefix)/etc/npmrc` stays in place: add
+  `cache=${HOME}/.cache/npm` to it, or remove it so the installer links its
+  own. Homebrew-run npm reads only that file, so registry or certificate
+  settings that Brewfile npm entries need belong there, not in
   `~/.config/npm/npmrc`.
 
 ### Validation

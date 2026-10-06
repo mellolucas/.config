@@ -181,17 +181,27 @@ brew_bin() {
 }
 
 # npm reads its global config even when Homebrew hides the shell's
-# NPM_CONFIG_CACHE from the npm it runs for Brewfile entries.
+# NPM_CONFIG_CACHE from the npm it runs for Brewfile entries. A Homebrew this
+# user cannot write belongs to another account and is left alone.
 npm_global_config() {
   brew=$(brew_bin) || return 1
-  prefix=$("$brew" --prefix 2>/dev/null) && [ -n "$prefix" ] || return 1
+  prefix=$("$brew" --prefix 2>/dev/null) || return 1
+  [ -n "$prefix" ] || return 1
+  writable="$prefix/etc"
+  [ -d "$writable" ] || writable=$prefix
+  [ -w "$writable" ] || return 1
   printf '%s/etc/npmrc\n' "$prefix"
 }
 
+# A plain file there is this machine's own npm config, the only one
+# Homebrew-run npm reads; links are this repo's to manage.
 link_npm_global_config() {
-  if npmrc=$(npm_global_config); then
-    link_path "$repo_dir/homebrew/npmrc" "$npmrc"
+  npmrc=$(npm_global_config) || return 0
+  if [ -e "$npmrc" ] && [ ! -L "$npmrc" ]; then
+    printf 'kept %s: this machine'\''s own npm config\n' "$npmrc"
+    return 0
   fi
+  link_path "$repo_dir/homebrew/npmrc" "$npmrc"
 }
 
 ensure_macos_command_line_tools() {

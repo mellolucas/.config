@@ -201,7 +201,7 @@ for operation in bundle install link no-upgrade; do
     export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
     export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
     export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
-    mkdir "$HOME"
+    mkdir "$HOME" "$HOME/prefix"
     printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
     unset HOMEBREW_BUNDLE_NO_UPGRADE
     if [ "$operation" = no-upgrade ]; then
@@ -244,10 +244,32 @@ $npm_update"
   )
 done
 
+# A machine's own global npm config stays; another account's Homebrew is skipped.
+(
+  export HOME="$test_root/own-npmrc" PATH="$test_root/package-bin:$PATH"
+  export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+  export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+  mkdir -p "$HOME/prefix/etc"
+  printf 'registry=https://registry.example.invalid/\n' > "$HOME/prefix/etc/npmrc"
+  "$installer" link > "$HOME/dispatch.log" 2>&1
+  check test ! -L "$HOME/prefix/etc/npmrc"
+  check test "$(cat "$HOME/prefix/etc/npmrc")" = 'registry=https://registry.example.invalid/'
+  check grep -Fq "kept $HOME/prefix/etc/npmrc" "$HOME/dispatch.log"
+  if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail 'own npm config was backed up'; fi
+  if [ "$(id -u)" -ne 0 ]; then
+    rm "$HOME/prefix/etc/npmrc"
+    chmod a-w "$HOME/prefix/etc"
+    "$installer" link >> "$HOME/dispatch.log" 2>&1
+    chmod u+w "$HOME/prefix/etc"
+    check test ! -e "$HOME/prefix/etc/npmrc"
+    check test ! -L "$HOME/prefix/etc/npmrc"
+  fi
+)
+
 # Fresh installs run brew from its prefix before Homebrew is on PATH; Bundle
 # and npm must still find npm next to brew, and npm's global config must be in
 # place before Bundle runs npm.
-mkdir "$test_root/brew-prefix" "$test_root/fresh-home"
+mkdir "$test_root/brew-prefix" "$test_root/fresh-home" "$test_root/fresh-home/prefix"
 cat > "$test_root/brew-prefix/brew" <<'EOF'
 #!/bin/sh
 set -eu
