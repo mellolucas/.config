@@ -19,6 +19,10 @@ export PAGER="${PAGER:-less}"
 export LESS="${LESS:--FRX --mouse}"
 export LESSHISTFILE="${LESSHISTFILE:--}"
 
+# The Brewfile installs Copilot CLI and dotfiles update upgrades it; without
+# this, Copilot downloads newer versions itself and runs those instead
+export COPILOT_AUTO_UPDATE="${COPILOT_AUTO_UPDATE-false}"
+
 path=(
   "$HOME/.local/bin"
   $path
