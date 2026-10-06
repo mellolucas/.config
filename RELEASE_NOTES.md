@@ -37,8 +37,9 @@
 - Interactive non-login shells (common on Linux) now set up Homebrew too.
 - Option+Left and Option+Right jump words at the prompt and in Neovim instead
   of dropping into vi command mode or Neovim's normal mode.
-- Browse mode also scrolls with the Up and Down arrows; Ghostty's own
-  Cmd+Option and Cmd+Ctrl arrow chords move between and resize panes.
+- Browse mode also scrolls with the Up and Down arrows, keeps the Option pane
+  chords, and Option+b leaves it again; Ghostty's own Cmd+Option and Cmd+Ctrl
+  arrow chords move between and resize panes.
 - fzf takes its colors from the terminal palette (`fzf/fzfrc`), so it follows
   Catppuccin Mocha and Latte like the rest; the `keys` picker uses the same
   colors and still ignores personal fzf options.

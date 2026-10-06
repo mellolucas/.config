@@ -93,7 +93,9 @@ Ghostty's browse mode scrolls and copies terminal history without touching the r
 | `/` then `n` / `N` | Search, next, previous |
 | `y` | Copy the mouse selection |
 | `:` | Ghostty command palette |
-| `Esc`, `q`, or `i` | Leave browse mode |
+| `Esc`, `q`, `i`, or `Option+b` | Leave browse mode |
+
+- The pane chords (`Option+h/j/k/l`, `Option+z`, and the rest) work the same while browsing.
 
 ## Documents: Read a document
 

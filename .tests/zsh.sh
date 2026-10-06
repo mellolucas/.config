@@ -553,6 +553,21 @@ RUBY
   done
 )
 
+# Browse mode keeps every Option split chord with the same action; Option+b leaves it.
+(
+  setopt extendedglob
+  ghostty_lines=(${${(f)"$(<"$repo/ghostty/vim.ghostty")"}##[[:space:]]#})
+  chords=0
+  for line in ${(M)ghostty_lines:#keybind = (performable:|)alt+*}; do
+    binding=${${line#keybind = }#performable:}
+    [[ $binding != alt+b=* ]] || continue
+    (( ++chords ))
+    (( ${ghostty_lines[(Ie)keybind = browse/$binding]} )) || fail "browse mode lacks $binding"
+  done
+  (( chords )) || fail 'no Option split chords found'
+  (( ${ghostty_lines[(Ie)keybind = browse/alt+b=deactivate_key_table]} )) || fail 'browse mode Option+b exit'
+)
+
 git() {
   [[ $1 == -C ]] || fail "unexpected git invocation: $*"
   shift 2

@@ -35,4 +35,20 @@ keybind = browse/shift+semicolon=toggle_command_palette
 keybind = browse/escape=deactivate_key_table
 keybind = browse/q=deactivate_key_table
 keybind = browse/i=deactivate_key_table
+keybind = browse/alt+b=deactivate_key_table
+# The split chords keep their meaning while browsing; catch_all would swallow
+# them. Not performable: at an edge nothing reaches the program underneath.
+keybind = browse/alt+h=goto_split:left
+keybind = browse/alt+j=goto_split:down
+keybind = browse/alt+k=goto_split:up
+keybind = browse/alt+l=goto_split:right
+keybind = browse/alt+s=new_split:down
+keybind = browse/alt+v=new_split:right
+keybind = browse/alt+shift+h=resize_split:left,10
+keybind = browse/alt+shift+j=resize_split:down,10
+keybind = browse/alt+shift+k=resize_split:up,10
+keybind = browse/alt+shift+l=resize_split:right,10
+keybind = browse/alt+equal=equalize_splits
+keybind = browse/alt+z=toggle_split_zoom
+keybind = browse/alt+q=close_surface
 keybind = browse/catch_all=ignore
