@@ -26,6 +26,9 @@
 - Homebrew's downloads and logs and Go's build cache move from `~/Library` to
   their Linux locations in `~/.cache`; other command-line tools keep macOS's
   `~/Library` defaults.
+- The installer links `homebrew/npmrc` as npm's global config in Homebrew's
+  prefix, so npm keeps its cache in `~/.cache/npm` even when Homebrew Bundle
+  runs it without the shell's variables.
 - `dotfiles doctor` lists hidden entries in `$HOME` outside the XDG layout,
   replacing its fixed list of legacy files.
 - Node and Python are shared runtimes alongside Go and Bun.
@@ -60,6 +63,9 @@
   -modcache` clears its read-only module cache).
 - `~/Library/Caches/Homebrew`, `~/Library/Logs/Homebrew`, and
   `~/Library/Caches/go-build` only hold caches and logs and can be deleted.
+- An existing `$(brew --prefix)/etc/npmrc` is moved to a timestamped backup
+  when the installer links its own; carry any settings you need into
+  `~/.config/npm/npmrc`.
 
 ### Validation
 

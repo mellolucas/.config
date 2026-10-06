@@ -24,6 +24,8 @@ unset $xdg_vars
 mkdir -p "$HOME" "$test_root/repo/zsh" "$test_root/bin"
 cp "$repo/install.sh" "$test_root/repo/install.sh"
 cp "$repo/zsh/.zshenv" "$repo/zsh/homebrew.sh" "$repo/zsh/xdg.sh" "$test_root/repo/zsh/"
+mkdir -p "$test_root/repo/homebrew"
+cp "$repo/homebrew/npmrc" "$test_root/repo/homebrew/npmrc"
 
 # Load function definitions without the CLI dispatcher.
 test "$(grep -c '^# CLI dispatcher\.$' "$repo/install.sh")" = 1
@@ -36,6 +38,8 @@ installer="$repo_dir/install.sh"
 timestamp() { printf '20000101000000\n'; }
 ensure_homebrew() { :; }
 bundle_dotfiles() { :; }
+# In-process lifecycle calls never reach the host's Homebrew prefix.
+brew_bin() { return 1; }
 # The dispatcher loads the tool homes; direct lifecycle calls need them too.
 # shellcheck source=/dev/null
 with_layout() ( . "$repo_dir/zsh/xdg.sh"; "$@" )
@@ -74,6 +78,8 @@ check test ! -e "$XDG_CONFIG_HOME"
 mkdir -p "$test_root/cli-home" "$test_root/cli-bin"
 cat > "$test_root/cli-bin/brew" <<'EOF'
 #!/bin/sh
+# Reading the prefix is not provisioning.
+[ "$*" = --prefix ] && { printf '%s\n' "$HOME/prefix"; exit 0; }
 printf 'brew invoked\n' >> "$HOME/provision.log"
 exit 1
 EOF
@@ -177,6 +183,7 @@ set -eu
 case "$*" in
   'bundle --global') printf 'invoked\n' >> "$HOME/brew.log" ;;
   'bundle list --global --npm') printf '@scope/tool\nplain-tool\n' ;;
+  --prefix) printf '%s\n' "$HOME/prefix" ;;
   *) exit 1 ;;
 esac
 EOF
@@ -203,6 +210,8 @@ for operation in bundle install link no-upgrade; do
     fi
     "$installer" "$operation" > "$HOME/dispatch.log" 2>&1
     "$installer" "$operation" >> "$HOME/dispatch.log" 2>&1
+    check test "$(readlink "$HOME/prefix/etc/npmrc")" = "$repo_dir/homebrew/npmrc"
+    if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail "repeated $operation made backups"; fi
     if [ "$operation" = link ]; then
       check test ! -e "$HOME/brew.log"
     else
@@ -224,23 +233,31 @@ $npm_update"
     else
       check test -L "$HOME/.zshenv"
       check test -L "$HOME/.local/bin/dotfiles"
-      check test "$(ls -A "$XDG_CONFIG_HOME")" = zsh
+      check test "$(ls -A "$XDG_CONFIG_HOME" | tr '\n' ' ')" = 'homebrew zsh '
       check test -d "$XDG_DATA_HOME/codex"
       check test -d "$XDG_STATE_HOME/codex"
-      if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail "repeated $operation made backups"; fi
+    fi
+    if [ "$operation" = link ]; then
+      "$installer" uninstall >> "$HOME/dispatch.log" 2>&1
+      check test ! -L "$HOME/prefix/etc/npmrc"
     fi
   )
 done
 
 # Fresh installs run brew from its prefix before Homebrew is on PATH; Bundle
-# and npm must still find npm next to brew.
+# and npm must still find npm next to brew, and npm's global config must be in
+# place before Bundle runs npm.
 mkdir "$test_root/brew-prefix" "$test_root/fresh-home"
 cat > "$test_root/brew-prefix/brew" <<'EOF'
 #!/bin/sh
 set -eu
 case "$*" in
-  'bundle --global') printf '%s\n' "$PATH" > "$HOME/brew-path.log" ;;
+  'bundle --global')
+    printf '%s\n' "$PATH" > "$HOME/brew-path.log"
+    if [ -L "$HOME/prefix/etc/npmrc" ]; then : > "$HOME/npmrc-linked"; fi
+    ;;
   'bundle list --global --npm') printf '@scope/tool\nplain-tool\n' ;;
+  --prefix) printf '%s\n' "$HOME/prefix" ;;
   *) exit 1 ;;
 esac
 EOF
@@ -259,6 +276,7 @@ chmod +x "$test_root/brew-prefix/brew" "$test_root/brew-prefix/npm"
 ) > "$test_root/fresh.log" 2>&1 || { cat "$test_root/fresh.log" >&2; fail 'bundle with Homebrew off PATH'; }
 check grep -q "^$test_root/brew-prefix:" "$test_root/fresh-home/brew-path.log"
 check test "$(cat "$test_root/fresh-home/npm.log")" = "$npm_update"
+check test -e "$test_root/fresh-home/npmrc-linked"
 
 printf 'older\n' > "$test_root/conflict.backup.20000101000000"
 printf 'newer\n' > "$test_root/conflict"

@@ -180,6 +180,20 @@ brew_bin() {
   return 1
 }
 
+# npm reads its global config even when Homebrew hides the shell's
+# NPM_CONFIG_CACHE from the npm it runs for Brewfile entries.
+npm_global_config() {
+  brew=$(brew_bin) || return 1
+  prefix=$("$brew" --prefix 2>/dev/null) && [ -n "$prefix" ] || return 1
+  printf '%s/etc/npmrc\n' "$prefix"
+}
+
+link_npm_global_config() {
+  if npmrc=$(npm_global_config); then
+    link_path "$repo_dir/homebrew/npmrc" "$npmrc"
+  fi
+}
+
 ensure_macos_command_line_tools() {
   is_darwin || return 0
   xcode-select -p >/dev/null 2>&1 && return 0
@@ -250,6 +264,7 @@ link_dotfiles() {
   fi
 
   link_path "$installer" "$user_bin_home/dotfiles"
+  link_npm_global_config
 }
 
 # Links land first so a brew-phase failure leaves a partially-usable setup.
@@ -283,6 +298,8 @@ bundle_dotfiles() {
   # Non-admin macOS casks default to ~/Applications, as in shell startup.
   # shellcheck source=zsh/homebrew.sh
   . "$repo_dir/zsh/homebrew.sh"
+  # Fresh installs link before Homebrew exists; Bundle may run npm right away.
+  link_npm_global_config
 
   printf 'running brew bundle --global (%s)\n' "$brewfile"
   "$brew" bundle --global || {
@@ -770,6 +787,11 @@ doctor_dotfiles() {
     printf 'missing\n'
   fi
 
+  if npmrc=$(npm_global_config); then
+    printf 'npm global config %s: ' "$npmrc"
+    print_link_state "$repo_dir/homebrew/npmrc" "$npmrc"
+  fi
+
   printf 'zsh entrypoint ~/.zshenv: '
   if [ -f "$repo_dir/zsh/.zshenv" ]; then
     print_link_state "$repo_dir/zsh/.zshenv" "$HOME/.zshenv"
@@ -877,6 +899,9 @@ uninstall_dotfiles() {
   done
 
   remove_owned_link "$user_bin_home/dotfiles" "$installer"
+  if npmrc=$(npm_global_config); then
+    remove_owned_link "$npmrc" "$repo_dir/homebrew/npmrc"
+  fi
 
   printf '\ndone.\n'
 }
