@@ -579,49 +579,25 @@ check_git_updates() (
     printf 'dotfiles: detached HEAD\n'
     return 1
   }
-  local_rev=$(git -C "$repo_dir" rev-parse --verify 'HEAD^{commit}' 2>/dev/null) || {
-    printf 'dotfiles: unborn branch or unreadable HEAD\n'
-    return 1
-  }
-  remote=$(git -C "$repo_dir" config --get "branch.$branch.remote") && [ -n "$remote" ] || {
+  remote=$(git -C "$repo_dir" config --get "branch.$branch.remote") || {
     printf 'dotfiles: no upstream configured\n'
     return 1
   }
-  # Preserve trailing newlines so even empty extra merge entries are rejected.
-  upstream=$(git -C "$repo_dir" config --get-all "branch.$branch.merge" && printf '.') || {
-    printf 'dotfiles: no upstream configured\n'
-    return 1
-  }
-  upstream=${upstream%'
-.'}
-  case "$upstream" in
-    refs/*) ;;
-    *) printf 'dotfiles: upstream must be one full ref\n'; return 1 ;;
-  esac
-  git -C "$repo_dir" check-ref-format "$upstream" || {
-    printf 'dotfiles: upstream must be one valid ref (multiple merge refs are unsupported)\n'
-    return 1
-  }
-
-  # Ignore configured destinations, including mappings into local branches/tags.
-  GIT_TERMINAL_PROMPT=0 git -C "$repo_dir" -c fetch.pruneTags=false \
-    fetch --no-tags --no-prune --no-recurse-submodules --refmap= "$remote" "$upstream" || return 1
-  fetched_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ') || return 1
-  printf 'dotfiles fetched at: %s (UTC)\n' "$fetched_at"
-  upstream_rev=$(git -C "$repo_dir" rev-parse --verify 'FETCH_HEAD^{commit}') || return 1
-  incoming_count=$(git -C "$repo_dir" rev-list --count "$local_rev..$upstream_rev") || return 1
-  local_count=$(git -C "$repo_dir" rev-list --count "$upstream_rev..$local_rev") || return 1
+  # Like git fetch: tracking refs update and the repository's fetch settings apply.
+  GIT_TERMINAL_PROMPT=0 git -C "$repo_dir" fetch --quiet "$remote" || return 1
+  printf 'dotfiles fetched at: %s (UTC)\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  upstream=$(git -C "$repo_dir" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null) || return 1
+  incoming_count=$(git -C "$repo_dir" rev-list --count "HEAD..$upstream") || return 1
+  local_count=$(git -C "$repo_dir" rev-list --count "$upstream..HEAD") || return 1
   if [ "$local_count" -eq 0 ] && [ "$incoming_count" -eq 0 ]; then
     state=equal
   elif [ "$incoming_count" -eq 0 ]; then
     state=ahead
   elif [ "$local_count" -eq 0 ]; then
     state=behind
-  elif git -C "$repo_dir" merge-base "$local_rev" "$upstream_rev" >/dev/null; then
+  elif git -C "$repo_dir" merge-base HEAD "$upstream" >/dev/null; then
     state=diverged
   else
-    merge_status=$?
-    [ "$merge_status" -eq 1 ] || return 1
     state=no-common-history
   fi
   printf 'dotfiles: %s (%s)\n' "$state" "$upstream"
@@ -638,8 +614,6 @@ check_updates() {
 
   brewfile="${HOMEBREW_BUNDLE_FILE_GLOBAL:-$xdg_config_home/homebrew/Brewfile}"
   printf '\nHomebrew Brewfile: %s\n' "$brewfile"
-  printf 'Homebrew metadata freshness: unknown; automatic update disabled.\n'
-  printf 'Package extensions may contact upstream services.\n'
   if [ ! -f "$brewfile" ]; then
     printf 'error: no Brewfile found at %s\n' "$brewfile" >&2
     check_result=1
@@ -656,8 +630,7 @@ check_updates() {
     printf 'Homebrew: Brewfile unmet or check failed; see native output above\n'
     check_result=1
   fi
-  printf '\nNext: dotfiles status to inspect; dotfiles update to apply repo and package updates.\n'
-  printf 'Package metadata was not explicitly refreshed; brew update refreshes it without upgrading packages.\n'
+  printf '\nNext: dotfiles update applies repository and package updates; brew update first refreshes package metadata.\n'
   return "$check_result"
 }
 
@@ -909,10 +882,8 @@ update options:
   --yes       skip the --discard confirmation prompt
 
 check-updates exit codes:
-  0           inspection completed and Brewfile satisfied, even if dotfiles differ
-  1           unavailable/incomplete inspection, or Brewfile unmet/check failed
-              Brew's failure cannot distinguish unmet dependencies from errors.
-              No install/upgrade; automatic Homebrew update is disabled.
+  0           inspection completed and the Brewfile is satisfied
+  1           inspection incomplete, or the Brewfile is unmet
 
 default command:
   install     when executed directly as install.sh

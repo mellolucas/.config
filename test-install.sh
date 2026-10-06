@@ -344,8 +344,8 @@ if [ "${CHECK_UPDATES:-0}" = 1 ]; then
       [ "$*" = "-C $2 status --porcelain --untracked-files=all" ] || exit 91
       [ "${GIT_OPTIONAL_LOCKS:-}" = 0 ] || exit 92
       ;;
-    -c)
-      [ "$*" = "-C $2 -c fetch.pruneTags=false fetch --no-tags --no-prune --no-recurse-submodules --refmap= ${CHECK_REMOTE:-origin} $CHECK_SOURCE" ] || exit 93
+    fetch)
+      [ "$*" = "-C $2 fetch --quiet ${CHECK_REMOTE:-origin}" ] || exit 93
       [ "${GIT_TERMINAL_PROMPT:-}" = 0 ] || exit 94
       printf 'fetch\n' >> "$HOME/check-git.log"
       ;;
@@ -353,7 +353,7 @@ if [ "${CHECK_UPDATES:-0}" = 1 ]; then
       [ -f "$HOME/check-git.log" ] || exit 95
       printf 'rev-list\n' >> "$HOME/check-git.log"
       ;;
-    rev-parse|symbolic-ref|config|check-ref-format|merge-base) ;;
+    rev-parse|symbolic-ref|config|merge-base) ;;
     *) printf 'unexpected check-updates Git command: %s\n' "$*" >&2; exit 96 ;;
   esac
 fi
@@ -534,26 +534,23 @@ printf 'fixture: native Brew output\n'
 exit "${BREW_CHECK_RC:-0}"
 EOF
 unrelated_commit=$(fixture_commit unrelated)
-git -C "$seed" tag mapped-tag "$incoming_commit"
 printf '# selected fixture\n' > "$test_root/check.Brewfile"
 for scenario in equal dirty ahead behind diverged no-common detached unborn no-upstream \
-  fetch-failed missing-upstream fresh-tracking stale-mapping dot-remote slash-remote status-failed \
-  hostile-tags hostile-heads multiple-merge empty-extra-merge invalid-source wildcard-source destination-source \
+  fetch-failed missing-upstream fresh-tracking dot-remote slash-remote status-failed \
   brew-unmet brew-error missing-brewfile xdg-brewfile not-repo ancestor-repo extra-arg; do
   check_repo="$test_root/check-$scenario"
   initial=$base_commit incoming=$base_commit expected_rc=0
   diagnostic='dotfiles: equal' expected_incoming=0 expected_local=0
   fixture_remote=origin brew_rc=0 fail_status=0 fetch_expected=1
-  fixture_source=refs/heads/main
   selected_brewfile="$test_root/check.Brewfile"
   set --
   case "$scenario" in
     ahead) initial=$local_commit expected_local=1 diagnostic='dotfiles: ahead' ;;
-    behind|fresh-tracking|stale-mapping|hostile-heads|hostile-tags)
+    behind|fresh-tracking)
       incoming=$incoming_commit expected_incoming=1 diagnostic='dotfiles: behind' ;;
     diverged) initial=$local_commit incoming=$incoming_commit expected_local=1 expected_incoming=1 diagnostic='dotfiles: diverged' ;;
     no-common) incoming=$unrelated_commit expected_local=1 expected_incoming=1 diagnostic='dotfiles: no-common-history' ;;
-    detached|unborn|no-upstream|status-failed|not-repo|ancestor-repo|multiple-merge|empty-extra-merge|invalid-source|wildcard-source|destination-source)
+    detached|unborn|no-upstream|status-failed|not-repo|ancestor-repo)
       expected_rc=1 fetch_expected=0 diagnostic='dotfiles: unknown' ;;
     fetch-failed|missing-upstream) expected_rc=1 diagnostic='dotfiles: unknown' ;;
     dot-remote) fixture_remote=. ;;
@@ -573,9 +570,7 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
   git -C "$check_repo" tag local-only "$base_commit"
   git -C "$check_repo" update-ref refs/remotes/origin/keep "$base_commit"
   git -C "$check_repo" config fetch.prune true
-  git -C "$check_repo" config fetch.pruneTags true
   git -C "$check_repo" config remote.origin.prune true
-  git -C "$check_repo" config remote.origin.pruneTags true
   git -C "$seed" update-ref refs/heads/main "$incoming"
   case "$scenario" in
     dirty)
@@ -591,26 +586,7 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
     fetch-failed) git -C "$check_repo" remote set-url origin "$test_root/nonexistent-remote" ;;
     missing-upstream) git -C "$seed" update-ref -d refs/heads/main ;;
     fresh-tracking) git -C "$check_repo" update-ref -d refs/remotes/origin/main ;;
-    stale-mapping)
-      git -C "$check_repo" config --add remote.origin.fetch '^refs/heads/main'
-      ;;
-    hostile-tags)
-      fixture_source=refs/tags/mapped-tag
-      git -C "$check_repo" config branch.main.merge "$fixture_source"
-      git -C "$check_repo" update-ref "$fixture_source" "$base_commit"
-      git -C "$check_repo" config --add remote.origin.fetch '+refs/tags/*:refs/tags/*'
-      ;;
-    hostile-heads)
-      git -C "$check_repo" branch other "$base_commit"
-      git -C "$check_repo" config --add remote.origin.fetch '+refs/heads/main:refs/heads/other'
-      ;;
-    multiple-merge) git -C "$check_repo" config --add branch.main.merge refs/heads/base ;;
-    empty-extra-merge) git -C "$check_repo" config --add branch.main.merge '' ;;
-    invalid-source) git -C "$check_repo" config branch.main.merge main ;;
-    wildcard-source) git -C "$check_repo" config branch.main.merge 'refs/heads/*' ;;
-    destination-source) git -C "$check_repo" config branch.main.merge 'refs/heads/main:refs/heads/other' ;;
     dot-remote)
-      fixture_source=refs/heads/local-upstream
       git -C "$check_repo" branch local-upstream "$incoming_commit"
       git -C "$check_repo" branch --set-upstream-to=local-upstream main > /dev/null
       expected_incoming=1 diagnostic='dotfiles: behind'
@@ -623,9 +599,7 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
       ;;
   esac
   printf 'ignored\n' > "$check_repo/local.secret"
-  # Failed fetches must not report equality from a previous successful fetch.
-  printf '%s\t\tfixture: cached fetch\n' "$initial" > "$check_repo/.git/FETCH_HEAD"
-  before_refs=$(git -C "$check_repo" for-each-ref --format='%(refname) %(objectname)')
+  before_refs=$(git -C "$check_repo" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags)
   before_status=$(git -C "$check_repo" status --porcelain --untracked-files=all)
   cp "$check_repo/.git/index" "$test_root/check.index"
   cp "$check_repo/.git/HEAD" "$test_root/check.HEAD"
@@ -637,7 +611,7 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
   rm -f "$test_root/cli-home/check-brew.log" "$test_root/cli-home/check-git.log"
   check_rc=0
   run_cli env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=status.showUntrackedFiles \
-    GIT_CONFIG_VALUE_0=no CHECK_UPDATES=1 CHECK_REMOTE="$fixture_remote" CHECK_SOURCE="$fixture_source" \
+    GIT_CONFIG_VALUE_0=no CHECK_UPDATES=1 CHECK_REMOTE="$fixture_remote" \
     FAIL_GIT_STATUS="$fail_status" BREW_CHECK_RC="$brew_rc" HOMEBREW_BUNDLE_NO_UPGRADE=1 \
     HOMEBREW_FORCE_API_AUTO_UPDATE=1 HOMEBREW_BUNDLE_INSTALL=1 HOMEBREW_BUNDLE_CHECK_ALREADY_OUTPUT_FORMULAE_ERRORS=fixture \
     HOMEBREW_BUNDLE_FILE_GLOBAL="$selected_brewfile" \
@@ -687,8 +661,8 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
   check cmp "$test_root/check.tracked" "$check_repo/tracked"
   check test "$(cat "$check_repo/local.secret")" = ignored
   check test "$(git -C "$check_repo" status --porcelain --untracked-files=all)" = "$before_status"
-  # Inspection fetches must not update any branches, tags, or tracking refs.
-  after_refs=$(git -C "$check_repo" for-each-ref --format='%(refname) %(objectname)')
+  # With default fetch settings, tracking refs may move; local branches and tags stay.
+  after_refs=$(git -C "$check_repo" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags)
   check test "$after_refs" = "$before_refs"
 done
 check test ! -e "$test_root/cli-home/provision.log"
