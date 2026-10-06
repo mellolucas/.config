@@ -160,6 +160,21 @@ managed_dirs() {
   done
 }
 
+# A link this repo made for a top-level directory it no longer has.
+is_orphaned_link() {
+  [ -L "$1" ] && [ ! -e "$1" ] || return 1
+  target_real=$(resolve_script "$1") || return 1
+  [ "$target_real" = "$repo_dir/${1##*/}" ]
+}
+
+remove_orphaned_links() {
+  for dest in "$xdg_config_home"/*; do
+    is_orphaned_link "$dest" || continue
+    rm "$dest"
+    printf 'removed orphaned link %s\n' "$dest"
+  done
+}
+
 brew_bin() {
   if command -v brew >/dev/null 2>&1; then
     command -v brew
@@ -266,6 +281,7 @@ link_dotfiles() {
     name=${src##*/}
     link_path "$src" "$xdg_config_home/$name"
   done
+  remove_orphaned_links
 
   if [ -f "$xdg_config_home/zsh/.zshenv" ]; then
     link_path "$xdg_config_home/zsh/.zshenv" "$HOME/.zshenv"
@@ -834,19 +850,10 @@ doctor_dotfiles() {
     print_link_state "$src" "$xdg_config_home/$name" || problems=$((problems + 1))
   done
 
-  # Orphans: symlinks into this repo without a matching top-level domain
   for dest in "$xdg_config_home"/*; do
-    [ -L "$dest" ] || continue
-    name=${dest##*/}
-    [ -d "$repo_dir/$name" ] && continue
-    target_real=$(resolve_script "$dest") || continue
-
-    case "$target_real" in
-      "$repo_dir"/*)
-        printf 'link %s: orphaned; remove with: rm %s\n' "$name" "$dest"
-        problems=$((problems + 1))
-        ;;
-    esac
+    is_orphaned_link "$dest" || continue
+    printf 'link %s: orphaned; dotfiles link removes it\n' "${dest##*/}"
+    problems=$((problems + 1))
   done
 
   printf 'ghostty: '
@@ -955,6 +962,7 @@ uninstall_dotfiles() {
     name=${src##*/}
     remove_owned_link "$xdg_config_home/$name" "$src"
   done
+  remove_orphaned_links
 
   remove_owned_link "$user_bin_home/dotfiles" "$installer"
   if npmrc=$(npm_global_config); then

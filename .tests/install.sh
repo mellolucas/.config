@@ -166,6 +166,10 @@ check test ! -e "$XDG_CONFIG_HOME/zsh.backup.20000101000000"
 
 printf 'foreign\n' > "$test_root/foreign"
 ln -s "$test_root/foreign" "$XDG_CONFIG_HOME/foreign"
+# Only a dangling link to this repo's same-named directory is a retired link.
+ln -s "$repo_dir/retired" "$XDG_CONFIG_HOME/retired"
+ln -s "$test_root/elsewhere/retired" "$XDG_CONFIG_HOME/elsewhere"
+ln -s "$repo_dir/other-name" "$XDG_CONFIG_HOME/renamed"
 uninstall_dotfiles > "$test_root/uninstall.log"
 check test ! -L "$XDG_CONFIG_HOME/zsh"
 check test ! -L "$HOME/.zshenv"
@@ -173,6 +177,11 @@ check test ! -e "$HOME/.zshenv"
 check test ! -L "$HOME/.local/bin/dotfiles"
 check test -L "$XDG_CONFIG_HOME/foreign"
 check test -f "$test_root/foreign"
+check test ! -L "$XDG_CONFIG_HOME/retired"
+check grep -Fqx "removed orphaned link $XDG_CONFIG_HOME/retired" "$test_root/uninstall.log"
+check test -L "$XDG_CONFIG_HOME/elsewhere"
+check test -L "$XDG_CONFIG_HOME/renamed"
+rm "$XDG_CONFIG_HOME/elsewhere" "$XDG_CONFIG_HOME/renamed"
 uninstall_dotfiles >> "$test_root/uninstall.log"
 
 # Exercise native dispatch without invoking real Homebrew or npm.
@@ -790,6 +799,7 @@ ln -s "$test_root/missing" "$HOME/.dangling"
 mkdir -p "$XDG_CONFIG_HOME"
 rm -rf "$XDG_CONFIG_HOME/zsh"
 ln -s "$test_root/missing" "$XDG_CONFIG_HOME/zsh"
+ln -s "$repo_dir/retired" "$XDG_CONFIG_HOME/retired"
 if (
   # A hidden custom XDG home is part of the layout; the default name is not.
   # shellcheck disable=SC2034 # read by the sourced doctor_dotfiles
@@ -803,16 +813,20 @@ check grep -Fq "home .zshrc: ignored while this repo sets ZDOTDIR; move wanted l
 if grep -Fq 'home .zprofile' "$test_root/doctor.log"; then fail 'doctor reported an absent .zprofile'; fi
 check grep -Fq 'gh auth: not authenticated' "$test_root/doctor.log"
 check grep -Fqx "link zsh: broken symlink -> $test_root/missing" "$test_root/doctor.log"
+check grep -Fqx 'link retired: orphaned; dotfiles link removes it' "$test_root/doctor.log"
 check grep -Eqx '[0-9]+ problems found; dotfiles link repairs links, backing up what it replaces' "$test_root/doctor.log"
 rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.dangling"
 rm "$XDG_CONFIG_HOME/zsh"
 run_doctor > "$test_root/doctor.log" 2>&1 || true
 check grep -Fqx 'home: nothing outside the XDG layout' "$test_root/doctor.log"
 
-# A complete setup reports no problems and exits 0.
+# A complete setup reports no problems and exits 0; linking removes the
+# retired link.
 : > "$test_root/Brewfile"
 (
-  with_layout link_dotfiles > /dev/null
+  with_layout link_dotfiles > "$test_root/link.log"
+  check test ! -L "$XDG_CONFIG_HOME/retired"
+  check grep -Fqx "removed orphaned link $XDG_CONFIG_HOME/retired" "$test_root/link.log"
   PATH="$HOME/.local/bin:$PATH"
   # shellcheck disable=SC2034 # read by the sourced doctor_dotfiles
   HOMEBREW_BUNDLE_FILE_GLOBAL="$test_root/Brewfile"
