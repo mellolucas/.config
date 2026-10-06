@@ -44,10 +44,10 @@
   sort = version:refname # Sort tags by version
 
 [pretty]
-  compact = %C(auto)%m% h%d% s %C(dim black)·%C(reset dim italic)% ar by% aN%C(auto)
-  truncated = %C(auto)%m%h%<(40,trunc)% s%C(dim black)·%C(reset dim italic)%<(14,trunc)% ar by%<(8,trunc)% aN%C(auto) # 80-col budget for git-glance
-  compare = %C(auto)%m% h %C(dim yellow)^%p%C(auto)%d% s %C(dim black)·%C(reset dim italic)% ar by% aN%C(auto)
-  audit = %C(auto)%m% h%d% s %C(dim black)·%C(reset dim italic) at% ad by [%an](%ae)%C(auto)
+  compact = %C(auto)%m% h%d% s ·%C(italic)% ar by% aN%C(auto)
+  truncated = %C(auto)%m%h%<(40,trunc)% s·%C(italic)%<(14,trunc)% ar by%<(8,trunc)% aN%C(auto) # 80-col budget for git-glance
+  compare = %C(auto)%m% h %C(italic)^%p%C(auto)%d% s ·%C(italic)% ar by% aN%C(auto)
+  audit = %C(auto)%m% h%d% s ·%C(italic) at% ad by [%an](%ae)%C(auto)
 
 [format]
   pretty = compact
@@ -55,6 +55,12 @@
 [log]
   decorate = short
   date = iso-strict
+
+# Git's yellow hashes and tags fade on light themes
+[color "diff"]
+  commit = blue
+[color "decorate"]
+  tag = blue bold
 
 [core]
   pager = "if command -v delta >/dev/null; then delta; else less; fi"
@@ -64,6 +70,9 @@
   side-by-side = true
   line-numbers-left-format = ""
   line-numbers-right-format = "│{nm:<2}┊{np:>2}│"
+  line-numbers-minus-style = red # Palette colors instead of fixed grays and dark tones
+  line-numbers-plus-style = green
+  line-numbers-zero-style = normal
 
 [interactive]
   diffFilter = "if command -v delta >/dev/null; then delta --color-only; else cat; fi"
