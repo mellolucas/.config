@@ -783,13 +783,18 @@ run_doctor() (
   doctor_dotfiles
 )
 : > "$HOME/.zshrc"
-mkdir "$HOME/.copilot" "$HOME/.ssh"
-run_doctor > "$test_root/doctor.log" 2>&1 || true
-check grep -Fqx 'home: outside the XDG layout: .copilot .zshrc' "$test_root/doctor.log"
+mkdir "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache"
+ln -s "$test_root/missing" "$HOME/.dangling"
+(
+  # A hidden custom XDG home is part of the layout; the default name is not.
+  xdg_cache_home="$HOME/.tool-cache"
+  run_doctor
+) > "$test_root/doctor.log" 2>&1 || true
+check grep -Fqx 'home: outside the XDG layout: .cache .copilot .dangling .zshrc ..legacy' "$test_root/doctor.log"
 check grep -Fq "home .zshrc: ignored while this repo sets ZDOTDIR; move wanted lines to $XDG_CONFIG_HOME/zsh/local.zsh" "$test_root/doctor.log"
 if grep -Fq 'home .zprofile' "$test_root/doctor.log"; then fail 'doctor reported an absent .zprofile'; fi
 check grep -Fq 'gh auth: not authenticated' "$test_root/doctor.log"
-rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh"
+rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.dangling"
 run_doctor > "$test_root/doctor.log" 2>&1 || true
 check grep -Fqx 'home: nothing outside the XDG layout' "$test_root/doctor.log"
 

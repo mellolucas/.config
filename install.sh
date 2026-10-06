@@ -856,14 +856,24 @@ doctor_dotfiles() {
     printf 'missing\n'
   fi
 
-  # Hidden entries the layout expects in $HOME: the XDG roots, the zsh
-  # entrypoint, macOS's own files, and the homes OpenSSH and the AWS CLI hardcode
+  # Hidden entries the layout expects in $HOME: the hidden top level of each
+  # XDG and command home, the zsh entrypoint, the OS's own files, and the
+  # homes OpenSSH and the AWS CLI hardcode
+  layout=
+  for root in "$xdg_config_home" "$xdg_data_home" "$xdg_state_home" "$xdg_cache_home" "$user_bin_home"; do
+    case "$root" in
+      "$HOME"/.*) relative=${root#"$HOME"/}; layout="$layout ${relative%%/*}" ;;
+    esac
+  done
   outside=
-  for path in "$HOME"/.[!.]*; do
+  for path in "$HOME"/.[!.]* "$HOME"/..?*; do
     [ -e "$path" ] || [ -L "$path" ] || continue
     name=${path##*/}
+    case " $layout " in
+      *" $name "*) continue ;;
+    esac
     case "$name" in
-      .zshenv|.config|.local|.cache|.ssh|.aws|.Trash|.CFUserTextEncoding|.DS_Store) continue ;;
+      .zshenv|.ssh|.aws|.Trash|.CFUserTextEncoding|.DS_Store) continue ;;
       # Linux homes start with these from /etc/skel
       .bashrc|.profile|.bash_logout) is_darwin || continue ;;
     esac
