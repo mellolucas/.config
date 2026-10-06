@@ -157,17 +157,25 @@ check test -L "$XDG_CONFIG_HOME/foreign"
 check test -f "$test_root/foreign"
 uninstall_dotfiles >> "$test_root/uninstall.log"
 
-# Exercise native dispatch without invoking real Homebrew.
+# Exercise native dispatch without invoking real Homebrew or npm.
 mkdir "$test_root/package-bin"
 cat > "$test_root/package-bin/brew" <<'EOF'
 #!/bin/sh
 set -eu
-printf 'invoked\n' >> "$HOME/brew.log"
-[ "$*" = 'bundle --global' ]
+case "$*" in
+  'bundle --global') printf 'invoked\n' >> "$HOME/brew.log" ;;
+  'bundle list --global --npm') printf '@scope/tool\nplain-tool\n' ;;
+  *) exit 1 ;;
+esac
+EOF
+cat > "$test_root/package-bin/npm" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$HOME/npm.log"
 EOF
 printf '#!/bin/sh\nprintf "Linux\\n"\n' > "$test_root/package-bin/uname"
-chmod +x "$test_root/package-bin/brew" "$test_root/package-bin/uname" "$installer"
-for operation in bundle install link; do
+chmod +x "$test_root/package-bin/brew" "$test_root/package-bin/npm" "$test_root/package-bin/uname" "$installer"
+npm_update='update --global --ignore-scripts --min-release-age=1 @scope/tool plain-tool'
+for operation in bundle install link no-upgrade; do
   (
     export HOME="$test_root/package-$operation" PATH="$test_root/package-bin:$PATH"
     export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
@@ -175,6 +183,11 @@ for operation in bundle install link; do
     export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
     mkdir "$HOME"
     printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
+    unset HOMEBREW_BUNDLE_NO_UPGRADE
+    if [ "$operation" = no-upgrade ]; then
+      export HOMEBREW_BUNDLE_NO_UPGRADE=1
+      operation=bundle
+    fi
     "$installer" "$operation" > "$HOME/dispatch.log" 2>&1
     "$installer" "$operation" >> "$HOME/dispatch.log" 2>&1
     if [ "$operation" = link ]; then
@@ -182,6 +195,13 @@ for operation in bundle install link; do
     else
       check test "$(cat "$HOME/brew.log")" = "invoked
 invoked"
+    fi
+    # npm upgrades follow Bundle runs unless upgrades are disabled.
+    if [ "$operation" = link ] || [ -n "${HOMEBREW_BUNDLE_NO_UPGRADE-}" ]; then
+      check test ! -e "$HOME/npm.log"
+    else
+      check test "$(cat "$HOME/npm.log")" = "$npm_update
+$npm_update"
     fi
     if [ "$operation" = bundle ]; then
       check test ! -e "$XDG_CONFIG_HOME"
@@ -195,6 +215,34 @@ invoked"
     fi
   )
 done
+
+# Fresh installs run brew from its prefix before Homebrew is on PATH; Bundle
+# and npm must still find npm next to brew.
+mkdir "$test_root/brew-prefix" "$test_root/fresh-home"
+cat > "$test_root/brew-prefix/brew" <<'EOF'
+#!/bin/sh
+set -eu
+case "$*" in
+  'bundle --global') printf '%s\n' "$PATH" > "$HOME/brew-path.log" ;;
+  'bundle list --global --npm') printf '@scope/tool\nplain-tool\n' ;;
+  *) exit 1 ;;
+esac
+EOF
+cp "$test_root/package-bin/npm" "$test_root/brew-prefix/npm"
+chmod +x "$test_root/brew-prefix/brew" "$test_root/brew-prefix/npm"
+(
+  # shellcheck source=/dev/null
+  . "$test_root/library.sh"
+  repo_dir="$test_root/repo"
+  brew_bin() { printf '%s\n' "$test_root/brew-prefix/brew"; }
+  export HOME="$test_root/fresh-home" HOMEBREW_BUNDLE_FILE_GLOBAL="$test_root/fresh-home/Brewfile"
+  unset HOMEBREW_BUNDLE_NO_UPGRADE
+  printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
+  PATH=/usr/bin:/bin
+  bundle_dotfiles
+) > "$test_root/fresh.log" 2>&1 || { cat "$test_root/fresh.log" >&2; fail 'bundle with Homebrew off PATH'; }
+check grep -q "^$test_root/brew-prefix:" "$test_root/fresh-home/brew-path.log"
+check test "$(cat "$test_root/fresh-home/npm.log")" = "$npm_update"
 
 printf 'older\n' > "$test_root/conflict.backup.20000101000000"
 printf 'newer\n' > "$test_root/conflict"

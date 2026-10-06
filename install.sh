@@ -269,6 +269,8 @@ bundle_dotfiles() {
     printf 'error: Homebrew is not installed. Run: dotfiles install\n' >&2
     exit 1
   }
+  # Bundle finds npm on the caller's PATH, which lacks Homebrew on fresh installs.
+  PATH="${brew%/*}:$PATH"
 
   brewfile="${HOMEBREW_BUNDLE_FILE_GLOBAL:-$xdg_config_home/homebrew/Brewfile}"
   [ -f "$brewfile" ] || {
@@ -283,6 +285,18 @@ bundle_dotfiles() {
   printf 'running brew bundle --global (%s)\n' "$brewfile"
   "$brew" bundle --global || {
     printf 'error: brew bundle failed\n' >&2
+    exit 1
+  }
+
+  # Bundle installs npm packages but never upgrades them. Mirror its
+  # safeguards: no install scripts and a one-day release cooldown.
+  [ -z "${HOMEBREW_BUNDLE_NO_UPGRADE-}" ] || return 0
+  npm_packages=$("$brew" bundle list --global --npm) || exit 1
+  [ -n "$npm_packages" ] || return 0
+  printf 'updating npm packages from the Brewfile\n'
+  # shellcheck disable=SC2086 # one package name per word
+  npm update --global --ignore-scripts --min-release-age=1 $npm_packages || {
+    printf 'error: npm update failed\n' >&2
     exit 1
   }
 }
@@ -621,6 +635,7 @@ check_updates() {
     printf 'error: Homebrew is not installed\n' >&2
     check_result=1
   elif (
+    PATH="${brew%/*}:$PATH"
     unset HOMEBREW_BUNDLE_NO_UPGRADE HOMEBREW_BUNDLE_INSTALL
     unset HOMEBREW_FORCE_API_AUTO_UPDATE HOMEBREW_BUNDLE_CHECK_ALREADY_OUTPUT_FORMULAE_ERRORS
     HOMEBREW_NO_AUTO_UPDATE=1 "$brew" bundle check --global --verbose
@@ -869,7 +884,7 @@ usage: dotfiles [install|link|bundle|update|check-updates|status|doctor|uninstal
 commands:
   install     link configs into XDG_CONFIG_HOME, ensure Homebrew, brew bundle
   link        link configs into XDG_CONFIG_HOME without touching packages
-  bundle      run brew bundle for this dotfiles Brewfile
+  bundle      run brew bundle, then update the Brewfile's npm packages
   update      fetch upstream, fast-forward when clean, then reinstall
   check-updates  fetch and compare dotfiles; run brew bundle check (no arguments)
   status      show dotfiles repo status
