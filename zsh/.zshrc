@@ -48,6 +48,12 @@ bindkey -M viins '^?' backward-delete-char
 bindkey -M viins '^H' backward-delete-char
 # 10ms for snappy insert/vicmd switching; terminals send Alt chords as one burst
 KEYTIMEOUT=1
+# Option+Left/Right arrive as ESC b/f (macOS word jumps); unbound, vi modes
+# would read them as Esc plus a vi motion
+bindkey -M viins '^[b' backward-word
+bindkey -M viins '^[f' forward-word
+bindkey -M vicmd '^[b' vi-backward-word
+bindkey -M vicmd '^[f' vi-forward-word
 
 setopt interactive_comments
 setopt prompt_subst

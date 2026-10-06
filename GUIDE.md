@@ -55,6 +55,7 @@ Move around and build commands without retyping.
 | `Tab` | Complete; press again to choose from a menu |
 | `v **` then `Tab` | Fuzzy-pick paths for any command |
 | `cd -` | Return to the previous directory |
+| `Option+←` / `Option+→` | Jump a word back / forward |
 
 - Typing a directory name alone changes into it.
 - The prompt uses vi keys: Esc enters command mode, `i` returns to typing.

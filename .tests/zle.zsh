@@ -222,6 +222,12 @@ for mode in native fzf; do
   expect 'native vi command editing' bc vicmd
   snapshot $'\x18\x12abc\eh\ej\ek\el'
   expect 'Ghostty Option navigation remains insert-mode no-ops' abc
+  snapshot $'\x18\x12one two\ebX'
+  expect 'Option+Left jumps a word back and keeps typing' 'one Xtwo'
+  snapshot $'\x18\x12one two\eb\efX'
+  expect 'Option+Right jumps a word forward and keeps typing' 'one twoX'
+  snapshot $'\x18\x12one two\e0\efX'
+  expect 'Option+Right in command mode moves a word instead of finding' onetwo vicmd
   snapshot $'\x18\x12\x18\x07'
   expect 'completion does not leak globdots into ordinary expansion' glob/visible
   zpty -d shell
