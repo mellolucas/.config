@@ -27,7 +27,7 @@ brew "python"
 
 brew "gh"
 brew "opencode"
-cask "claude-code"
+cask "claude-code" if OS.mac?
 # Their casks are unnotarized, so macOS blocks them; npm installs are not quarantined
 npm "@github/copilot"
 npm "@openai/codex"

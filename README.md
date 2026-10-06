@@ -36,7 +36,7 @@ Homebrew owns package installs and upgrades: Ghostty's updater is off and OpenCo
 
 The shared Brewfile covers the editor toolchain and language servers, the Go, Node, Bun, and Python runtimes, the App Store CLI and Obsidian on macOS, and Apple's Container on Apple silicon with macOS 26+. Brewfile `npm` entries install tools published on npm; Homebrew Bundle never upgrades them, so `update` does, without install scripts and only to releases at least a day old, as Bundle installs them. `check-updates` only confirms they are installed.
 
-Agents: OpenCode (the workspace default) and Claude Code are installed through Homebrew; Claude Code reads `AGENTS.md` directly. Copilot CLI and Codex come from npm through Brewfile entries, because their Homebrew casks are unnotarized and macOS blocks them; `gh copilot` runs the same `copilot`. Each agent keeps its home under `~/.local/share` (see [Where files live](#where-files-live)).
+Agents: OpenCode (the workspace default) and Claude Code are installed through Homebrew; Claude Code reads `AGENTS.md` directly. Its cask is macOS-only, so on Linux install Claude Code with its own installer. Copilot CLI and Codex come from npm through Brewfile entries, because their Homebrew casks are unnotarized and macOS blocks them; `gh copilot` runs the same `copilot`. Each agent keeps its home under `~/.local/share` (see [Where files live](#where-files-live)).
 
 ## Where files live
 
