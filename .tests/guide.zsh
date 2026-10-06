@@ -73,7 +73,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 
 typeset -a topics labels
 typeset -A pages titles
-current='' intro=''
+current='' intro='' previous=''
 while IFS= read -r line || [[ -n $line ]]; do
   if [[ $line == '## '* ]]; then
     heading=${line#'## '}
@@ -84,13 +84,20 @@ while IFS= read -r line || [[ -n $line ]]; do
     needs_label=1
   elif [[ -n $current ]]; then
     pages[$current]+="$line"$'\n'
-    if (( needs_label )) && [[ -n $line ]]; then
+    # Table rows (after header and separator) are picker entries in page order.
+    if [[ $line == '| '* ]]; then
+      if [[ $previous == '|'* && $line != '| ---'* ]]; then
+        cells=("${(@s: | :)${${line#'| '}%' |'}}")
+        labels+=("$current"$'\t'"  ${cells[1]//\`/}  ${(j: | :)cells[2,-1]//\`/}")
+      fi
+    elif (( needs_label )) && [[ -n $line ]]; then
       labels+=("$current"$'\t'"$titles[$current] - $line")
       needs_label=0
     fi
   else
     intro+="$line"$'\n'
   fi
+  previous=$line
 done < "$repo/GUIDE.md"
 [[ ${(j: :)topics} == 'workspace files shell panes reading documents editor git agents maintain' ]] ||
   fail 'guide topic contract'
@@ -101,7 +108,7 @@ for topic in "${topics[@]}"; do
   all+=$'\n'"$pages[$topic]"
 done
 index+=$'\n`keys all` reads everything. `keys --plain` needs no viewer.\n'
-navigation=$'\n---\nGuide navigation: `keys` chooses another task. In the reader, `q` returns to the shell.\n'
+navigation=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task; `q` leaves the reader.\n'
 picker=$'FZF:ARGS:--layout=reverse|--no-multi|--wrap|--delimiter=\t|--with-nth=2..|--prompt=Find a task > |--header=Working here\nEnter reads a page. Esc returns to the shell.\nFZF:ENV::/dev/null\nFZF:INPUT\n'
 picker+="${(F)labels}"$'\nFZF:END\n'
 
