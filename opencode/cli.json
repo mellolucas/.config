@@ -8,7 +8,8 @@
     "leader": {
       "key": "ctrl+space"
     },
-    "command.palette.show": "<leader>:"
+    "command.palette.show": "<leader>:",
+    "app.exit": "ctrl+c,<leader>q"
   },
   "scroll": {
     "acceleration": true

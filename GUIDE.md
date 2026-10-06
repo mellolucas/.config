@@ -176,6 +176,7 @@ Run a coding agent beside your editor.
 | `workspace --agent codex` | Codex |
 
 - Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
+- In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C` or `Ctrl+Space` then `q`.
 - Repository guidance lives in `AGENTS.md`; Claude Code reads it directly.
 - Set a different default in `zsh/local.zsh`: `export DOTFILES_WORKSPACE_AGENT_CMD='claude'`.
 
