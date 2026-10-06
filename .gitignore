@@ -20,6 +20,8 @@ opencode/package.json
 opencode/package-lock.json
 opencode/bun.lock
 opencode/node_modules/
+# OpenCode 2 background-server settings, including a generated password
+opencode/service.json
 
 # Homebrew-generated third-party tap trust store; never tracked
 homebrew/trust.json*

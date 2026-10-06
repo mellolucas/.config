@@ -47,7 +47,7 @@ with shellcheck 'shellcheck' shellcheck install.sh zsh/homebrew.sh .tests/run .t
 with zsh 'zsh syntax' zsh -fc 'for f in zsh/.zshenv zsh/.zprofile zsh/.zshrc zsh/*.sh zsh/functions/*; do zsh -n "$f" || exit 1; done'
 with git 'git config' git config --file git/config --list
 with ghostty 'ghostty config' ghostty +validate-config --config-file=ghostty/config.ghostty
-with biome 'opencode config' biome lint opencode/opencode.jsonc opencode/tui.jsonc
+with biome 'opencode config' biome lint opencode/opencode.jsonc opencode/cli.json
 with 'zsh git' 'lifecycle' sh .tests/install.sh
 with git 'git helpers' sh .tests/git.sh
 with 'zsh git' 'zsh helpers' sh .tests/zsh.sh
