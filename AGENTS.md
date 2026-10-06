@@ -40,9 +40,9 @@ Operating rules for anyone (human or agent) working on this dotfiles repository.
   `local.*` / `*.local` names, plus `personal` and `work`. Machine-local
   configs have a tracked `*.example` template next to them; root-level
   `local.*` planning files do not.
-- Generated runtime files (e.g. opencode's `package.json`/`node_modules`) are
-  ignored explicitly in the repo `.gitignore` — never tracked, never relied on
-  to ignore themselves.
+- Generated runtime files (e.g. opencode's `service.json`) are ignored
+  explicitly in the repo `.gitignore` — never tracked, never relied on to
+  ignore themselves.
 - Review new tool integration: when adding a package or configuration domain,
   verify native config/storage paths, required runtimes, platform support, and
   Homebrew update ownership, and install and launch the real package on macOS

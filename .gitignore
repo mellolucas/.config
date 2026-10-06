@@ -14,12 +14,6 @@
 
 !**/*.example
 
-# opencode runtime-generated files (plugin deps); never tracked
-opencode/.gitignore
-opencode/package.json
-opencode/package-lock.json
-opencode/bun.lock
-opencode/node_modules/
 # OpenCode 2 background-server settings, including a generated password
 opencode/service.json
 
