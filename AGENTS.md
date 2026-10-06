@@ -53,11 +53,12 @@ Operating rules for anyone (human or agent) working on this dotfiles repository.
   verify native config/storage paths, required runtimes, platform support, and
   Homebrew update ownership, and install and launch the real package on macOS
   first (Gatekeeper and self-updaters only show up at runtime). Review XDG
-  placement, theme, keybindings, completion, generated-file ignores, and user
-  guidance where relevant; add only settings that improve the intended
-  workflow. No config file is a valid outcome. Shared packages support the
-  default environment or an explicitly approved general-use role;
-  personal/project-specific choices remain local.
+  placement, theme (Catppuccin Mocha for dark and Latte for light, inherited
+  from the terminal palette where possible), keybindings, completion,
+  generated-file ignores, and user guidance where relevant; add only settings
+  that improve the intended workflow. No config file is a valid outcome. Shared
+  packages support the default environment or an explicitly approved
+  general-use role; personal/project-specific choices remain local.
 - `zsh/homebrew.sh` and `zsh/xdg.sh` are shared by shell startup and
   `install.sh`; keep them POSIX sh so both can source them.
 - Commit style: small, cohesive conventional commits,

@@ -11,9 +11,9 @@
 - `keys` opens a task-oriented field guide; `GUIDE.md` holds the same pages.
 - Ghostty owns Option-key pane navigation, browse mode, and splits; Neovim
   keeps native window controls and handles the chords at pane edges.
-- bat, Delta, and Glow's Markdown styling use the terminal palette, so output
-  follows Ghostty's light and dark themes; Glow code blocks use fixed colors
-  readable on both.
+- Colors follow Catppuccin, Mocha in dark mode and Latte in light: bat, Delta,
+  and Glow's Markdown styling use the terminal palette, so output follows
+  Ghostty's theme; Glow code blocks keep Latte colors, readable in both.
 - Claude Code is a shared Homebrew package; Copilot CLI and Codex are shared
   npm packages declared in the Brewfile, because their casks are unnotarized
   and macOS blocks them. `dotfiles update` upgrades Brewfile npm packages,
