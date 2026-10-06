@@ -787,6 +787,7 @@ mkdir "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool
 ln -s "$test_root/missing" "$HOME/.dangling"
 (
   # A hidden custom XDG home is part of the layout; the default name is not.
+  # shellcheck disable=SC2034 # read by the sourced doctor_dotfiles
   xdg_cache_home="$HOME/.tool-cache"
   run_doctor
 ) > "$test_root/doctor.log" 2>&1 || true
