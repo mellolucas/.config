@@ -12,6 +12,11 @@
 # export EDITOR='nvim --clean'
 # export VISUAL="$EDITOR"
 
+# Skip shared Brewfile packages on this machine (space-separated names);
+# new shells pick this up, so start one before running dotfiles.
+# export HOMEBREW_BUNDLE_CASK_SKIP='obsidian'
+# export HOMEBREW_BUNDLE_BREW_SKIP='container'
+
 # export SOME_TOOL_HOME="$XDG_CONFIG_HOME/some-tool"
 # export AWS_CONFIG_FILE="$XDG_CONFIG_HOME/aws/config"
 

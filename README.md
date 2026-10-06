@@ -42,7 +42,7 @@ Machine-specific settings live in ignored files next to tracked `*.example` temp
 
 - `zsh/local.zsh` — environment, aliases, and workspace defaults such as `DOTFILES_WORKSPACE_AGENT_CMD`
 - `git/config.d/local`, `personal`, or `work` — identity and signing (the template includes the SSH signing runbook)
-- `homebrew/local.Brewfile` — extra packages
+- `homebrew/local.Brewfile` — extra packages; to skip a shared one on this machine, export `HOMEBREW_BUNDLE_CASK_SKIP` or `HOMEBREW_BUNDLE_BREW_SKIP` in `zsh/local.zsh` (shells started afterwards pick it up)
 
 Set only what differs from the defaults; updates never rewrite local files. Agent homes relocated by environment variables (for example `CLAUDE_CONFIG_DIR`) belong in `zsh/local.zsh` too.
 
