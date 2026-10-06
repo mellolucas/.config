@@ -1,0 +1,27 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install test tools
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+            echo "$HOMEBREW_PREFIX/bin" >> "$GITHUB_PATH"
+          fi
+          brew install zsh neovim shellcheck fzf eza
+      - name: Run isolated checks
+        run: sh .tests/run
