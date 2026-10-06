@@ -614,6 +614,17 @@ fn.environ = real_environ
 fn.delete(directory, "rf")
 assert(ok, err)
 
+-- Focus re-asks the terminal for its background, so 'background' follows a
+-- light/dark switch made while Neovim runs.
+local sent = {}
+local real_ui_send = api.nvim_ui_send
+api.nvim_ui_send = function(data) sent[#sent + 1] = data end
+local config_env = setmetatable({ require = function() end }, { __index = _G })
+assert(loadfile("nvim/lua/config/init.lua", "t", config_env))()
+api.nvim_exec_autocmds("FocusGained", {})
+api.nvim_ui_send = real_ui_send
+assert(vim.deep_equal(sent, { "\027]11;?\007" }), "focus query: " .. vim.inspect(sent))
+
 -- :grep runs grepprg through the shell: an unmatched zsh glob would silently
 -- empty the results, and nested repositories' .git folders must stay out.
 fn.executable = real_executable
@@ -632,4 +643,4 @@ if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   assert(vim.deep_equal(found, { "file" }), ":grep results: " .. vim.inspect(found))
 end
 
-print("Markdown preview, DiffSaved, GitDiff, and :grep tests passed")
+print("Markdown preview, DiffSaved, GitDiff, focus background query, and :grep tests passed")

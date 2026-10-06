@@ -61,6 +61,8 @@
   colors and still ignores personal fzf options.
 - OpenCode's Catppuccin theme follows the terminal's light or dark appearance
   (`"mode": "system"`).
+- A running Neovim follows a light/dark switch too: it asks the terminal for
+  its background again whenever its pane regains focus.
 - OpenCode 2: interface settings live in `opencode/cli.json`, replacing
   `tui.jsonc`; updates use the `update` key, and the background server's
   `service.json` stays machine-local.

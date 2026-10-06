@@ -2,7 +2,7 @@
 
 A focused terminal environment for Ghostty, zsh, Neovim, and Git. Native tools, XDG locations, and one Homebrew-managed package lifecycle keep it understandable and portable.
 
-Colors follow Catppuccin: Mocha in dark mode and Latte in light. Ghostty switches with the system appearance, and Neovim, OpenCode, fzf, bat, Delta, Glow, and the prompt follow it. Glow's code blocks are the one exception: Glow cannot use the terminal palette for code, so they keep Latte colors, which stay readable in both modes.
+Colors follow Catppuccin: Mocha in dark mode and Latte in light. Ghostty switches with the system appearance, and Neovim, OpenCode, fzf, bat, Delta, Glow, and the prompt follow it; a running Neovim catches up when its pane regains focus. Glow's code blocks are the one exception: Glow cannot use the terminal palette for code, so they keep Latte colors, which stay readable in both modes.
 
 ## Get started
 
