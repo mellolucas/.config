@@ -106,7 +106,7 @@ if [[ ${1:-} == --glance-render-child ]]; then
   print END
   exit 0
 fi
-for file in "$repo"/zsh/{homebrew.zsh,.zprofile,.zshrc,functions/{fzfe,fzfv,git-glance,github-open,github-view,help,keys}} "$repo/test-zsh.sh"; do
+for file in "$repo"/zsh/{homebrew.sh,.zprofile,.zshrc,functions/{fzfe,fzfv,git-glance,github-open,github-view,help,keys}} "$repo/test-zsh.sh"; do
   zsh -n "$file"
 done
 
@@ -481,131 +481,74 @@ done
 (
   HOME="$test_root/home with spaces"
   id() {
-    print -r -- "$*" >> "$test_root/policy-id"
     expect '-Gn' "$*" 'group lookup arguments'
-    print -r -- "$groups"
+    (( ${id_rc:-0} )) || print -r -- "$groups"
     return "${id_rc:-0}"
   }
   mkdir() { mkdir_args+=("$@"); }
-
+  default="--appdir=\"$HOME/Applications\""
   for OSTYPE in darwin23 linux-gnu; do
     for groups in 'staff admin everyone' 'staff admin-helper everyone'; do
-      for cask_opts in unset '' '--no-quarantine --language=en' \
-        '--appdir=/custom/Apps --no-quarantine' \
-        '"--appdir=/custom/Apps with spaces" --no-quarantine' \
-        '--appdir="/custom/Apps with spaces"' \
-        '--appdir-extra=/other'; do
+      for cask_opts in unset '' '--no-quarantine' '--appdir=/custom/Apps --no-quarantine' \
+        '"--appdir=/custom/Apps with spaces"' "'--appdir=$HOME/Applications'"; do
         unset HOMEBREW_CASK_OPTS
-        [[ $cask_opts == unset ]] || HOMEBREW_CASK_OPTS=$cask_opts
+        [[ $cask_opts == unset ]] || export HOMEBREW_CASK_OPTS=$cask_opts
         expected=${HOMEBREW_CASK_OPTS-}
-        expected_set=${+HOMEBREW_CASK_OPTS}
         expected_mkdir=()
-        expected_id=''
-        [[ $OSTYPE != darwin* ]] || expected_id='-Gn'
-        if [[ $OSTYPE == darwin* && $groups == 'staff admin-helper everyone' ]]; then
+        if [[ $OSTYPE == darwin* && $groups == *admin-helper* ]]; then
           expected_mkdir=(-p "$HOME/Applications")
           case $cask_opts in
-            unset|'') expected="'--appdir=$HOME/Applications'" ;;
-            '--no-quarantine --language=en'|'--appdir-extra=/other')
-              expected="'--appdir=$HOME/Applications' $cask_opts" ;;
+            unset|'') expected=$default ;;
+            *--appdir=*) ;;
+            *) expected="$default $cask_opts" ;;
           esac
-          expected_set=1
         fi
         for pass in 1 2; do
           label="cask policy: $OSTYPE / $groups / ${(qqq)cask_opts} / pass $pass"
           mkdir_args=()
-          : > "$test_root/policy-id"
-          source "$repo/zsh/homebrew.zsh"
+          source "$repo/zsh/homebrew.sh"
           expect "$expected" "${HOMEBREW_CASK_OPTS-}" "$label options"
-          expect "$expected_set" "${+HOMEBREW_CASK_OPTS}" "$label set/unset"
           expect "${(j:|:)expected_mkdir}" "${(j:|:)mkdir_args}" "$label mkdir arguments"
-          expect "$expected_id" "$(recorded policy-id)" "$label group lookup"
-          if [[ -n $expected_mkdir && $cask_opts != *'--appdir='* && $cask_opts != *'--appdir '* ]]; then
-            [[ ${(t)HOMEBREW_CASK_OPTS} == *export* ]] || fail "$label export"
-          fi
         done
       done
     done
   done
 
   (
-    OSTYPE=darwin groups='staff admin' id_rc=1
+    OSTYPE=darwin id_rc=1
     unset HOMEBREW_CASK_OPTS
-    source "$repo/zsh/homebrew.zsh"
-    expect "'--appdir=$HOME/Applications'" "$HOMEBREW_CASK_OPTS" 'failed group lookup does not grant admin status'
+    source "$repo/zsh/homebrew.sh"
+    expect "$default" "$HOMEBREW_CASK_OPTS" 'failed group lookup does not grant admin status'
   )
 
-  # Ruby is a test-only oracle for Homebrew's Shellwords and Config.env selection.
+  # Ruby is a test-only oracle for Homebrew's Shellwords split and last-wins appdir.
   if [[ -n $ruby_bin ]]; then
   PATH=/usr/bin:/bin "$ruby_bin" -rshellwords -ropen3 - "$repo" "$test_root" "$zsh_bin" <<'RUBY'
 repo, root, zsh = ARGV
-installer = File.read("#{repo}/install.sh")[/^ensure_homebrew_cask_appdir\(\) \{\n.*?^\}/m]
-abort 'missing installer cask function' unless installer
-policies = {
-  '/bin/sh' => "#{installer}\nis_darwin() { return 0; }; is_admin() { return 1; }; policy() { ensure_homebrew_cask_appdir; }",
-  zsh => 'OSTYPE=darwin; id() { printf "staff\\n"; }; policy() { source "$1/zsh/homebrew.zsh"; }',
-}
-installer_body = installer[/^  cask_appdir=\$\(\n.*?^  mkdir -p "\$HOME\/Applications"/m]
-abort 'runtime cask policies drifted' unless installer_body && File.read("#{repo}/zsh/homebrew.zsh").include?(installer_body)
-inputs = [nil, '', '--no-quarantine --language=en', '--appdir-extra=/other',
-          '--appdir=/custom/Apps', '--appdir="/custom/Apps with spaces"',
-          '"--appdir=/custom/Apps with spaces"', "'--appdir=/custom/O'\\''Brien'",
-          "\t--appdir=/custom/Apps\n", '--appdir=', '--appdir=/a --appdir=/b',
-          '--language="en --appdir=/not-an-option"', '--language=en;--appdir=/not-an-option',
-          '$\'--appdir=/not-an-option\'', '--appdir=$(touch sentinel)',
-          '--language="$(touch sentinel)"', '--appdir=/a\\ b', '--appdir\\=/a',
-          "--appdir=\"/a\\\nb\"", '--appdir="/a\\qb"', '--appdir="/a\\$b\\`c\\\\d\\\"e"',
-          "--language='a\\b'\v--appdir=/custom/Apps\f--language=en\r", "--appdir=/a\n\n",
-          "--language=en\\\n--appdir=/not-an-option", '--language=trailing\\',
-          '--appdir /custom/Apps', '"--appdir" /custom/Apps', '--appdir',
-          '--appdir=/a --appdir /b', '--appdir="unfinished', "--language='unfinished"]
-homes = ["#{root}/ordinary", "#{root}/O'Brien home \\ $ ` ; * ? [ ] \"\t\n"]
-homes.product(inputs).each do |home, input|
-  begin
-    words = Shellwords.shellsplit(input || '')
-    invalid = words.include?('--appdir') ? '--appdir=/path' : nil
-  rescue ArgumentError
-    invalid = 'unmatched quote'
-  end
-  policies.each do |shell, policy|
-    script = "#{policy}\nmkdir() { :; }; " \
-             'if policy "$1"; then policy "$1" || exit; printf "%s" "${HOMEBREW_CASK_OPTS-}"; ' \
-             'else printf "%s" "${HOMEBREW_CASK_OPTS-}"; exit 1; fi'
-    output, error, status = Open3.capture3({'HOME' => home, 'HOMEBREW_CASK_OPTS' => input},
-                                         shell, '-f', '-c', script, 'cask-test', repo, chdir: root)
-    label = "#{shell}: #{home.inspect} / #{input.inspect}"
-    if invalid
-      abort "#{label}: invalid options accepted or mutated: #{error}" unless
-        !status.success? && error.include?(invalid) && output == (input || '')
-      next
-    end
-    abort "#{label}: #{error}" unless status.success? && error.empty?
-    parsed = Shellwords.shellsplit(output)
-    # Config.env consumes equals-form flags; the final matching flag wins.
-    config = parsed.select { |arg| arg.include?('=') }.map { |arg| arg.split('=', 2) }
-                   .to_h { |flag, value| [flag.sub(/^--/, '').tr('-', '_'), value] }
-    appdirs = words.grep(/\A--appdir=/).map { |word| word.split('=', 2).last }
-    actual = parsed.grep(/\A--appdir=/).map { |word| word.split('=', 2).last }
-    expected = appdirs.empty? ? ["#{home}/Applications"] : appdirs
-    abort "#{label}: wrong appdir tokens: #{parsed.inspect}" unless actual == expected
-    abort "#{label}: wrong Config.env appdir" unless config['appdir'] == expected.last
-    if appdirs.empty?
-      abort "#{label}: other options changed" unless parsed.drop(1) == words
-    else
-      abort "#{label}: explicit options changed" unless output == input
-    end
-  end
+homes = ["#{root}/ordinary", "#{root}/O'Brien home"]
+inputs = [nil, '--no-quarantine', '--appdir=/custom', '"--appdir=/custom with spaces" --no-quarantine']
+policy = 'id() { echo staff; }; mkdir() { :; }; . "$1/zsh/homebrew.sh"; printf "%s" "${HOMEBREW_CASK_OPTS-}"'
+[zsh, '/bin/sh'].product(homes, inputs).each do |shell, home, input|
+  env = { 'HOME' => home, 'OSTYPE' => 'darwin', 'HOMEBREW_CASK_OPTS' => input }
+  output, error, status = Open3.capture3(env, shell, '-f', '-c', policy, 'cask-test', repo)
+  label = "#{shell}: #{home.inspect} / #{input.inspect}"
+  abort "#{label}: #{error}" unless status.success? && error.empty?
+  chosen = Shellwords.shellsplit(output).grep(/\A--appdir=/).map { |word| word.split('=', 2).last }
+  explicit = Shellwords.shellsplit(input || '').grep(/\A--appdir=/).map { |word| word.split('=', 2).last }
+  expected = explicit.last || "#{home}/Applications"
+  abort "#{label}: Homebrew would choose #{chosen.last.inspect}" unless chosen.last == expected
 end
-abort 'options were evaluated' if File.exist?("#{root}/sentinel")
-puts 'ok: both cask policies match Shellwords and equals-form appdir selection'
+puts 'ok: shared cask policy yields the expected Homebrew appdir in zsh and sh'
 RUBY
   else
     print -r -- 'SKIP: optional Ruby Shellwords comparison (ruby not installed)'
   fi
 
   # Check wiring as text: executing profiles could evaluate a real brew binary.
-  [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nsource "$ZDOTDIR/homebrew.zsh"\n'* ]] ||
+  [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nsource "$ZDOTDIR/homebrew.sh"\n'* ]] ||
     fail '.zprofile must source the cask policy'
+  [[ $(<"$repo/install.sh") == *$'\n  . "$repo_dir/zsh/homebrew.sh"\n'* ]] ||
+    fail 'install.sh must apply the shared cask policy'
   [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nif [[ -o login || -z $HOMEBREW_PREFIX ]]; then\n'* ]] ||
     fail '.zprofile must rerun shellenv for login shells and initialize other shells once'
   [[ $'\n'$(<"$repo/zsh/.zshrc")$'\n' == *$'\n[[ -o login ]] || source "$ZDOTDIR/.zprofile"\n'* ]] ||

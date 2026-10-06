@@ -19,7 +19,7 @@ unset GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR
 unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_TEMPLATE_DIR
 mkdir -p "$HOME" "$test_root/repo/zsh" "$test_root/bin"
 cp "$repo/install.sh" "$test_root/repo/install.sh"
-cp "$repo/zsh/.zshenv" "$test_root/repo/zsh/"
+cp "$repo/zsh/.zshenv" "$repo/zsh/homebrew.sh" "$test_root/repo/zsh/"
 
 # Load function definitions without the CLI dispatcher.
 test "$(grep -c '^# CLI dispatcher\.$' "$repo/install.sh")" = 1

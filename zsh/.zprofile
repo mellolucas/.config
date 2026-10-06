@@ -17,4 +17,4 @@ fi
 # brew shellenv prepends its dirs; keep personal shims first (typeset -U dedups)
 path=("$HOME/.local/bin" $path)
 
-source "$ZDOTDIR/homebrew.zsh"
+source "$ZDOTDIR/homebrew.sh"
