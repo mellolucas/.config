@@ -114,8 +114,8 @@ fi
 autoload -Uz vcs_info
 
 zstyle ':vcs_info:*' enable git
-zstyle ':vcs_info:git:*' formats ' %F{magenta}%b%f'
-zstyle ':vcs_info:git:*' actionformats ' %F{magenta}%b|%a%f'
+zstyle ':vcs_info:git:*' formats ' %F{cyan}%b%f'
+zstyle ':vcs_info:git:*' actionformats ' %F{cyan}%b|%a%f'
 
 _vcs_info_precmd() {
   vcs_info

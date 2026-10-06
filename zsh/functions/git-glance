@@ -75,7 +75,7 @@ done
 local -a wt
 (( conflicted )) && wt+=("%F{red}${conflicted} conflicted%f")
 (( staged ))     && wt+=("%F{green}${staged} staged%f")
-(( modified ))   && wt+=("%F{yellow}${modified} modified%f")
+(( modified ))   && wt+=("%F{blue}${modified} modified%f")
 (( untracked ))  && wt+=("${untracked} untracked")
 (( $#wt ))       || wt=('%F{green}clean%f')
 
@@ -114,13 +114,13 @@ if [[ $ZSH_SUBSHELL == 0 && -t 1 ]] && (( ${+commands[tput]} )); then
     print -rn -- "$canvas_home"
   fi
 fi
-print -P -- "\n%F{blue}${repo//\%/%%}%f${(l:pad:):-}%F{8}${fetched}%f"
+print -P -- "\n%F{blue}${repo//\%/%%}%f${(l:pad:):-}${fetched}"
 print -P -- "%F{8}${(l:80::─:):-}%f"
 [[ -n $op ]] && print -P -- "%F{red}⚠ $op in progress%f"
-print -P -- "%F{8}branch%f    %F{magenta}${branch//\%/%%}%f $track"
-print -P -- "%F{8}worktree%f  ${(j: · :)wt}"
-(( nstash ))    && print -P -- "%F{8}stash%f     $nstash · ${stash//\%/%%}"
-(( $#shown ))   && print -P -- "%F{8}branches%f  ${(j: · :)shown}"
+print -P -- "branch    %F{cyan}${branch//\%/%%}%f $track"
+print -P -- "worktree  ${(j: · :)wt}"
+(( nstash ))    && print -P -- "stash     $nstash · ${stash//\%/%%}"
+(( $#shown ))   && print -P -- "branches  ${(j: · :)shown}"
 if git rev-parse -q --verify HEAD >/dev/null 2>&1; then
   print
   git --no-pager log -3 --pretty=truncated

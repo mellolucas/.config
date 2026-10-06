@@ -14,6 +14,8 @@
 - Colors follow Catppuccin, Mocha in dark mode and Latte in light: bat, Delta,
   and Glow's Markdown styling use the terminal palette, so output follows
   Ghostty's theme; Glow code blocks keep Latte colors, readable in both.
+  Text avoids the palette's yellow and magenta, which fade on Latte: the
+  prompt's branch and `git-glance` use cyan and blue.
 - Claude Code is a shared Homebrew package; Copilot CLI and Codex are shared
   npm packages declared in the Brewfile, because their casks are unnotarized
   and macOS blocks them. `dotfiles update` upgrades Brewfile npm packages,
