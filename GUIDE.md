@@ -165,8 +165,8 @@ Run a coding agent beside your editor.
 | `ocode` | OpenCode in the current pane |
 | `Ctrl+Space` then `:` (in OpenCode) | OpenCode's command palette; `Ctrl+Space` is its leader |
 | `workspace --agent claude` | Claude Code |
-| `workspace --agent 'gh copilot'` | GitHub Copilot CLI (gh downloads it on first use) |
-| `workspace --agent codex` | Codex, after enabling it in the local Brewfile |
+| `workspace --agent copilot` | GitHub Copilot CLI (`gh copilot` runs it too) |
+| `workspace --agent codex` | Codex |
 
 - Each agent keeps its native home and settings; log in through its own flow.
 - Repository guidance lives in `AGENTS.md`; Claude Code reads it directly.
@@ -179,7 +179,7 @@ Inspect and update this setup deliberately; nothing runs at shell startup.
 | Run | Result |
 | --- | --- |
 | `dotfiles check-updates` | Fetch and check packages; applies no updates |
-| `dotfiles update` | Update the repository, relink, and apply the Brewfile |
+| `dotfiles update` | Update the repository, relink, apply the Brewfile, and update its npm packages |
 | `dotfiles link` | Relink configuration without touching packages |
 | `dotfiles status` / `dotfiles doctor` | Repository state / environment health |
 | `help COMMAND` | A command's help, even through an alias |

@@ -14,9 +14,11 @@
 - bat, Delta, and Glow's Markdown styling use the terminal palette, so output
   follows Ghostty's light and dark themes; Glow code blocks use fixed colors
   readable on both.
-- Claude Code is a shared Homebrew package. Copilot CLI runs through
-  `gh copilot`, and Codex is an optional local entry: their casks are
-  unnotarized, so macOS blocks them. Agents keep their native homes.
+- Claude Code is a shared Homebrew package; Copilot CLI and Codex are shared
+  npm packages declared in the Brewfile, because their casks are unnotarized
+  and macOS blocks them. `dotfiles update` upgrades Brewfile npm packages,
+  which Homebrew Bundle only installs. Agents keep their native homes.
+- Node and Python are shared runtimes alongside Go and Bun.
 - New helpers: `workspace` flags, `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
   `Space g d`, and `Space e r`.
 - Interactive non-login shells (common on Linux) now set up Homebrew too.

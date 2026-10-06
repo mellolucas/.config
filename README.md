@@ -23,7 +23,7 @@ Run **`keys`** and pick a task, or open a page directly: `keys files`, `keys pan
 
 ```sh
 dotfiles check-updates # Fetch and check packages; applies no updates
-dotfiles update        # Update the repository, relink, and apply the Brewfile
+dotfiles update        # Update the repository, relink, apply the Brewfile, update its npm packages
 dotfiles link          # Relink configuration without touching packages
 dotfiles status        # Repository state
 dotfiles doctor        # Environment health
@@ -32,9 +32,9 @@ dotfiles uninstall     # Remove owned links; packages, backups, and data stay
 
 Homebrew owns package installs and upgrades: Ghostty's updater is off and OpenCode only notifies. Turn off Obsidian's automatic updates in its settings on each machine. Nothing runs at shell startup; `check-updates` and `update` are explicit, and neither refreshes Homebrew's catalogue (`brew update` does). Incoming updates need a clean checkout that can fast-forward; `update --discard` is the explicit destructive alternative.
 
-The shared Brewfile covers the editor toolchain and language servers, Go and Bun, the App Store CLI and Obsidian on macOS, and Apple's Container on Apple silicon with macOS 26+.
+The shared Brewfile covers the editor toolchain and language servers, the Go, Node, Bun, and Python runtimes, the App Store CLI and Obsidian on macOS, and Apple's Container on Apple silicon with macOS 26+. Brewfile `npm` entries install tools published on npm; Homebrew Bundle never upgrades them, so `update` does, without install scripts and only to releases at least a day old, as Bundle installs them. `check-updates` only confirms they are installed.
 
-Agents: OpenCode (the workspace default) and Claude Code are installed through Homebrew; Claude Code reads `AGENTS.md` directly. Copilot CLI runs through `gh copilot`, and Codex is an optional local Brewfile entry, because their Homebrew casks are unnotarized and macOS blocks them. Agents keep their native homes and settings.
+Agents: OpenCode (the workspace default) and Claude Code are installed through Homebrew; Claude Code reads `AGENTS.md` directly. Copilot CLI and Codex come from npm through Brewfile entries, because their Homebrew casks are unnotarized and macOS blocks them; `gh copilot` runs the same `copilot`. Agents keep their native homes and settings.
 
 ## Make it local
 
@@ -52,6 +52,7 @@ Notes:
 - zsh ignores `~/.zshrc` and `~/.zprofile` because this setup sets `ZDOTDIR`; `dotfiles doctor` flags them so their lines can move to `zsh/local.zsh`.
 - Non-admin macOS users get casks in `~/Applications`; an explicit `--appdir=` in `HOMEBREW_CASK_OPTS` wins.
 - Git 2.35 or newer is required for the `zdiff3` merge conflict style.
+- Homebrew's `python3` refuses global `pip install`; use `python3 -m venv` for packages. Plain `python` is not linked.
 - OpenCode saves settings changed in its interface to the tracked `opencode/cli.json`; commit or discard them like any edit. Its `service.json` holds a per-machine password and stays ignored.
 
 ## Development
