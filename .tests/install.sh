@@ -733,18 +733,24 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
 done
 check test ! -e "$test_root/cli-home/provision.log"
 
-# doctor points ignored home zsh startup files to the local override file.
-: > "$HOME/.zshrc"
-(
+# doctor lists hidden home entries outside the XDG layout and points ignored
+# zsh startup files to the local override file.
+run_doctor() (
   # Keep diagnostics offline and independent of host binaries.
   gh() { return 1; }
   ghostty() { :; }
   nvim() { :; }
   doctor_dotfiles
-) > "$test_root/doctor.log" 2>&1 || true
-check grep -Fq "legacy $HOME/.zshrc: present; ignored while this repo sets ZDOTDIR; move wanted lines to $XDG_CONFIG_HOME/zsh/local.zsh" "$test_root/doctor.log"
-check grep -Fq "legacy $HOME/.zprofile: absent" "$test_root/doctor.log"
+)
+: > "$HOME/.zshrc"
+mkdir "$HOME/.copilot" "$HOME/.ssh"
+run_doctor > "$test_root/doctor.log" 2>&1 || true
+check grep -Fqx 'home: outside the XDG layout: .copilot .zshrc' "$test_root/doctor.log"
+check grep -Fq "home .zshrc: ignored while this repo sets ZDOTDIR; move wanted lines to $XDG_CONFIG_HOME/zsh/local.zsh" "$test_root/doctor.log"
+if grep -Fq 'home .zprofile' "$test_root/doctor.log"; then fail 'doctor reported an absent .zprofile'; fi
 check grep -Fq 'gh auth: not authenticated' "$test_root/doctor.log"
-rm "$HOME/.zshrc"
+rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh"
+run_doctor > "$test_root/doctor.log" 2>&1 || true
+check grep -Fqx 'home: nothing outside the XDG layout' "$test_root/doctor.log"
 
 printf 'ok: lifecycle regression checks\n'

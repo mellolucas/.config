@@ -824,26 +824,28 @@ doctor_dotfiles() {
     printf 'missing\n'
   fi
 
-  for path in \
-    "$HOME/.zshrc" \
-    "$HOME/.zprofile" \
-    "$HOME/.zcompdump" \
-    "$HOME/.viminfo" \
-    "$HOME/.lesshst" \
-    "$HOME/.vim" \
-    "$HOME/.zsh_sessions" \
-    "$HOME/.zsh_history"
-  do
-    printf 'legacy %s: ' "$path"
-    if [ ! -e "$path" ]; then
-      printf 'absent\n'
-    else
-      case "$path" in
-        */.zshrc|*/.zprofile)
-          printf 'present; ignored while this repo sets ZDOTDIR; move wanted lines to %s\n' \
-            "$xdg_config_home/zsh/local.zsh" ;;
-        *) printf 'present\n' ;;
-      esac
+  # Hidden entries the layout expects in $HOME: the XDG roots, the zsh
+  # entrypoint, macOS's own files, and the homes OpenSSH and the AWS CLI hardcode
+  outside=
+  for path in "$HOME"/.[!.]*; do
+    [ -e "$path" ] || [ -L "$path" ] || continue
+    name=${path##*/}
+    case "$name" in
+      .zshenv|.config|.local|.cache|.ssh|.aws|.Trash|.CFUserTextEncoding|.DS_Store) continue ;;
+      # Linux homes start with these from /etc/skel
+      .bashrc|.profile|.bash_logout) is_darwin || continue ;;
+    esac
+    outside="$outside $name"
+  done
+  if [ -n "$outside" ]; then
+    printf 'home: outside the XDG layout:%s\n' "$outside"
+  else
+    printf 'home: nothing outside the XDG layout\n'
+  fi
+  for name in .zshrc .zprofile; do
+    if [ -e "$HOME/$name" ]; then
+      printf 'home %s: ignored while this repo sets ZDOTDIR; move wanted lines to %s\n' \
+        "$name" "$xdg_config_home/zsh/local.zsh"
     fi
   done
 

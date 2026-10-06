@@ -23,6 +23,8 @@
   homes live in `~/.local/share`, Codex's database in `~/.local/state`, npm,
   Node, Python, and Go keep config, history, and caches in the XDG homes, and
   `go install` targets `~/.local/bin`.
+- `dotfiles doctor` lists hidden entries in `$HOME` outside the XDG layout,
+  replacing its fixed list of legacy files.
 - Node and Python are shared runtimes alongside Go and Bun.
 - New helpers: `workspace` flags, `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
   `Space g d`, and `Space e r`.

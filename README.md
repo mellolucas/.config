@@ -40,7 +40,7 @@ Agents: OpenCode (the workspace default) and Claude Code are installed through H
 
 Every file sits in the XDG home that matches its nature: configuration in `~/.config`, data in `~/.local/share`, state such as history and logs in `~/.local/state`, caches in `~/.cache`, and your own commands in `~/.local/bin`. `zsh/xdg.sh` points tools without native XDG support there, for shells and the installer alike: agents keep one home each under `~/.local/share` (`copilot`, `codex`, `claude`), Codex keeps its database in `~/.local/state/codex`, and npm, Node, Python, and Go follow the same split.
 
-`$HOME` holds only the `.zshenv` link. macOS apps keep Apple's `~/Library` layout. Exceptions, because the tools hardcode them: `~/.ssh` (OpenSSH), the AWS CLI's caches in `~/.aws`, Copilot's cache in `~/Library/Caches/copilot`, and Go's telemetry in `~/Library/Application Support/go`. Homebrew strips these variables from programs it runs, so npm under Homebrew Bundle still writes `~/.npm`.
+`$HOME` holds only the `.zshenv` link, and `dotfiles doctor` lists any other hidden entry there. macOS apps keep Apple's `~/Library` layout. Exceptions, because the tools hardcode them: `~/.ssh` (OpenSSH), the AWS CLI's caches in `~/.aws`, Copilot's cache in `~/Library/Caches/copilot`, and Go's telemetry in `~/Library/Application Support/go`. Homebrew strips these variables from programs it runs, so npm under Homebrew Bundle still writes `~/.npm`.
 
 ## Make it local
 
