@@ -42,6 +42,8 @@
 - fzf takes its colors from the terminal palette (`fzf/fzfrc`), so it follows
   Catppuccin Mocha and Latte like the rest; the `keys` picker uses the same
   colors and still ignores personal fzf options.
+- OpenCode's Catppuccin theme follows the terminal's light or dark appearance
+  (`"mode": "system"`).
 - OpenCode 2: interface settings live in `opencode/cli.json`, replacing
   `tui.jsonc`; updates use the `update` key, and the background server's
   `service.json` stays machine-local.
