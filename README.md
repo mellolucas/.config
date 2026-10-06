@@ -1,91 +1,60 @@
 # .config
 
-A focused terminal environment for Ghostty, zsh, Neovim, and Git. Native tools, XDG locations, and a single Homebrew-managed package lifecycle keep the setup understandable and portable.
+A focused terminal environment for Ghostty, zsh, Neovim, and Git. Native tools, XDG locations, and one Homebrew-managed package lifecycle keep it understandable and portable.
 
 ## Get started
 
-Requires Git, zsh, Ghostty 1.3+, and Neovim 0.12+. macOS is the primary platform; workspace automation is macOS-only. Fresh-machine and Linux testing remain user follow-up work; see the [release notes](RELEASE_NOTES.md) for validation scope.
+Requires Git, zsh, Ghostty 1.3+, and Neovim 0.12+. macOS is the primary platform; Linux is supported best-effort, and workspace automation is macOS-only.
 
-Keep the checkout separate from `$XDG_CONFIG_HOME` (normally `~/.config`). Installation and updates refuse physically identical paths, including symlink aliases, to protect unrelated applications' configuration.
-
-From this checkout:
+Keep the checkout separate from `$XDG_CONFIG_HOME` (normally `~/.config`). From the checkout:
 
 ```sh
 ./install.sh install
 exec zsh -l
 ```
 
-Installation links each configuration directory into `$XDG_CONFIG_HOME`, adds the shell entrypoint and `dotfiles` command, then ensures Homebrew and applies the Brewfile. Bootstrapping Homebrew also needs curl and bash, plus Xcode Command Line Tools on macOS. Administrator authorization may be required; non-admin accounts need an existing usable Homebrew installation.
-
-Links land before provisioning. Conflicting paths are moved to unique timestamped backups, never overwritten, and rerunning installation is safe. A package-setup failure leaves the linked configuration available.
+Installation links each configuration directory into `$XDG_CONFIG_HOME`, adds the `~/.zshenv` entrypoint and the `dotfiles` command, then ensures Homebrew and applies the Brewfile. Bootstrapping Homebrew needs curl and bash, plus the Xcode Command Line Tools on macOS. Conflicting files are moved to timestamped backups, never overwritten, and rerunning is safe.
 
 ## Find your flow
 
-Run **`keys`** and choose what you want to do. Type to find a task, Enter to read it, Esc to cancel, and `q` to leave the reader.
-
-```sh
-keys files       # Find, preview, and open files
-keys shell       # Change directory, insert paths, and recall commands
-keys panes       # Move and arrange your workspace
-keys editor      # Explore, edit, and compare
-keys git         # Resume work and review changes
-```
-
-The [field guide](GUIDE.md) is the same content, readable on GitHub. `keys all` opens everything; `keys TOPIC --plain` needs no renderer. Direct topics work without fzf, and missing viewers fall back to Markdown. Selecting a topic never executes its examples.
-
-Use Tab to discover topics, workspace flags, and lifecycle commands. Native editor controls stay available, and the guide identifies whether a shortcut belongs to Ghostty, Neovim, a picker, or a pager.
+Run **`keys`** and pick a task, or open a page directly: `keys files`, `keys panes`, `keys git`. The [field guide](GUIDE.md) is the same content.
 
 ## Maintain the setup
 
 ```sh
-dotfiles status   # Inspect the configuration repository
-dotfiles doctor   # Check the environment
-dotfiles check-updates # Fetch repository metadata and inspect managed packages
-dotfiles update   # Update the repository and apply the Brewfile
-dotfiles link     # Link configuration without touching packages
-dotfiles bundle   # Apply packages without updating the repository
-dotfiles help     # Full lifecycle usage
+dotfiles check-updates # Fetch and check packages; applies no updates
+dotfiles update        # Update the repository, relink, and apply the Brewfile
+dotfiles link          # Relink configuration without touching packages
+dotfiles status        # Repository state
+dotfiles doctor        # Environment health
+dotfiles uninstall     # Remove owned links; packages, backups, and data stay
 ```
 
-Use Homebrew for Brewfile package upgrades. Ghostty's automatic updater is disabled and OpenCode only notifies about updates. In Obsidian, turn off **Settings → General → Automatic updates** on each machine; this repository does not rewrite its private preferences. Applying the Brewfile can download and upgrade packages, but does not update macOS or pin package versions.
+Homebrew owns package installs and upgrades: Ghostty's updater is off and OpenCode only notifies. Turn off Obsidian's automatic updates in its settings on each machine. Nothing runs at shell startup; `check-updates` and `update` are explicit, and neither refreshes Homebrew's catalogue (`brew update` does). Incoming updates need a clean checkout that can fast-forward; `update --discard` is the explicit destructive alternative.
 
-The shared baseline includes Go for the enabled Go language server and Bun for AI-related utilities. macOS also includes the conditional App Store CLI and Obsidian; Container is included on Apple silicon with macOS 26+. Container-based project environments are future work, not configured automatically. Container upgrades may interrupt its running services. Use the commented local Brewfile template for alternative agents and project-specific tools.
+The shared Brewfile covers the editor toolchain and language servers, Go and Bun, the App Store CLI and Obsidian on macOS, and Apple's Container on Apple silicon with macOS 26+.
 
-Agents: OpenCode (the workspace default) and Claude Code are shared Homebrew packages, and Claude Code reads `AGENTS.md` directly. Copilot CLI runs through `gh copilot`, which downloads it on first use and keeps it updated; Codex is an optional local Brewfile entry. Their Homebrew casks are unnotarized, so macOS Gatekeeper blocks them.
-
-To deploy configuration without touching packages, use `dotfiles link`. Native Neovim packages and project-selected Go toolchains have separate lifecycles; Go may download a required toolchain without replacing its Homebrew installation.
-
-`dotfiles check-updates` is explicit, not a startup hook. It fetches the checkout's upstream like `git fetch`, reports incoming and local-only commits without merging, then runs `brew bundle check --global --verbose` without refreshing Homebrew's catalogue; `brew update` does that. It exits 0 when the inspection completed and the Brewfile is satisfied, even if commits are available, and 1 otherwise.
-
-Normal incoming updates require a clean, fast-forwardable checkout. An already-current or locally-ahead checkout is reapplied without altering local edits. Both update modes refuse incoming tracked paths that collide with ignored local content. `dotfiles update --discard` is an explicit destructive alternative, not a routine repair command; `--yes` skips its confirmation.
+Agents: OpenCode (the workspace default) and Claude Code are installed through Homebrew; Claude Code reads `AGENTS.md` directly. Copilot CLI runs through `gh copilot`, and Codex is an optional local Brewfile entry, because their Homebrew casks are unnotarized and macOS blocks them. Agents keep their native homes and settings.
 
 ## Make it local
 
-Keep machine-specific settings in ignored overrides, using the tracked example templates:
+Machine-specific settings live in ignored files next to tracked `*.example` templates (paths relative to `$XDG_CONFIG_HOME`):
 
-- `zsh/local.zsh`
-- `git/config.d/local`, `personal`, or `work`
-- `homebrew/local.Brewfile`
+- `zsh/local.zsh` — environment, aliases, and workspace defaults such as `DOTFILES_WORKSPACE_AGENT_CMD`
+- `git/config.d/local`, `personal`, or `work` — identity and signing (the template includes the SSH signing runbook)
+- `homebrew/local.Brewfile` — extra packages
 
-These paths are relative to `$XDG_CONFIG_HOME`. The Git identity template includes the SSH commit-signing runbook.
+Set only what differs from the defaults; updates never rewrite local files. Agent homes relocated by environment variables (for example `CLAUDE_CONFIG_DIR`) belong in `zsh/local.zsh` too.
 
-Use sparse overrides rather than copying every default. For example, set `DOTFILES_WORKSPACE_AGENT_CMD='kiro-cli chat'` in `zsh/local.zsh`, or use `workspace --agent 'kiro-cli chat'` for one launch. The template lists the supported pane defaults. New defaults apply when no override is set; updates do not rewrite local files. There is no central settings format or automatic session-start update policy.
+Notes:
 
-Agents keep their native homes and settings files; nothing is seeded or relocated. To keep a relocated home for shell launches, export its variable (for example `CLAUDE_CONFIG_DIR`) in `zsh/local.zsh`; GUI and IDE launches still use the native home.
+- `git config --global` writes to the tracked `git/config` here; use `git config --file "$XDG_CONFIG_HOME/git/config.d/local"` for machine settings.
+- zsh ignores `~/.zshrc` and `~/.zprofile` because this setup sets `ZDOTDIR`; `dotfiles doctor` flags them so their lines can move to `zsh/local.zsh`.
+- Non-admin macOS users get casks in `~/Applications`; an explicit `--appdir=` in `HOMEBREW_CASK_OPTS` wins.
+- Git 2.35 or newer is required for the `zdiff3` merge conflict style.
 
-Non-admin macOS casks default to `$HOME/Applications`. An explicit override takes precedence: inside `HOMEBREW_CASK_OPTS`, use `--appdir=/path`, quoting paths with spaces, rather than `--appdir /path`.
+## Development
 
-## Know the boundaries
+`sh .tests/run` runs every isolated check without provisioning anything; CI runs it on macOS and Ubuntu. Rules for contributors, human or agent, live in [AGENTS.md](AGENTS.md).
 
-- Ghostty panes and Neovim windows are separate layers. Option navigation tries Ghostty first, with normal-mode editor fallback.
-- Markdown previews show saved content and restore the source view. Rendered positioning is approximate; a warning indicates the finite scrollback limit was reached. Toggle again after resizing.
-- `help` accepts simple literal aliases, not shell expressions. `EDITOR` supports quoted executable/argument words without evaluating expressions.
-- Directory totals are opt-in scans. Icons depend on font support. Delta can truncate long lines; the guide provides a native-pager alternative.
-
-## Remove the links
-
-```sh
-dotfiles uninstall
-```
-
-Only owned symlinks are removed. Backups, local data, created directories, and installed packages remain. Removing a Brewfile entry does not uninstall its package; package removal is a separate explicit action.
+Licensed under the [MIT License](LICENSE).
