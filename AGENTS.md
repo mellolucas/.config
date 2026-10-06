@@ -10,10 +10,16 @@ Operating rules for anyone (human or agent) working on this dotfiles repository.
   ongoing cost (code, tests, docs) against its daily benefit; for edge cases
   that need deliberate misconfiguration, document the limitation instead of
   coding around it.
-- **XDG-first**: configs live under `$XDG_CONFIG_HOME`; state, cache, and data go
-  to their XDG homes. `$HOME` stays nearly empty (only the `.zshenv` symlink).
-  Tools without XDG support keep their native homes rather than being relocated
-  by shared configuration.
+- **XDG-first**: every file goes to the XDG home matching its nature (config,
+  data, state, or cache), so its location is known in advance. Tools without
+  native XDG support are pointed there through their own documented variables:
+  shared tools in the shared environment, machine-local tools in
+  `zsh/local.zsh`. A tool that keeps everything in one directory goes under
+  `$XDG_DATA_HOME`. `$HOME` stays nearly empty (only the `.zshenv` symlink).
+  Paths a tool hardcodes are documented exceptions, never symlinked into place.
+  macOS GUI apps keep Apple's `~/Library` layout, as do command-line tools
+  that default there unless a documented variable moves the whole category to
+  the tool's own Linux XDG location.
 - **Native-first**: prefer app-native config locations and mechanisms
   (e.g. `vim.pack` and native LSP in nvim, `vcs_info` for the prompt, Ghostty key
   tables, `brew bundle --global`). No frameworks, no plugin managers.
@@ -52,8 +58,8 @@ Operating rules for anyone (human or agent) working on this dotfiles repository.
   workflow. No config file is a valid outcome. Shared packages support the
   default environment or an explicitly approved general-use role;
   personal/project-specific choices remain local.
-- `zsh/homebrew.sh` is shared by shell startup (`.zprofile`) and `install.sh`;
-  keep it POSIX sh so both can source it.
+- `zsh/homebrew.sh` and `zsh/xdg.sh` are shared by shell startup and
+  `install.sh`; keep them POSIX sh so both can source them.
 - Commit style: small, cohesive conventional commits,
   `type(scope): lowercase summary`, scope = domain directory
   (e.g. `chore(zsh): ...`, `fix(ghostty): ...`).
