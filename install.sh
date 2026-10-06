@@ -701,19 +701,23 @@ status_dotfiles() {
   fi
 }
 
+# Returns non-zero unless dest is this repo's link to src.
 print_link_state() {
   src=$1
   dest=$2
   src_real=$(resolve_path "$src") || src_real=
 
   if [ -L "$dest" ]; then
-    if ! dest_real=$(resolve_script "$dest"); then
+    # A link to nothing (or a cycle) is broken, wherever it points.
+    if [ ! -e "$dest" ] || ! dest_real=$(resolve_script "$dest"); then
       printf 'broken symlink -> %s\n' "$(readlink "$dest")"
-    elif [ "$dest_real" = "$src_real" ]; then
-      printf 'ok\n'
-    else
-      printf 'foreign symlink -> %s\n' "$dest_real"
+      return 1
     fi
+    if [ "$dest_real" = "$src_real" ]; then
+      printf 'ok\n'
+      return 0
+    fi
+    printf 'foreign symlink -> %s\n' "$dest_real"
   elif [ -e "$dest" ]; then
     if dest_real=$(resolve_path "$dest") && [ "$dest_real" = "$src_real" ]; then
       printf 'in place (not a managed link; install/update require a separate checkout)\n'
@@ -723,6 +727,7 @@ print_link_state() {
   else
     printf 'missing\n'
   fi
+  return 1
 }
 
 # Returns 0 when version >= floor, 1 when older, 2 when unparseable.
@@ -767,11 +772,15 @@ print_version_check() {
   case "$version_status" in
     0) printf '%s (>= %s.%s)\n' "$version" "$floor_major" "$floor_minor" ;;
     2) printf 'version unparseable (want >= %s.%s)\n' "$floor_major" "$floor_minor" ;;
-    *) printf '%s (< %s.%s; upgrade recommended)\n' "$version" "$floor_major" "$floor_minor" ;;
+    *)
+      printf '%s (< %s.%s; upgrade recommended)\n' "$version" "$floor_major" "$floor_minor"
+      return 1
+      ;;
   esac
 }
 
 doctor_dotfiles() {
+  problems=0
   printf 'dotfiles repo: %s\n' "$repo_dir"
   printf 'XDG_CONFIG_HOME: %s\n' "$xdg_config_home"
 
@@ -780,13 +789,15 @@ doctor_dotfiles() {
     command -v dotfiles
   else
     printf 'missing\n'
+    problems=$((problems + 1))
   fi
 
   printf 'Homebrew: '
   if brew=$(brew_bin 2>/dev/null); then
     printf '%s\n' "$brew"
   else
-    printf 'missing\n'
+    printf 'missing; run: dotfiles install\n'
+    problems=$((problems + 1))
   fi
 
   printf 'Brewfile: '
@@ -795,24 +806,32 @@ doctor_dotfiles() {
     printf '%s\n' "$brewfile"
   else
     printf 'missing\n'
+    problems=$((problems + 1))
   fi
 
   if npmrc=$(npm_global_config); then
     printf 'npm global config %s: ' "$npmrc"
-    print_link_state "$repo_dir/homebrew/npmrc" "$npmrc"
+    if [ -e "$npmrc" ] && [ ! -L "$npmrc" ]; then
+      printf 'this machine'\''s own (kept)\n'
+    else
+      print_link_state "$repo_dir/homebrew/npmrc" "$npmrc" || problems=$((problems + 1))
+    fi
   fi
 
   printf 'zsh entrypoint ~/.zshenv: '
   if [ -f "$repo_dir/zsh/.zshenv" ]; then
-    print_link_state "$repo_dir/zsh/.zshenv" "$HOME/.zshenv"
+    print_link_state "$repo_dir/zsh/.zshenv" "$HOME/.zshenv" || problems=$((problems + 1))
   else
     printf 'no source at %s\n' "$repo_dir/zsh/.zshenv"
+    problems=$((problems + 1))
   fi
 
-  managed_dirs | while IFS= read -r src; do
+  # Loops run in this shell, not a pipe, so their problems count.
+  for src in "$repo_dir"/*; do
+    [ -d "$src" ] || continue
     name=${src##*/}
     printf 'link %s: ' "$name"
-    print_link_state "$src" "$xdg_config_home/$name"
+    print_link_state "$src" "$xdg_config_home/$name" || problems=$((problems + 1))
   done
 
   # Orphans: symlinks into this repo without a matching top-level domain
@@ -823,14 +842,20 @@ doctor_dotfiles() {
     target_real=$(resolve_script "$dest") || continue
 
     case "$target_real" in
-      "$repo_dir"/*) printf 'link %s: orphaned; remove with: rm %s\n' "$name" "$dest" ;;
+      "$repo_dir"/*)
+        printf 'link %s: orphaned; remove with: rm %s\n' "$name" "$dest"
+        problems=$((problems + 1))
+        ;;
     esac
   done
 
   printf 'ghostty: '
   if command -v ghostty >/dev/null 2>&1; then
     version=$(ghostty +version 2>/dev/null | awk 'NR == 1 { print $2 }' || true)
-    print_version_check "$version" 1 3
+    print_version_check "$version" 1 3 || problems=$((problems + 1))
+  elif is_darwin; then
+    printf 'not found; run: dotfiles bundle\n'
+    problems=$((problems + 1))
   else
     printf 'not found\n'
   fi
@@ -838,9 +863,10 @@ doctor_dotfiles() {
   printf 'nvim: '
   if command -v nvim >/dev/null 2>&1; then
     version=$(nvim --version 2>/dev/null | awk 'NR == 1 { sub(/^v/, "", $2); print $2 }' || true)
-    print_version_check "$version" 0 12
+    print_version_check "$version" 0 12 || problems=$((problems + 1))
   else
-    printf 'not found\n'
+    printf 'not found; run: dotfiles bundle\n'
+    problems=$((problems + 1))
   fi
 
   printf 'gh: '
@@ -851,9 +877,11 @@ doctor_dotfiles() {
       printf 'authenticated\n'
     else
       printf 'not authenticated; run: gh auth login\n'
+      problems=$((problems + 1))
     fi
   else
-    printf 'missing\n'
+    printf 'missing; run: dotfiles bundle\n'
+    problems=$((problems + 1))
   fi
 
   # Hidden entries the layout expects in $HOME: the hidden top level of each
@@ -881,6 +909,7 @@ doctor_dotfiles() {
   done
   if [ -n "$outside" ]; then
     printf 'home: outside the XDG layout:%s\n' "$outside"
+    problems=$((problems + 1))
   else
     printf 'home: nothing outside the XDG layout\n'
   fi
@@ -897,6 +926,7 @@ doctor_dotfiles() {
       xcode-select -p
     else
       printf 'missing; run: xcode-select --install\n'
+      problems=$((problems + 1))
     fi
 
     printf 'macOS admin user: '
@@ -906,6 +936,14 @@ doctor_dotfiles() {
       printf 'no; Homebrew casks default to %s\n' "$HOME/Applications"
     fi
   fi
+
+  case "$problems" in
+    0) printf '\nno problems found\n'; return 0 ;;
+    1) printf '\n1 problem found' ;;
+    *) printf '\n%s problems found' "$problems" ;;
+  esac
+  printf '; dotfiles link repairs links, backing up what it replaces\n'
+  return 1
 }
 
 uninstall_dotfiles() {
@@ -937,7 +975,7 @@ commands:
   update      fetch upstream, fast-forward when clean, then reinstall
   check-updates  fetch and compare dotfiles; run brew bundle check (no arguments)
   status      show dotfiles repo status
-  doctor      show environment status and next steps
+  doctor      check the setup and name fixes; exits 1 on problems
   uninstall   remove symlinks owned by this repo
   help        show this usage help message
 

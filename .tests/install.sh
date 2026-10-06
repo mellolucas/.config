@@ -773,8 +773,10 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
 done
 check test ! -e "$test_root/cli-home/provision.log"
 
-# doctor lists hidden home entries outside the XDG layout and points ignored
-# zsh startup files to the local override file.
+# doctor lists hidden home entries outside the XDG layout, points ignored
+# zsh startup files to the local override file, calls a link to nothing
+# broken, and exits 1 while anything needs fixing.
+repo_dir="$test_root/repo"
 run_doctor() (
   # Keep diagnostics offline and independent of host binaries.
   gh() { return 1; }
@@ -785,18 +787,42 @@ run_doctor() (
 : > "$HOME/.zshrc"
 mkdir "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache"
 ln -s "$test_root/missing" "$HOME/.dangling"
-(
+mkdir -p "$XDG_CONFIG_HOME"
+rm -rf "$XDG_CONFIG_HOME/zsh"
+ln -s "$test_root/missing" "$XDG_CONFIG_HOME/zsh"
+if (
   # A hidden custom XDG home is part of the layout; the default name is not.
   # shellcheck disable=SC2034 # read by the sourced doctor_dotfiles
   xdg_cache_home="$HOME/.tool-cache"
   run_doctor
-) > "$test_root/doctor.log" 2>&1 || true
+) > "$test_root/doctor.log" 2>&1; then
+  fail 'doctor exited 0 with problems'
+fi
 check grep -Fqx 'home: outside the XDG layout: .cache .copilot .dangling .zshrc ..legacy' "$test_root/doctor.log"
 check grep -Fq "home .zshrc: ignored while this repo sets ZDOTDIR; move wanted lines to $XDG_CONFIG_HOME/zsh/local.zsh" "$test_root/doctor.log"
 if grep -Fq 'home .zprofile' "$test_root/doctor.log"; then fail 'doctor reported an absent .zprofile'; fi
 check grep -Fq 'gh auth: not authenticated' "$test_root/doctor.log"
+check grep -Fqx "link zsh: broken symlink -> $test_root/missing" "$test_root/doctor.log"
+check grep -Eqx '[0-9]+ problems found; dotfiles link repairs links, backing up what it replaces' "$test_root/doctor.log"
 rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.dangling"
+rm "$XDG_CONFIG_HOME/zsh"
 run_doctor > "$test_root/doctor.log" 2>&1 || true
 check grep -Fqx 'home: nothing outside the XDG layout' "$test_root/doctor.log"
+
+# A complete setup reports no problems and exits 0.
+: > "$test_root/Brewfile"
+(
+  with_layout link_dotfiles > /dev/null
+  PATH="$HOME/.local/bin:$PATH"
+  # shellcheck disable=SC2034 # read by the sourced doctor_dotfiles
+  HOMEBREW_BUNDLE_FILE_GLOBAL="$test_root/Brewfile"
+  brew_bin() { printf '%s\n' "$test_root/brew"; }
+  is_darwin() { return 1; }
+  gh() { :; }
+  ghostty() { printf 'Ghostty 1.3.1\n'; }
+  nvim() { printf 'NVIM v0.12.5\n'; }
+  doctor_dotfiles
+) > "$test_root/doctor.log" 2>&1 || fail "doctor found problems in a complete setup: $(cat "$test_root/doctor.log")"
+check grep -Fqx 'no problems found' "$test_root/doctor.log"
 
 printf 'ok: lifecycle regression checks\n'

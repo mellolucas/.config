@@ -30,7 +30,8 @@
   prefix, so npm keeps its cache in `~/.cache/npm` even when Homebrew Bundle
   runs it without the shell's variables.
 - `dotfiles doctor` lists hidden entries in `$HOME` outside the XDG layout,
-  replacing its fixed list of legacy files.
+  replacing its fixed list of legacy files. It calls a link to nothing broken,
+  names a fix for each problem, and exits 1 until none remain.
 - Node and Python are shared runtimes alongside Go and Bun.
 - New helpers: `workspace` flags, `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
   `Space g d`, and `Space e r`.
