@@ -91,12 +91,13 @@ Ghostty's browse mode scrolls and copies terminal history without touching the r
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` | Full page down / up |
 | `gg` / `G` | Top / bottom |
-| `/` then `n` / `N` | Search, next, previous |
-| `y` | Copy the mouse selection |
+| `/` | Search: type, Enter, then `Esc` hands keys back to browse mode |
+| `n` / `N` | Next / previous match |
+| `y` or `Cmd+C` | Copy the mouse selection |
 | `:` | Ghostty command palette |
 | `Esc`, `q`, `i`, or `Option+b` | Leave browse mode |
 
-- The pane chords (`Option+h/j/k/l`, `Option+z`, and the rest) work the same while browsing.
+- Browse mode belongs to the pane: resize, equalize, zoom, and close (`Option+Shift+h/j/k/l`, `Option+=`, `Option+z`, `Option+q`) work while browsing; leave it before moving to another pane or splitting.
 
 ## Documents: Read a document
 

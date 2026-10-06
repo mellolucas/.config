@@ -553,18 +553,25 @@ RUBY
   done
 )
 
-# Browse mode keeps every Option split chord with the same action; Option+b leaves it.
+# Browse mode keeps the Option chords that act on its own pane, drops the ones
+# that move focus away (the pane would stay in browse mode), and Option+b leaves.
 (
   setopt extendedglob
   ghostty_lines=(${${(f)"$(<"$repo/ghostty/vim.ghostty")"}##[[:space:]]#})
   chords=0
   for line in ${(M)ghostty_lines:#keybind = (performable:|)alt+*}; do
     binding=${${line#keybind = }#performable:}
-    [[ $binding != alt+b=* ]] || continue
-    (( ++chords ))
-    (( ${ghostty_lines[(Ie)keybind = browse/$binding]} )) || fail "browse mode lacks $binding"
+    case $binding in
+      alt+b=*) ;;
+      *=goto_split:*|*=new_split:*)
+        (( ! ${ghostty_lines[(I)keybind = browse/${binding%%=*}=*]} )) ||
+          fail "browse mode keeps focus-moving ${binding%%=*}" ;;
+      *)
+        (( ++chords ))
+        (( ${ghostty_lines[(Ie)keybind = browse/$binding]} )) || fail "browse mode lacks $binding" ;;
+    esac
   done
-  (( chords )) || fail 'no Option split chords found'
+  (( chords )) || fail 'no pane-local Option chords found'
   (( ${ghostty_lines[(Ie)keybind = browse/alt+b=deactivate_key_table]} )) || fail 'browse mode Option+b exit'
 )
 

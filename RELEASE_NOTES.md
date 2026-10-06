@@ -40,8 +40,9 @@
   Option+Backspace deletes a word, Ctrl+W and Ctrl+U reach past where typing
   began, words end at punctuation as in Neovim, and Ctrl+R in command mode is
   vi's redo (fzf's history search keeps Ctrl+R while typing).
-- Browse mode also scrolls with the Up and Down arrows, keeps the Option pane
-  chords, and Option+b leaves it again; Ghostty's own Cmd+Option and Cmd+Ctrl
+- Browse mode also scrolls with the Up and Down arrows, copies with Cmd+C,
+  keeps the Option chords that act on its own pane (resize, equalize, zoom,
+  close), and Option+b leaves it again; Ghostty's own Cmd+Option and Cmd+Ctrl
   arrow chords move between and resize panes.
 - fzf takes its colors from the terminal palette (`fzf/fzfrc`), so it follows
   Catppuccin Mocha and Latte like the rest; the `keys` picker uses the same
