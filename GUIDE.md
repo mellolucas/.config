@@ -344,19 +344,19 @@ Inspect and update the environment through its single lifecycle entry point.
 
 - `dotfiles status` shows configuration repository state.
 - `dotfiles doctor` reports environment health and next steps.
-- `dotfiles check-updates` fetches repository metadata and checks managed packages without applying updates.
+- `dotfiles check-updates` fetches the repository's upstream and checks managed packages without applying updates.
 - `dotfiles help` describes lifecycle commands.
 - `help COMMAND` opens command or builtin documentation; simple literal aliases work too.
 
 ### Update deliberately
 
-Start with `dotfiles check-updates` when you want to inspect availability. Git counts follow a successful fetch; Homebrew uses available metadata without an automatic refresh, so its freshness is unknown. `brew update` explicitly refreshes Homebrew's catalogue without upgrading packages. Bundle checks may access external services and evaluate your Brewfile, but do not invoke Bundle installation. Nothing runs automatically when a shell starts.
+Start with `dotfiles check-updates` when you want to inspect availability. It fetches like `git fetch` and checks the Brewfile without refreshing Homebrew's catalogue; `brew update` refreshes it without upgrading packages. Nothing runs automatically when a shell starts.
 
 `dotfiles update`
 
 This updates the configuration repository and applies its Brewfile. Use Homebrew for package upgrades, including OpenCode. Ghostty automatic updates are disabled; turn off Obsidian's automatic updates in its General settings on each machine. `dotfiles bundle` applies packages without updating the repository or deploying config links. These commands can download and upgrade tools, not macOS itself.
 
-`HOMEBREW_BUNDLE_NO_UPGRADE=1 dotfiles install` skips normal upgrades of installed entries, but can still install missing packages and change dependencies. It is not an offline or links-only mode. Neovim's native package lock and project-selected Go toolchains remain separate from Brewfile updates.
+`dotfiles link` deploys configuration links without touching packages. Neovim's native package lock and project-selected Go toolchains remain separate from Brewfile updates.
 
 If incoming changes conflict with local work, stop and inspect it. `dotfiles update --discard` is an explicit destructive choice, not a routine repair command.
 

@@ -17,9 +17,9 @@ framework or generated keymap layer.
 - One lifecycle CLI for installation, package application, updates, diagnostics,
   status, and owned-link removal. Links land before provisioning; conflicting
   paths are backed up without overwriting earlier backups.
-- `dotfiles check-updates` explicitly fetches repository status and performs a
-  native Brewfile check without applying updates. Package metadata freshness is
-  reported separately; no startup update hook or shared settings format is added.
+- `dotfiles check-updates` fetches like `git fetch` and performs a native Brewfile
+  check without applying updates; `dotfiles link` deploys configuration without
+  touching packages. No startup update hook or shared settings format is added.
 - Updates reject unsafe repository states and incoming paths that would replace
   ignored local content. Git operations are isolated from inherited repository
   selectors, and inspection failures stop updates.
@@ -85,8 +85,8 @@ framework or generated keymap layer.
   contain quoted command/argument words, but not executable shell expressions.
 - `gcl` / `git clone-smart` accepts one repository argument. Use `git clone` or
   `gh repo clone` directly for clone options.
-- In `HOMEBREW_CASK_OPTS`, specify `--appdir=/path`; the separated environment
-  spelling `--appdir /path` is rejected. Explicit supported overrides win.
+- In `HOMEBREW_CASK_OPTS`, specify `--appdir=/path`; Homebrew ignores the
+  separated `--appdir /path` spelling. Explicit overrides win.
 - Uninstall removes owned links, not packages, backups, or local data. Removing
   an entry from the Brewfile does not automatically uninstall that package.
 

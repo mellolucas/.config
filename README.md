@@ -42,6 +42,7 @@ dotfiles status   # Inspect the configuration repository
 dotfiles doctor   # Check the environment
 dotfiles check-updates # Fetch repository metadata and inspect managed packages
 dotfiles update   # Update the repository and apply the Brewfile
+dotfiles link     # Link configuration without touching packages
 dotfiles bundle   # Apply packages without updating the repository
 dotfiles help     # Full lifecycle usage
 ```
@@ -52,11 +53,9 @@ The shared baseline includes Go for the enabled Go language server and Bun for A
 
 Agents: OpenCode (the workspace default) and Claude Code are shared Homebrew packages, and Claude Code reads `AGENTS.md` directly. Copilot CLI runs through `gh copilot`, which downloads it on first use and keeps it updated; Codex is an optional local Brewfile entry. Their Homebrew casks are unnotarized, so macOS Gatekeeper blocks them.
 
-For a run that skips upgrades of already-installed Bundle entries, use `HOMEBREW_BUNDLE_NO_UPGRADE=1 dotfiles install`; add `HOMEBREW_NO_AUTO_UPDATE=1` to suppress Homebrew's automatic catalogue refresh. This is not links-only or offline: missing packages and their dependencies may still be installed or upgraded. Native Neovim packages and project-selected Go toolchains have separate lifecycles; Go may download a required toolchain without replacing its Homebrew installation.
+To deploy configuration without touching packages, use `dotfiles link`. Native Neovim packages and project-selected Go toolchains have separate lifecycles; Go may download a required toolchain without replacing its Homebrew installation.
 
-`dotfiles check-updates` is explicit, not a startup hook. It fetches the configured Git remote and reports incoming/local commits without merging or changing the checkout. It then runs `brew bundle check --global --verbose`, with automatic metadata refresh disabled and outdated checks enabled. Homebrew metadata freshness is reported as unknown; run `brew update` explicitly for a fresh catalogue before checking again. No Bundle install/upgrade command is invoked, but Brewfile Ruby and package-manager extensions can perform their own work or access the network; this is not an offline sandbox.
-
-Exit status is 0 when Git inspection completed and the evaluated Brewfile is satisfied, even if repository commits are available; 1 means inspection was incomplete or Homebrew reported unmet dependencies/an error. Read the two sections independently. A failed fetch never claims the repository is current.
+`dotfiles check-updates` is explicit, not a startup hook. It fetches the checkout's upstream like `git fetch`, reports incoming and local-only commits without merging, then runs `brew bundle check --global --verbose` without refreshing Homebrew's catalogue; `brew update` does that. It exits 0 when the inspection completed and the Brewfile is satisfied, even if commits are available, and 1 otherwise.
 
 Normal incoming updates require a clean, fast-forwardable checkout. An already-current or locally-ahead checkout is reapplied without altering local edits. Both update modes refuse incoming tracked paths that collide with ignored local content. `dotfiles update --discard` is an explicit destructive alternative, not a routine repair command; `--yes` skips its confirmation.
 
