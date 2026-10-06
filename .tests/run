@@ -48,6 +48,7 @@ with zsh 'zsh syntax' zsh -fc 'for f in zsh/.zshenv zsh/.zprofile zsh/.zshrc zsh
 with git 'git config' git config --file git/config --list
 with ghostty 'ghostty config' ghostty +validate-config --config-file=ghostty/config.ghostty
 with biome 'opencode config' biome lint opencode/opencode.jsonc opencode/cli.json
+with brew 'brewfile' env HOMEBREW_NO_AUTO_UPDATE=1 brew bundle list --file=homebrew/Brewfile --all
 with 'zsh git' 'lifecycle' sh .tests/install.sh
 with git 'git helpers' sh .tests/git.sh
 with 'zsh git' 'zsh helpers' sh .tests/zsh.sh
