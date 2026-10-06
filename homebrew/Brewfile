@@ -21,10 +21,16 @@ brew "basedpyright"
 brew "go"
 brew "gopls"
 
+brew "node"
 brew "bun"
-brew "gh" # also runs Copilot CLI through `gh copilot`
+brew "python"
+
+brew "gh"
 brew "opencode"
 cask "claude-code"
+# Their casks are unnotarized, so macOS blocks them; npm installs are not quarantined
+npm "@github/copilot"
+npm "@openai/codex"
 
 cask "obsidian" if OS.mac?
 
