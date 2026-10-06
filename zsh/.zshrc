@@ -48,10 +48,21 @@ bindkey -M viins '^?' backward-delete-char
 bindkey -M viins '^H' backward-delete-char
 # 10ms for snappy insert/vicmd switching; terminals send Alt chords as one burst
 KEYTIMEOUT=1
-# Option+Left/Right arrive as ESC b/f (macOS word jumps); unbound, vi modes
-# would read them as Esc plus a vi motion
-bindkey -M viins '^[b' backward-word
-bindkey -M viins '^[f' forward-word
+# Word keys use vi words, as in Neovim. Option+Left/Right arrive as ESC b/f and
+# Option+Backspace as ESC DEL (macOS word keys); unbound, vi modes would read
+# them as Esc plus a vi motion. zsh's own vi kills stop where typing began, so
+# Ctrl+W and Ctrl+U (Cmd+Backspace in Ghostty) reach past it.
+backward-kill-vi-word() {
+  local end=$CURSOR
+  zle vi-backward-word
+  BUFFER=$LBUFFER${BUFFER:$end}
+}
+zle -N backward-kill-vi-word
+bindkey -M viins '^[b' vi-backward-word
+bindkey -M viins '^[f' vi-forward-word
+bindkey -M viins '^[^?' backward-kill-vi-word
+bindkey -M viins '^W' backward-kill-vi-word
+bindkey -M viins '^U' backward-kill-line
 bindkey -M vicmd '^[b' vi-backward-word
 bindkey -M vicmd '^[f' vi-forward-word
 

@@ -228,6 +228,14 @@ for mode in native fzf; do
   expect 'Option+Right jumps a word forward and keeps typing' 'one twoX'
   snapshot $'\x18\x12one two\e0\efX'
   expect 'Option+Right in command mode moves a word instead of finding' onetwo vicmd
+  snapshot $'\x18\x12cd foo/bar.baz\ebX'
+  expect 'Option+Left stops at punctuation, like Neovim' 'cd foo/bar.Xbaz'
+  snapshot $'\x18\x12one two\e\x7fX'
+  expect 'Option+Backspace deletes a word and keeps typing' 'one X'
+  snapshot $'\x18\x12one two\ea\x17'
+  expect 'Ctrl+W deletes past where typing began' 'one ' main
+  snapshot $'\x18\x12one two\ea\x15'
+  expect 'Ctrl+U deletes past where typing began' '' main
   snapshot $'\x18\x12\x18\x07'
   expect 'completion does not leak globdots into ordinary expansion' glob/visible
   zpty -d shell
