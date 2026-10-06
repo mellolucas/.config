@@ -163,6 +163,7 @@ Run a coding agent beside your editor.
 | --- | --- |
 | `workspace` | OpenCode in the right pane (the default) |
 | `ocode` | OpenCode in the current pane |
+| `Ctrl+Space` then `:` (in OpenCode) | OpenCode's command palette; `Ctrl+Space` is its leader |
 | `workspace --agent claude` | Claude Code |
 | `workspace --agent 'gh copilot'` | GitHub Copilot CLI (gh downloads it on first use) |
 | `workspace --agent codex` | Codex, after enabling it in the local Brewfile |

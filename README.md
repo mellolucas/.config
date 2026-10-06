@@ -52,6 +52,7 @@ Notes:
 - zsh ignores `~/.zshrc` and `~/.zprofile` because this setup sets `ZDOTDIR`; `dotfiles doctor` flags them so their lines can move to `zsh/local.zsh`.
 - Non-admin macOS users get casks in `~/Applications`; an explicit `--appdir=` in `HOMEBREW_CASK_OPTS` wins.
 - Git 2.35 or newer is required for the `zdiff3` merge conflict style.
+- OpenCode saves settings changed in its interface to the tracked `opencode/cli.json`; commit or discard them like any edit. Its `service.json` holds a per-machine password and stays ignored.
 
 ## Development
 
