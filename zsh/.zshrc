@@ -169,8 +169,8 @@ if [[ $OSTYPE == darwin* ]] && command -v caffeinate >/dev/null 2>&1; then
   alias awake='caffeinate -di'
 fi
 
-alias rg='rg --hidden --follow --smart-case --glob="!.git/*" --max-columns=120 --max-columns-preview'
-alias rga='rg --no-ignore --glob="!.git/*"'
+alias rg='rg --hidden --follow --smart-case --glob="!.git" --max-columns=120 --max-columns-preview'
+alias rga='rg --no-ignore --glob="!.git"'
 alias rgf='rg --files-with-matches'
 alias rgfa='rga --files-with-matches'
 alias rgc='rg --count'

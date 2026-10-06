@@ -44,8 +44,9 @@
   keeps the Option chords that act on its own pane (resize, equalize, zoom,
   close), and Option+b leaves it again; Ghostty's own Cmd+Option and Cmd+Ctrl
   arrow chords move between and resize panes.
-- Neovim's `:grep` searches with ripgrep: hidden files included, ignore files
-  respected, and every `.git` folder skipped, nested repositories' too.
+- Neovim's `:grep` searches with ripgrep like the shell's `rg`: hidden files
+  included, ignore files respected, and every `.git` folder skipped, nested
+  repositories' too.
 - fzf takes its colors from the terminal palette (`fzf/fzfrc`), so it follows
   Catppuccin Mocha and Latte like the rest; the `keys` picker uses the same
   colors and still ignores personal fzf options.
