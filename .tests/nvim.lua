@@ -56,13 +56,16 @@ for _, key in ipairs({ "h", "j", "k", "l" }) do
   end
 end
 
--- Option+Left/Right (<M-b>/<M-f>) jump words without leaving the mode.
-api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
-api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-b>X<M-f>Y<Esc>", true, false, true), "xt", false)
-assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one XtwoY")
+-- Option+Left/Right (<M-b>/<M-f>) jump to word starts without leaving the mode.
+api.nvim_buf_set_lines(typing, 0, -1, false, { "one two three" })
+api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-b>X<Esc>0i<M-f>Y<Esc>", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one Ytwo Xthree")
 api.nvim_feedkeys(api.nvim_replace_termcodes("0<M-f>x", true, false, true), "xt", false)
-assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one twoY")
-assert(fn.maparg("<M-b>", "c") == "<S-Left>" and fn.maparg("<M-f>", "c") == "<S-Right>")
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one two Xthree")
+api.nvim_feedkeys(api.nvim_replace_termcodes("0v<M-f>y", true, false, true), "xt", false)
+assert(fn.getreg('"') == "one t")
+api.nvim_feedkeys(api.nvim_replace_termcodes(":let g:jump = 'ab'<C-b><M-f><M-f><M-f>'x'..<CR>", true, false, true), "xt", false)
+assert(vim.g.jump == "xab")
 
 local source = api.nvim_create_buf(true, false)
 api.nvim_buf_set_name(source, "/virtual/preview.md")

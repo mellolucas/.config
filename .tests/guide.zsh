@@ -15,6 +15,7 @@ if [[ ${1:-} == --child ]]; then
   export PAGER=unexpected LESS=unexpected
   fzf() {
     local input='' line chosen=''
+    [[ -r $FZF_DEFAULT_OPTS_FILE ]] || { print -r -u2 -- "FZF:UNREADABLE:$FZF_DEFAULT_OPTS_FILE"; return 2; }
     IFS= read -r -d '' input || [[ -n $input ]]
     print -r -u2 -- "FZF:ARGS:${(j:|:)@}"
     print -r -u2 -- "FZF:ENV:$FZF_DEFAULT_OPTS:$FZF_DEFAULT_OPTS_FILE"
@@ -197,8 +198,9 @@ done
 
 # A separate source tree exercises multi-digit label counts without changing the guide.
 fixture_repo="$test_root/guide fixture"
-zf_mkdir -p "$fixture_repo/zsh/functions"
+zf_mkdir -p "$fixture_repo/zsh/functions" "$fixture_repo/fzf"
 print -r -- "$(<"$repo/zsh/functions/keys")" > "$fixture_repo/zsh/functions/keys"
+print -r -- "$(<"$repo/fzf/fzfrc")" > "$fixture_repo/fzf/fzfrc"
 repo=${fixture_repo:A}
 topics=() labels=() pages=() titles=()
 all=$'# Fixture guide\n'
