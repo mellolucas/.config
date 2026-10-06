@@ -34,7 +34,13 @@ Homebrew owns package installs and upgrades: Ghostty's updater is off and OpenCo
 
 The shared Brewfile covers the editor toolchain and language servers, the Go, Node, Bun, and Python runtimes, the App Store CLI and Obsidian on macOS, and Apple's Container on Apple silicon with macOS 26+. Brewfile `npm` entries install tools published on npm; Homebrew Bundle never upgrades them, so `update` does, without install scripts and only to releases at least a day old, as Bundle installs them. `check-updates` only confirms they are installed.
 
-Agents: OpenCode (the workspace default) and Claude Code are installed through Homebrew; Claude Code reads `AGENTS.md` directly. Copilot CLI and Codex come from npm through Brewfile entries, because their Homebrew casks are unnotarized and macOS blocks them; `gh copilot` runs the same `copilot`. Agents keep their native homes and settings.
+Agents: OpenCode (the workspace default) and Claude Code are installed through Homebrew; Claude Code reads `AGENTS.md` directly. Copilot CLI and Codex come from npm through Brewfile entries, because their Homebrew casks are unnotarized and macOS blocks them; `gh copilot` runs the same `copilot`. Each agent keeps its home under `~/.local/share` (see [Where files live](#where-files-live)).
+
+## Where files live
+
+Every file sits in the XDG home that matches its nature: configuration in `~/.config`, data in `~/.local/share`, state such as history and logs in `~/.local/state`, caches in `~/.cache`, and your own commands in `~/.local/bin`. `zsh/xdg.sh` points tools without native XDG support there, for shells and the installer alike: agents keep one home each under `~/.local/share` (`copilot`, `codex`, `claude`), Codex keeps its database in `~/.local/state/codex`, and npm, Node, Python, and Go follow the same split.
+
+`$HOME` holds only the `.zshenv` link. macOS apps keep Apple's `~/Library` layout. Exceptions, because the tools hardcode them: `~/.ssh` (OpenSSH), the AWS CLI's caches in `~/.aws`, Copilot's cache in `~/Library/Caches/copilot`, and Go's telemetry in `~/Library/Application Support/go`. Homebrew strips these variables from programs it runs, so npm under Homebrew Bundle still writes `~/.npm`.
 
 ## Make it local
 
@@ -44,7 +50,7 @@ Machine-specific settings live in ignored files next to tracked `*.example` temp
 - `git/config.d/local`, `personal`, or `work` — identity and signing (the template includes the SSH signing runbook)
 - `homebrew/local.Brewfile` — extra packages; to skip a shared one on this machine, export `HOMEBREW_BUNDLE_CASK_SKIP` or `HOMEBREW_BUNDLE_BREW_SKIP` in `zsh/local.zsh` (shells started afterwards pick it up)
 
-Set only what differs from the defaults; updates never rewrite local files. Agent homes relocated by environment variables (for example `CLAUDE_CONFIG_DIR`) belong in `zsh/local.zsh` too.
+Set only what differs from the defaults; updates never rewrite local files. Variables that move machine-only tools into the XDG homes belong in `zsh/local.zsh` too.
 
 Notes:
 

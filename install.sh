@@ -234,7 +234,9 @@ link_dotfiles() {
     "$xdg_cache_home" \
     "$user_bin_home" \
     "$xdg_state_home/zsh" \
-    "$xdg_cache_home/zsh"
+    "$xdg_cache_home/zsh" \
+    "$CODEX_HOME" \
+    "$CODEX_SQLITE_HOME"
 
   managed_dirs | while IFS= read -r src; do
     name=${src##*/}
@@ -923,6 +925,10 @@ default_command() {
 }
 
 # CLI dispatcher.
+# Commands see the same tool homes as the shell
+# shellcheck source=zsh/xdg.sh
+. "$repo_dir/zsh/xdg.sh"
+
 if [ "$#" -gt 0 ]; then
   cmd=$1
   shift

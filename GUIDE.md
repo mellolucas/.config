@@ -168,7 +168,7 @@ Run a coding agent beside your editor.
 | `workspace --agent copilot` | GitHub Copilot CLI (`gh copilot` runs it too) |
 | `workspace --agent codex` | Codex |
 
-- Each agent keeps its native home and settings; log in through its own flow.
+- Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
 - Repository guidance lives in `AGENTS.md`; Claude Code reads it directly.
 - Set a different default in `zsh/local.zsh`: `export DOTFILES_WORKSPACE_AGENT_CMD='claude'`.
 

@@ -17,9 +17,13 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 unset GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR
 unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_TEMPLATE_DIR
+# Tool homes follow each test's XDG homes, never the caller's environment.
+xdg_vars=$(sed -n 's/^export \([A-Z_][A-Z0-9_]*\)=.*/\1/p' "$repo/zsh/xdg.sh")
+# shellcheck disable=SC2086 # one variable name per word
+unset $xdg_vars
 mkdir -p "$HOME" "$test_root/repo/zsh" "$test_root/bin"
 cp "$repo/install.sh" "$test_root/repo/install.sh"
-cp "$repo/zsh/.zshenv" "$repo/zsh/homebrew.sh" "$test_root/repo/zsh/"
+cp "$repo/zsh/.zshenv" "$repo/zsh/homebrew.sh" "$repo/zsh/xdg.sh" "$test_root/repo/zsh/"
 
 # Load function definitions without the CLI dispatcher.
 test "$(grep -c '^# CLI dispatcher\.$' "$repo/install.sh")" = 1
@@ -32,16 +36,22 @@ installer="$repo_dir/install.sh"
 timestamp() { printf '20000101000000\n'; }
 ensure_homebrew() { :; }
 bundle_dotfiles() { :; }
+# The dispatcher loads the tool homes; direct lifecycle calls need them too.
+# shellcheck source=/dev/null
+with_layout() ( . "$repo_dir/zsh/xdg.sh"; "$@" )
 
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 check() { "$@" || fail "$*"; }
 
-# The zsh entrypoint is quiet, needs no PATH, and creates nothing.
+# The zsh entrypoint is quiet, needs no PATH, creates nothing, and loads the
+# tool homes from beside its link target.
 # shellcheck disable=SC2016
 check env -u ZDOTDIR ENTRYPOINT="$repo/zsh/.zshenv" zsh -f -c '
   PATH=""
   . "$ENTRYPOINT"
-  [[ $ZDOTDIR == "$XDG_CONFIG_HOME/zsh" ]]
+  [[ $ZDOTDIR == "$XDG_CONFIG_HOME/zsh" ]] &&
+    [[ $CODEX_HOME == "$XDG_DATA_HOME/codex" ]] &&
+    [[ $NPM_CONFIG_CACHE == "$XDG_CACHE_HOME/npm" ]]
 ' > "$test_root/env.log" 2>&1
 check test ! -s "$test_root/env.log"
 check test ! -e "$XDG_CONFIG_HOME"
@@ -138,12 +148,14 @@ check grep -Fxq 'bootstrap NONINTERACTIVE=unset' "$test_root/bootstrap.log"
 check grep -Fxq 'bootstrap NONINTERACTIVE=1' "$test_root/bootstrap.log"
 check grep -Fxq 'bootstrap NONINTERACTIVE=0' "$test_root/bootstrap.log"
 
-install_dotfiles > "$test_root/install.log"
+with_layout install_dotfiles > "$test_root/install.log"
 check grep -Fq 'exec zsh -l' "$test_root/install.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
 check test -L "$HOME/.local/bin/dotfiles"
-install_dotfiles >> "$test_root/install.log"
+check test -d "$XDG_DATA_HOME/codex"
+check test -d "$XDG_STATE_HOME/codex"
+with_layout install_dotfiles >> "$test_root/install.log"
 check test ! -e "$XDG_CONFIG_HOME/zsh.backup.20000101000000"
 
 printf 'foreign\n' > "$test_root/foreign"
@@ -171,6 +183,7 @@ EOF
 cat > "$test_root/package-bin/npm" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >> "$HOME/npm.log"
+printf '%s\n' "${NPM_CONFIG_CACHE-unset}" >> "$HOME/npm-cache.log"
 EOF
 printf '#!/bin/sh\nprintf "Linux\\n"\n' > "$test_root/package-bin/uname"
 chmod +x "$test_root/package-bin/brew" "$test_root/package-bin/npm" "$test_root/package-bin/uname" "$installer"
@@ -202,6 +215,7 @@ invoked"
     else
       check test "$(cat "$HOME/npm.log")" = "$npm_update
 $npm_update"
+      check test "$(sort -u "$HOME/npm-cache.log")" = "$XDG_CACHE_HOME/npm"
     fi
     if [ "$operation" = bundle ]; then
       check test ! -e "$XDG_CONFIG_HOME"
@@ -211,6 +225,8 @@ $npm_update"
       check test -L "$HOME/.zshenv"
       check test -L "$HOME/.local/bin/dotfiles"
       check test "$(ls -A "$XDG_CONFIG_HOME")" = zsh
+      check test -d "$XDG_DATA_HOME/codex"
+      check test -d "$XDG_STATE_HOME/codex"
       if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail "repeated $operation made backups"; fi
     fi
   )
@@ -266,7 +282,7 @@ set +e
   set -e
   # shellcheck disable=SC2329
   bundle_dotfiles() { return 1; }
-  install_dotfiles
+  with_layout install_dotfiles
 ) > "$test_root/failure.log" 2>&1
 rc=$?
 set -e
@@ -416,6 +432,7 @@ printf 'untracked\n' > "$cli_repo/dispatcher-marker"
 
 # In-place installs and updates must reject before any links, provisioning, or Git.
 mkdir -p "$cli_repo/zsh" "$cli_repo/homebrew" "$cli_repo/runtime"
+cp "$repo/zsh/xdg.sh" "$cli_repo/zsh/xdg.sh"
 printf '# existing entrypoint\n' > "$cli_repo/zsh/.zshenv"
 printf '# existing Brewfile\n' > "$cli_repo/homebrew/Brewfile"
 printf 'private\n' > "$cli_repo/runtime/data"
@@ -613,8 +630,9 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
   git clone -q --template= --branch main "$seed" "$check_repo"
   git -C "$check_repo" reset -q --hard "$initial"
   cp "$repo/install.sh" "$check_repo/install.sh"
-  mkdir -p "$check_repo/.git/info"
-  printf 'install.sh\n' >> "$check_repo/.git/info/exclude"
+  mkdir -p "$check_repo/zsh" "$check_repo/.git/info"
+  cp "$repo/zsh/xdg.sh" "$check_repo/zsh/xdg.sh"
+  printf 'install.sh\nzsh/xdg.sh\n' >> "$check_repo/.git/info/exclude"
   git -C "$check_repo" tag local-only "$base_commit"
   git -C "$check_repo" update-ref refs/remotes/origin/keep "$base_commit"
   git -C "$check_repo" config fetch.prune true

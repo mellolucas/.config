@@ -17,7 +17,12 @@
 - Claude Code is a shared Homebrew package; Copilot CLI and Codex are shared
   npm packages declared in the Brewfile, because their casks are unnotarized
   and macOS blocks them. `dotfiles update` upgrades Brewfile npm packages,
-  which Homebrew Bundle only installs. Agents keep their native homes.
+  which Homebrew Bundle only installs.
+- Every file follows the XDG layout by its nature. `zsh/xdg.sh`, read by
+  shells and the installer, points tools without native support there: agent
+  homes live in `~/.local/share`, Codex's database in `~/.local/state`, npm,
+  Node, Python, and Go keep config, history, and caches in the XDG homes, and
+  `go install` targets `~/.local/bin`.
 - Node and Python are shared runtimes alongside Go and Bun.
 - New helpers: `workspace` flags, `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
   `Space g d`, and `Space e r`.
@@ -39,6 +44,15 @@
   `ll --sort=age` for other orders.
 - In `HOMEBREW_CASK_OPTS`, use `--appdir=/path`; Homebrew ignores the
   `--appdir /path` spelling.
+- Agent homes moved to `~/.local/share/copilot`, `codex`, and `claude`. On a
+  machine set up earlier, quit the agents and move `~/.copilot` and `~/.codex`
+  there (first remove the empty `codex` folder `dotfiles link` creates), and
+  `~/.claude` to `claude` with `~/.claude.json` inside it; Claude Code may ask
+  you to log in again. Links that already point there can simply be removed.
+- npm reads `~/.config/npm/npmrc` instead of `~/.npmrc`; move yours if you
+  have one. `~/.npm` only holds npm's cache and can be deleted, as can `~/go`
+  once nothing you keep lives there (`GOMODCACHE=~/go/pkg/mod go clean
+  -modcache` clears its read-only module cache).
 
 ### Validation
 
