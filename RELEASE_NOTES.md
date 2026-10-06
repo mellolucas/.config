@@ -56,6 +56,10 @@
 - Neovim's `:grep` searches with ripgrep like the shell's `rg`: hidden files
   included, ignore files respected, and every `.git` folder skipped, nested
   repositories' too.
+- Git's global ignore covers only operating-system clutter (macOS, Linux,
+  Windows). It no longer hides project files such as `lib/`, `logs`, `tags`,
+  `*.spec`, or `pyrightconfig.json` in every repository, and no longer treats
+  every `icon` folder as a macOS `Icon` file.
 - fzf takes its colors from the terminal palette (`fzf/fzfrc`), so it follows
   Catppuccin Mocha and Latte like the rest; the `keys` picker uses the same
   colors and still ignores personal fzf options.
@@ -102,6 +106,10 @@
   own. Homebrew-run npm reads only that file, so registry or certificate
   settings that Brewfile npm entries need belong there, not in
   `~/.config/npm/npmrc`.
+- Repositories that relied on the global ignore for dependencies, build
+  output, or secrets (`node_modules`, `.venv`, `__pycache__`, `.env`) now show
+  them as untracked: add them to that project's `.gitignore`, or to
+  `.git/info/exclude` when only you need them, before running `git add -A`.
 
 ### Validation
 
