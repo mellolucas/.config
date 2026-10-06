@@ -1,0 +1,3 @@
+# Follow sourced repository files (e.g. zsh/homebrew.sh) from any directory
+external-sources=true
+source-path=SCRIPTDIR
