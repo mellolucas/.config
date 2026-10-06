@@ -57,6 +57,12 @@
   there (first remove the empty `codex` folder `dotfiles link` creates), and
   `~/.claude` to `claude` with `~/.claude.json` inside it; Claude Code may ask
   you to log in again. Links that already point there can simply be removed.
+  Codex's SQLite state (agent jobs and other resumable runtime state) lives in
+  `~/.local/state/codex`: move the `*.sqlite*` files from its old home there
+  while Codex is stopped.
+- Node and Python REPL histories live in `~/.local/state/node_repl_history`
+  and `~/.local/state/python_history`; move `~/.node_repl_history` and
+  `~/.python_history` there to keep them.
 - npm reads `~/.config/npm/npmrc` instead of `~/.npmrc`; move yours if you
   have one. `~/.npm` only holds npm's cache and can be deleted, as can `~/go`
   once nothing you keep lives there (`GOMODCACHE=~/go/pkg/mod go clean
