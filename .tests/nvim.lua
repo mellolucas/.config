@@ -56,6 +56,14 @@ for _, key in ipairs({ "h", "j", "k", "l" }) do
   end
 end
 
+-- Option+Left/Right (<M-b>/<M-f>) jump words without leaving the mode.
+api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
+api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-b>X<M-f>Y<Esc>", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one XtwoY")
+api.nvim_feedkeys(api.nvim_replace_termcodes("0<M-f>x", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one twoY")
+assert(fn.maparg("<M-b>", "c") == "<S-Left>" and fn.maparg("<M-f>", "c") == "<S-Right>")
+
 local source = api.nvim_create_buf(true, false)
 api.nvim_buf_set_name(source, "/virtual/preview.md")
 local lines = {}

@@ -183,6 +183,12 @@ map("n", "<A-l>", "<C-w>l", { desc = "Go to right window" })
 for _, key in ipairs({ "h", "j", "k", "l" }) do
   map({ "i", "v", "c" }, "<A-" .. key .. ">", "<Nop>", { desc = "Ignore pane-edge Option chord" })
 end
+-- Option+Left/Right arrive as <M-b>/<M-f> (Ghostty's macOS word jumps); unmapped,
+-- they too would read as Esc+motion.
+map({ "i", "c" }, "<M-b>", "<S-Left>", { desc = "Word back" })
+map({ "i", "c" }, "<M-f>", "<S-Right>", { desc = "Word forward" })
+map({ "n", "x" }, "<M-b>", "b", { desc = "Word back" })
+map({ "n", "x" }, "<M-f>", "w", { desc = "Word forward" })
 
 -- ---- Terminal Mode ----
 map("t", "<Esc><Esc>", [[<C-\><C-n>]], {
