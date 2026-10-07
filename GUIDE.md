@@ -192,7 +192,7 @@ Inspect and update this setup deliberately; nothing runs at shell startup.
 | `dotfiles update` | Update the repository, relink, apply the Brewfile, and update its npm packages |
 | `dotfiles link` | Relink configuration without touching packages |
 | `dotfiles status` / `dotfiles doctor` | Repository state / environment health |
-| `help COMMAND` | A command's help, even through an alias |
+| `help COMMAND` | A command's help, even through an alias; its manual when it has no `--help` |
 | `awake [COMMAND]` | Keep macOS awake (until Ctrl+C, or while COMMAND runs) |
 
 - `dots` is short for `dotfiles`; `dotsup` runs `dotfiles update`. Run `brew update` first to refresh package metadata.

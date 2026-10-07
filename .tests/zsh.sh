@@ -619,7 +619,14 @@ editor() { record editor "$@"; }
   expect $'editor\n--second\n--first\nuser argument\n--help' "$(recorded)" 'plain alias chain'
 
   source /dev/stdin <<< "$alias_block"
-  man() { record man "$@"; }
+  # Only bsd-tool has a manual; it rejects --help like caffeinate.
+  man() {
+    if [[ $1 == -w ]]; then
+      [[ $2 == bsd-tool ]]
+      return
+    fi
+    record man "$@"
+  }
   HELPDIR="$test_root/no-help-files"
   output=$(help exit >/dev/null; print -r -- survived) || fail 'help exit exited caller'
   expect survived "$output" 'help exit must not exit caller'
@@ -728,6 +735,15 @@ editor() { record editor "$@"; }
     help docs-exit >/dev/null || result=$?
     expect 19 "$result" "function exit stays in documentation subshell with bat=$has_bat"
   done
+
+  bsd-tool() { print -u2 -- 'bsd-tool: illegal option -- -'; return 64; }
+  help bsd-tool >/dev/null
+  expect $'man\nbsd-tool' "$(recorded)" 'a command that rejects --help shows its manual'
+  unfunction bat
+  glow() { record glow "$@"; }
+  source /dev/stdin <<< "$alias_block"
+  help mdv >/dev/null
+  expect $'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n0\n--help' "$(recorded)" 'help follows mdv through the glow alias'
 )
 
 fzf() {
@@ -801,6 +817,13 @@ encoded_ref='feature%2F%23%26%25%C3%A9'
 encoded_rel='nested%20dir/file%20%23%26%25%C3%A9.md'
 gh_state=success
 : > "$test_root/gh"
+for helper in github-open github-view; do
+  for flag in -h --help; do
+    output=$($helper "$flag") || fail "$helper $flag status"
+    [[ $output == "usage: $helper "* ]] || fail "$helper $flag usage"
+  done
+done
+[[ ! -s $test_root/gh ]] || fail 'helper usage invoked gh'
 github-open "$root/$rel"
 expect "browse
 $rel

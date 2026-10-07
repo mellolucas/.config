@@ -2,6 +2,12 @@
 
 emulate -L zsh
 
+if [[ $1 == (-h|--help) ]]; then
+  print -r -- 'usage: github-open [PATH]'
+  print -r -- 'Open PATH (default: the current directory) on GitHub at the current branch.'
+  return 0
+fi
+
 local target=${${1:-$PWD}:A}
 [[ -e $target ]] || {
   print -u2 -- "github-open: no such path: ${1:-$PWD}"

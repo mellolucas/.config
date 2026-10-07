@@ -146,7 +146,8 @@ alias vim='"${(@Q)${(z)EDITOR}}"'
 alias view='"${(@Q)${(z)EDITOR}}" -R -M'
 
 if command -v glow >/dev/null 2>&1; then
-  alias glow='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json"'
+  # The theme path expands once, here, so the alias stays literal for `help`
+  alias glow="glow --style ${(q)XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json"
   alias mdv='glow -p -w 0'
 fi
 

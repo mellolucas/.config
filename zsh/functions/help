@@ -61,11 +61,16 @@ if (( ${+builtins[$cmd[1]]} )); then
   return $?
 fi
 
-if command -v bat >/dev/null 2>&1; then
-  local output result=0
-  output=$("${cmd[@]}" "${@[2,-1]}" --help 2>&1) || result=$?
-  bat --plain --language=help <<< "$output" || :
-  return $result
-else
-  ( "${cmd[@]}" "${@[2,-1]}" --help 2>&1 )
+local output result=0
+output=$("${cmd[@]}" "${@[2,-1]}" --help 2>&1) || result=$?
+# BSD tools such as caffeinate reject --help; their manual is the help.
+if (( result )) && man -w "$cmd[1]" >/dev/null 2>&1; then
+  man "$cmd[1]"
+  return $?
 fi
+if command -v bat >/dev/null 2>&1; then
+  bat --plain --language=help <<< "$output" || :
+elif [[ -n $output ]]; then
+  print -r -- "$output"
+fi
+return $result
