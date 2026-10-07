@@ -63,15 +63,16 @@ trap 'exit 1' HUP INT TERM
 
 fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 
-# Stub platform checks and the absolute launcher, preserving its argument list.
+# Stub the launcher's executable check and absolute path, preserving its
+# argument list; the Ghostty route needs macOS, Ghostty, and no tmux.
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
-    DOTFILES_WORKSPACE_MIDDLE_TOP_CMD DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD
+    DOTFILES_WORKSPACE_MIDDLE_TOP_CMD DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD TMUX
+  OSTYPE=darwin23 TERM_PROGRAM=ghostty
   export DOTFILES_WORKSPACE_SCRIPT=$self
   code=$(<"$repo/zsh/functions/workspace")
-  local platform_check='[[ $OSTYPE == darwin* ]]' executable_check='[[ -x /usr/bin/osascript ]]'
-  [[ $code == *$platform_check* && $code == *$executable_check* ]] || fail 'platform fixture'
-  code=${code/$platform_check/'[[ 1 == 1 ]]'}
+  local executable_check='[[ -x /usr/bin/osascript ]]'
+  [[ $code == *$executable_check* ]] || fail 'platform fixture'
   code=${code/$executable_check/'[[ 1 == 1 ]]'}
   functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
@@ -151,7 +152,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   reject -- --help --editor
   reject "$temporary/missing-directory"
 
-  # Help must bypass even unavailable platform/script checks.
+  # Help must bypass even unavailable launcher and script checks.
   code=${functions[workspace]}
   functions[workspace]=${code//'[[ 1 == 1 ]]'/'[[ 1 == 0 ]]'}
   export DOTFILES_WORKSPACE_SCRIPT=$temporary/missing-script
@@ -162,6 +163,105 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     [[ $actual == 'usage: workspace '* ]] || fail "help after flag output: $option"
   done
   print -r -- 'ok: parser and dispatch'
+)
+
+# Outside Ghostty on macOS, and inside tmux, tmux lays out the same panes.
+(
+  unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
+    DOTFILES_WORKSPACE_MIDDLE_TOP_CMD DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD TMUX
+  # Never the Ghostty route here: it would open a real tab.
+  export TERM_PROGRAM=fixture
+  fpath=("$repo/zsh/functions" $fpath)
+  autoload -Uz workspace
+  temporary=$(mktemp -d "${TMPDIR:-/tmp}/workspace-tmux.XXXXXXXX")
+  temporary=${temporary:A}
+  trap 'command rm -rf -- "$temporary"' EXIT
+  mkdir -p "$temporary/bin" "$temporary/work dir" "$temporary/proj.v1" "$temporary/other/proj.v1"
+
+  # Without tmux on PATH the command explains itself and creates nothing.
+  if output=$(PATH=$temporary/bin workspace "$temporary/work dir" 2>&1 < /dev/null); then
+    fail 'accepted a missing tmux'
+  fi
+  [[ $output == $'workspace: tmux not found\nhint: run: dotfiles bundle' ]] || fail "missing tmux: $output"
+
+  # Inside tmux, even in Ghostty: a new window in the current session, and
+  # nothing attaches.
+  print '#!/bin/sh' > "$temporary/bin/tmux"
+  chmod +x "$temporary/bin/tmux"
+  tmux() {
+    print -r -- "${(j: :)${(qq)@}}" >> "$temporary/calls"
+    # Pane ids from the log: the function captures output in subshells
+    if [[ $1 == (new-window|split-window) ]]; then
+      local -a made=(${(M)${(f)"$(<"$temporary/calls")"}:#\'(new-window|split-window)\'*})
+      print -r -- "%$#made"
+    fi
+  }
+  output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 OSTYPE=darwin23 TERM_PROGRAM=ghostty \
+    workspace --middle-top '' --agent 'agent $(chat)' "$temporary/work dir" < /dev/null) || fail 'inside tmux'
+  [[ -z $output ]] || fail "inside tmux printed: $output"
+  expected=(
+    "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
+    "'split-window' '-h' '-l' '40%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-h' '-b' '-l' '33%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-v' '-l' '70%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'send-keys' '-t' '%3' '-l' '--' 'nvim .'" "'send-keys' '-t' '%3' 'Enter'"
+    "'send-keys' '-t' '%2' '-l' '--' 'agent \$(chat)'" "'send-keys' '-t' '%2' 'Enter'"
+    "'select-pane' '-t' '%4'"
+  )
+  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "inside tmux calls: $(<"$temporary/calls")"
+  unfunction tmux
+
+  if (( ! $+commands[tmux] )); then
+    print -r -- 'SKIP: real tmux layout (tmux not installed)'
+    print -r -- 'ok: tmux route'
+    exit 0
+  fi
+  # A real tmux server on a private socket, with this repository's tmux.conf.
+  export TMUX_TMPDIR=$temporary HOME=$temporary XDG_CONFIG_HOME=$temporary/config
+  mkdir -p "$XDG_CONFIG_HOME"
+  ln -s "$repo/tmux" "$XDG_CONFIG_HOME/tmux"
+  trap 'tmux kill-server 2>/dev/null; command rm -rf -- "$temporary"' EXIT
+  builtin cd -- "$temporary/proj.v1"
+  output=$(workspace --editor 'echo EDITOR' --agent 'echo AGENT' --middle-top 'echo TOP' \
+    --middle-bottom 'echo BOTTOM' < /dev/null) || fail 'real tmux session'
+  [[ $output == 'workspace: tmux session proj_v1 is ready; attach with: tmux attach -t proj_v1' ]] ||
+    fail "real tmux hint: $output"
+  output=$(workspace < /dev/null) || fail 'real tmux rerun'
+  [[ $output == *' proj_v1 is ready;'* ]] || fail "rerun did not reattach: $output"
+  builtin cd -- "$temporary/other/proj.v1"
+  output=$(workspace < /dev/null) || fail 'real tmux second directory'
+  [[ $output == *' proj_v1-2 is ready;'* ]] || fail "same name in another directory: $output"
+  [[ $(tmux list-sessions -F '#{session_name}' | sort) == $'proj_v1\nproj_v1-2' ]] || fail 'session count'
+  [[ $(tmux show -gv prefix) == None ]] || fail 'XDG tmux.conf not loaded'
+
+  # Panes keyed by position: columns 20/40/40 and middle rows 30/70, within
+  # rounding; each command ran in its own pane; focus is the bottom shell.
+  local -A width height active id
+  local line key w h a p
+  for line in ${(f)"$(tmux list-panes -t '=proj_v1' -F '#{pane_left}/#{pane_top} #{pane_width} #{pane_height} #{pane_active} #{pane_id}')"}; do
+    read -r key w h a p <<< "$line"
+    width[$key]=$w height[$key]=$h active[$key]=$a id[$key]=$p
+  done
+  (( ${#id} == 4 )) || fail "panes: ${(kv)id}"
+  integer columns=$(tmux display -p -t '=proj_v1:' '#{window_width}')
+  integer rows=$(tmux display -p -t '=proj_v1:' '#{window_height}')
+  integer middle=$(( width[0/0] + 1 ))
+  integer bottom=$(( height[$middle/0] + 1 ))
+  integer agent=$(( middle + width[$middle/0] + 1 ))
+  within() { (( $1 * 100 >= ($2 - 3) * $3 && $1 * 100 <= ($2 + 3) * $3 )) || fail "$4: $1 of $3"; }
+  within $width[0/0] 20 $columns 'editor width'
+  within $width[$middle/0] 40 $columns 'middle width'
+  within $height[$middle/0] 30 $rows 'middle top height'
+  (( active[$middle/$bottom] )) || fail 'focus is not the middle-bottom shell'
+  local -A wants=(0/0 EDITOR $middle/0 TOP $middle/$bottom BOTTOM $agent/0 AGENT)
+  local -F deadline=$(( SECONDS + 5 ))
+  for line in ${(k)wants}; do
+    until [[ $(tmux capture-pane -p -t "$id[$line]") == *$wants[$line]* ]]; do
+      (( SECONDS < deadline )) || fail "pane $line did not run its command"
+      sleep 0.1
+    done
+  done
+  print -r -- 'ok: tmux route'
 )
 
 wait_for() {

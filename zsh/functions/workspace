@@ -16,8 +16,9 @@ while (( $# )); do
       cat <<'EOF'
 usage: workspace [OPTIONS] [--] [DIR]
 
-Launch a Ghostty coding workspace layout as a new tab in the frontmost
-window (macOS only).
+Lay out a coding workspace: a new tab in Ghostty on macOS; elsewhere a tmux
+window (inside tmux) or a tmux session named after DIR, which rerunning
+workspace in DIR reattaches.
 
 Arguments:
   DIR   Workspace directory. Defaults to the current directory.
@@ -38,7 +39,7 @@ Layout:
 
 Environment:
   DOTFILES_WORKSPACE_SCRIPT=/path/to/workspace.applescript
-      Override the AppleScript implementation path.
+      Override the Ghostty AppleScript implementation path.
 
   DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
       Command started in the left pane.
@@ -88,10 +89,59 @@ if (( ${#directories} > 1 )); then
 fi
 dir=${directories[1]:-$PWD}
 
-[[ $OSTYPE == darwin* ]] || {
-  print -u2 -- 'workspace: Ghostty AppleScript automation requires macOS'
+[[ -d $dir ]] || {
+  print -r -u2 -- "workspace: not a directory: $dir"
   return 1
 }
+dir=${dir:A}
+
+# Outside Ghostty on macOS, and inside tmux, tmux lays out the same panes.
+if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
+  (( $+commands[tmux] )) || {
+    print -u2 -- 'workspace: tmux not found'
+    print -u2 -- 'hint: run: dotfiles bundle'
+    return 1
+  }
+  local name line top agent_pane editor_pane bottom_pane pane command
+  if [[ -z $TMUX ]]; then
+    for line in ${(f)"$(tmux list-sessions -F '#{session_name}:#{session_path}' 2>/dev/null)"}; do
+      [[ ${line#*:} == "$dir" ]] && name=${line%%:*} && break
+    done
+  fi
+  if [[ -z $name ]]; then
+    if [[ -n $TMUX ]]; then
+      top=$(tmux new-window -P -F '#{pane_id}' -n "${dir:t}" -c "$dir") || return
+    else
+      # Session names cannot hold . or :, and stay unique per directory
+      name=${${${dir:t}:-root}//[.:]/_}
+      local base=$name
+      local -i n=1
+      while tmux has-session -t "=$name" 2>/dev/null; do
+        name=$base-$(( ++n ))
+      done
+      top=$(tmux new-session -d -P -F '#{pane_id}' -s "$name" -c "$dir") || return
+    fi
+    # Widths 20/40/40 and middle heights 30/70: each split takes a share of
+    # the pane it divides.
+    agent_pane=$(tmux split-window -h -l 40% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
+    editor_pane=$(tmux split-window -h -b -l 33% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
+    bottom_pane=$(tmux split-window -v -l 70% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
+    for pane command in "$editor_pane" "$editor" "$agent_pane" "$agent" \
+      "$top" "$middle_top" "$bottom_pane" "$middle_bottom"; do
+      [[ -n $command ]] || continue
+      tmux send-keys -t "$pane" -l -- "$command" || return
+      tmux send-keys -t "$pane" Enter || return
+    done
+    tmux select-pane -t "$bottom_pane" || return
+  fi
+  [[ -z $TMUX ]] || return 0
+  if [[ -t 0 && -t 1 ]]; then
+    tmux attach-session -t "=$name"
+  else
+    print -r -- "workspace: tmux session $name is ready; attach with: tmux attach -t $name"
+  fi
+  return
+fi
 
 [[ -x /usr/bin/osascript ]] || {
   print -u2 -- 'workspace: /usr/bin/osascript not found'
@@ -104,12 +154,6 @@ local script=${DOTFILES_WORKSPACE_SCRIPT:-${XDG_CONFIG_HOME:-$HOME/.config}/ghos
   print -u2 -- 'hint: run: dotfiles link'
   return 1
 }
-
-[[ -d $dir ]] || {
-  print -r -u2 -- "workspace: not a directory: $dir"
-  return 1
-}
-dir=${dir:A}
 
 # Window text area in pixels (CSI 14 t) for the ratio-based split sizing.
 # Measured from the invoking pane: exact from an unsplit tab, undersized from
