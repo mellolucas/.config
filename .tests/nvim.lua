@@ -40,6 +40,8 @@ end
 
 vim.g.mapleader = " "
 dofile("nvim/lua/config/keymaps.lua")
+-- Space b l lists buffers, then waits at :b for a number or name.
+assert(fn.maparg(" bl", "n") == ":ls<CR>:b ", "Space b l: " .. fn.maparg(" bl", "n"))
 local toggle = fn.maparg(" tm", "n", false, true).callback
 assert(type(toggle) == "function")
 assert(fn.maparg(" tm", "t") == "")

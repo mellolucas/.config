@@ -155,7 +155,7 @@ map("n", "<leader>tm", function()
 end, { desc = "Toggle markdown preview" })
 
 -- Buffers: <leader>b*
-map("n", "<leader>bl", "<cmd>ls<CR>", { desc = "List active buffers" })
+map("n", "<leader>bl", ":ls<CR>:b ", { desc = "List buffers and pick one" })
 map("n", "<leader>b-", "<C-^>", { desc = "Switch to the previous buffer" })
 map("n", "<leader>bww", "<cmd>w<CR>", { desc = "Save buffer" })
 map("n", "<leader>bwq", "<cmd>wq<CR>", { desc = "Save and quit" })
