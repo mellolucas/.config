@@ -899,9 +899,10 @@ doctor_dotfiles() {
 
   printf 'tmux: '
   if command -v tmux >/dev/null 2>&1; then
-    # Releases carry a letter (3.7c); development builds a prefix (next-3.8)
+    # Releases carry a letter (3.7c); development builds a prefix (next-3.8).
+    # From 3.6, panes get truecolor and light/dark notifications by themselves.
     version=$(tmux -V 2>/dev/null | awk '{ sub(/^next-/, "", $2); sub(/[a-z]+$/, "", $2); print $2 }' || true)
-    print_version_check "$version" 3 2 || problems=$((problems + 1))
+    print_version_check "$version" 3 6 || problems=$((problems + 1))
   else
     printf 'not found; run: dotfiles bundle\n'
     problems=$((problems + 1))

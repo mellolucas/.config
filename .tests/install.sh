@@ -807,7 +807,7 @@ run_doctor() (
   gh() { return 1; }
   ghostty() { :; }
   nvim() { :; }
-  tmux() { printf 'tmux 3.1a\n'; }
+  tmux() { printf 'tmux 3.5a\n'; }
   login_shell() { printf '/bin/bash\n'; }
   doctor_dotfiles
 )
@@ -834,7 +834,7 @@ check grep -Fqx "link zsh: broken symlink -> $test_root/missing" "$test_root/doc
 check grep -Fqx 'link retired: orphaned; dotfiles link removes it' "$test_root/doctor.log"
 # shellcheck disable=SC2016 # the hint shows the command to type
 check grep -Fqx 'login shell: /bin/bash; run: chsh -s "$(command -v zsh)"' "$test_root/doctor.log"
-check grep -Fqx 'tmux: 3.1 (< 3.2; upgrade recommended)' "$test_root/doctor.log"
+check grep -Fqx 'tmux: 3.5 (< 3.6; upgrade recommended)' "$test_root/doctor.log"
 check grep -Eqx '[0-9]+ problems found; dotfiles link repairs links, backing up what it replaces' "$test_root/doctor.log"
 rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.dangling"
 rm "$XDG_CONFIG_HOME/zsh"
