@@ -20,6 +20,9 @@ Changes since `v0.0.1`.
   Codespaces install the lean package set and make zsh the login shell. Over
   SSH from Ghostty, zsh switches to xterm-256color where Ghostty's terminfo
   entry is missing, as on codespaces, so tmux starts.
+- On servers and in plain containers, a distribution's Neovim 0.10 or 0.11
+  starts without plugins and language servers instead of failing, and zsh
+  uses C.UTF-8 on Linux when no locale is set, so the prompt keeps its width.
 - Colors follow Catppuccin, Mocha in dark mode and Latte in light: bat, Delta,
   and Glow's Markdown styling use the terminal palette, so output follows
   Ghostty's theme; Glow code blocks keep Latte colors, readable in both.
