@@ -37,10 +37,7 @@ Layout:
   middle bottom  shell   (40% width, 70% height)
   right          agent   (40% width)
 
-Environment:
-  DOTFILES_WORKSPACE_SCRIPT=/path/to/workspace.applescript
-      Override the Ghostty AppleScript implementation path.
-
+Environment (set lasting defaults in zsh/local.zsh):
   DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
       Command started in the left pane.
 
@@ -52,6 +49,9 @@ Environment:
 
   DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD=''
       Command started in the middle-bottom pane. Empty skips.
+
+  DOTFILES_WORKSPACE_SCRIPT=/path/to/workspace.applescript
+      Override the Ghostty AppleScript implementation path.
 EOF
       return 0 ;;
     --agent|--editor|--middle-top|--middle-bottom|--agent=*|--editor=*|--middle-top=*|--middle-bottom=*)
