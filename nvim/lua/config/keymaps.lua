@@ -156,7 +156,7 @@ end, { desc = "Toggle markdown preview" })
 
 -- Buffers: <leader>b*
 map("n", "<leader>bl", "<cmd>ls<CR>", { desc = "List active buffers" })
-map("n", "<leader>b-", "<C-^>", { desc = "Switch to alternative buffer" })
+map("n", "<leader>b-", "<C-^>", { desc = "Switch to the previous buffer" })
 map("n", "<leader>bww", "<cmd>w<CR>", { desc = "Save buffer" })
 map("n", "<leader>bwq", "<cmd>wq<CR>", { desc = "Save and quit" })
 
@@ -174,7 +174,7 @@ map("n", "<leader>gd", "<cmd>GitDiff<CR>", { desc = "Diff saved file against ind
 
 -- Quit: <leader>q*
 map("n", "<leader>qq", "<cmd>q<CR>", { desc = "Quit" })
-map("n", "<leader>q!", "<cmd>q!<CR>", { desc = "Force quit" })
+map("n", "<leader>q!", "<cmd>q!<CR>", { desc = "Quit without saving" })
 
 -- Windows: <A-hjkl>
 -- Inside Ghostty these are the pass-through layer of the performable alt+hjkl split navigation; standalone, plain window nav.
