@@ -3,7 +3,13 @@
 emulate -L zsh
 zmodload -F zsh/parameter p:aliases p:builtins
 
-(( $# )) || { print -u2 'usage: help <command> [args...]'; return 1 }
+(( $# )) || { print -u2 'usage: help COMMAND [ARGS...]  (run keys for what this setup adds)'; return 1 }
+if [[ $1 == (-h|--help) ]]; then
+  print -r -- 'usage: help COMMAND [ARGS...]'
+  print -r -- "Show COMMAND's --help, following aliases to the real command, or its manual"
+  print -r -- 'when it has no --help. Run keys for what this setup adds.'
+  return 0
+fi
 
 # Accept literal words, quotes and escaped characters, not shell expressions.
 local -a cmd=("$1")

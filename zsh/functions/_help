@@ -1,0 +1,4 @@
+#compdef help
+
+# A command, then its own arguments; zsh's SCCS completion claims help otherwise
+_precommand

@@ -15,6 +15,8 @@ if [[ $1 == --child ]]; then
   config=${config#*'# ---- Completion ----'}
   config=${config%%'# Auto git-glance'*}
   eval "$config"
+  # help completes commands and their arguments, not zsh's SCCS subcommands
+  [[ ${_comps[help]-} == _help ]] || { print -u2 "FAIL: help completes with ${_comps[help]-nothing}"; exit 1; }
   # Completion must never invoke the helpers or pane commands.
   workspace keys dotfiles zle-test-command() { print -r -- "$0 $*" >> "$HOME/helper-calls"; }
   config=$(<"$repo/zsh/.zshrc")
@@ -112,7 +114,7 @@ mkdir -p "$test_root/home/fixtures" "$test_root/home/cache/zsh" "$test_root/home
 export HOME="$test_root/home" ZDOTDIR="$test_root/home"
 ln -s "${commands[mv]}" "$HOME/bin/mv"
 mkdir -p "$HOME/completions"
-for completion in _workspace _keys _dotfiles; do
+for completion in _workspace _keys _dotfiles _help; do
   ln -s "$repo/zsh/functions/$completion" "$HOME/completions/$completion"
 done
 native_fpath=("$HOME/completions" "${native_fpath[@]}")

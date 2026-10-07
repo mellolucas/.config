@@ -637,6 +637,14 @@ less() { fail 'unexpected less invocation'; }
 editor() { record editor "$@"; }
 
 (
+  # Its own help succeeds, and a bare call points to the guide.
+  output=$(help --help) || fail 'help --help status'
+  [[ $output == 'usage: help COMMAND'*'Run keys'* ]] || fail "help --help: $output"
+  if help > "$test_root/help-usage" 2>&1; then fail 'help without a command succeeded'; fi
+  [[ $(<"$test_root/help-usage") == 'usage: help COMMAND'*keys* ]] || fail 'bare help names keys'
+)
+
+(
   unfunction bat
   alias help-first='help-second --first' help-second='editor --second'
   help help-first 'user argument'

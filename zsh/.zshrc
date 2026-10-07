@@ -42,6 +42,8 @@ unset _brew_site_functions
 
 autoload -Uz compinit
 compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
+# zsh's SCCS completion claims delta ahead of git-delta's, demoted above
+(( $+commands[delta] )) && compdef _delta delta
 # Include dotfiles in completion without changing ordinary wildcard expansion.
 _comp_options+=(globdots)
 
