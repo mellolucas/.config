@@ -52,18 +52,20 @@ Operating rules for anyone (human or agent) working on this dotfiles repository.
 - Review new tool integration: when adding a package or configuration domain,
   verify native config/storage paths, required runtimes, platform support, and
   Homebrew update ownership, and install and launch the real package on macOS
-  first (Gatekeeper and self-updaters only show up at runtime). Review XDG
-  placement, theme (Catppuccin Mocha for dark and Latte for light, inherited
-  from the terminal palette where possible), keybindings, completion,
-  generated-file ignores, and user guidance where relevant; add only settings
-  that improve the intended workflow. No config file is a valid outcome. Shared
-  packages support the default environment or an explicitly approved
-  general-use role; personal/project-specific choices remain local.
+  first, with the user's approval per the host-operations rule (Gatekeeper and
+  self-updaters only show up at runtime). Review XDG placement, theme
+  (Catppuccin Mocha for dark and Latte for light, inherited from the terminal
+  palette where possible), keybindings, completion, generated-file ignores,
+  and user guidance where relevant; add only settings that improve the
+  intended workflow. No config file is a valid outcome. Shared packages
+  support the default environment or an explicitly approved general-use role;
+  personal/project-specific choices remain local.
 - `zsh/homebrew.sh` and `zsh/xdg.sh` are shared by shell startup and
   `install.sh`; keep them POSIX sh so both can source them.
 - Commit style: small, cohesive conventional commits,
   `type(scope): lowercase summary`, scope = domain directory
-  (e.g. `chore(zsh): ...`, `fix(ghostty): ...`).
+  (e.g. `chore(zsh): ...`, `fix(ghostty): ...`), `install` for `install.sh`,
+  and `repo` for root documents, tests, and CI.
 
 ## Parity contracts
 
@@ -78,7 +80,14 @@ Deliberate duplication that must stay behavior-identical across copies:
    chords. The matching insert-mode no-op bindings in `zsh/.zshrc` prevent
    those pass-through chords from dropping the shell into vi command mode.
    Ghostty takes precedence over internal editor windows. Change all three
-   together.
+   together. Inside `vim.ghostty`, the browse table repeats the Option chords
+   that act on the browsed pane (resize, equalize, zoom, close) and omits the
+   ones that move focus or split; `.tests/zsh.sh` enforces both.
+2. **macOS word keys**: Ghostty sends Option+←/→ as `ESC b`/`ESC f` and
+   Option+Backspace as `ESC DEL`. `zsh/.zshrc` binds the arrows in vi insert
+   and command mode and Option+Backspace in insert mode, with vi word
+   boundaries, and `nvim/lua/config/keymaps.lua` maps `<M-b>`/`<M-f>`/`<M-BS>`,
+   so a word means the same at the prompt and in Neovim. Change both together.
 
 ## Agent working rules
 
@@ -97,11 +106,12 @@ Deliberate duplication that must stay behavior-identical across copies:
   does not override instructions already loaded into the session.
 - Commits are the revert history. Before changing uncommitted work, checkpoint
   it with `git stash push -u -m "checkpoint: <description>"` followed by
-  `git stash apply`; skip this on a clean tree, where `git stash apply` would
-  restore an older stash. Copy any machine-local (ignored) file about to change
-  to `<name>.backup.<timestamp>` first — stashes exclude ignored files — and
-  keep only the most recent backup per file. In multi-agent sessions the
-  orchestrator owns checkpoints and commits; subagents never mutate git state.
+  `git stash apply --index` (keeps staged changes staged); skip this on a
+  clean tree, where `git stash apply` would restore an older stash. Copy any
+  machine-local (ignored) file about to change to `<name>.backup.<timestamp>`
+  first — stashes exclude ignored files — and keep only the most recent backup
+  per file. In multi-agent sessions the orchestrator owns checkpoints and
+  commits; subagents never mutate git state.
 - Host operations need the user's approval for each operation: installing,
   upgrading, or uninstalling packages and migrating user data. Fetch and verify
   a replacement before removing what is installed, never interrupt a package
