@@ -710,25 +710,40 @@ do
     end)
   end
 
-  -- Starting on a directory opens the tree there, in place of the listing.
+  -- Starting on a directory opens the tree in place of that directory's
+  -- listing, sized to the window; a file a +command opened, or a restored
+  -- session, stays as it is.
   local project = fn.tempname()
   fn.mkdir(project, "p")
+  local real_project = vim.uv.fs_realpath(project)
+  local function opens()
+    return #vim.tbl_filter(function(call) return call[1] == "open" end, calls)
+  end
   vim.cmd.argadd(fn.fnameescape(project))
-  vim.o.columns = 40
-  api.nvim_exec_autocmds("VimEnter", {})
-  local opened = last("open")[2]
-  assert(vim.fs.normalize(opened.path) == vim.fs.normalize(project) and opened.current_window == true,
-    "narrow start: " .. vim.inspect(opened))
   vim.cmd.tabnew()
   local listing = api.nvim_get_current_buf()
   api.nvim_buf_set_name(listing, project) -- as a directory listing is named
+  vim.o.columns = 40
+  api.nvim_exec_autocmds("VimEnter", {})
+  local opened = last("open")[2]
+  assert(opened.path == real_project and opened.current_window == true, "narrow start: " .. vim.inspect(opened))
+  assert(api.nvim_buf_is_valid(listing), "narrow start deleted a listing still on screen")
   vim.o.columns = 200
   api.nvim_exec_autocmds("VimEnter", {})
   opened = last("open")[2]
-  assert(vim.fs.normalize(opened.path) == vim.fs.normalize(project) and opened.current_window == nil,
-    "wide start: " .. vim.inspect(opened))
+  assert(opened.path == real_project and opened.current_window == nil, "wide start: " .. vim.inspect(opened))
   assert(not api.nvim_buf_is_valid(listing), "wide start keeps the directory listing")
-  vim.cmd.tabclose()
+  local count = opens()
+  vim.cmd.edit(fn.fnameescape(project .. "/README.md")) -- nvim DIR '+edit README.md'
+  api.nvim_exec_autocmds("VimEnter", {})
+  assert(opens() == count and api.nvim_buf_get_name(0):match("README%.md$"), "the tree replaced a +edit file")
+  vim.cmd.enew()
+  api.nvim_buf_set_name(0, project)
+  vim.v.this_session = project .. "/Session.vim"
+  api.nvim_exec_autocmds("VimEnter", {})
+  vim.v.this_session = ""
+  assert(opens() == count, "the tree replaced a restored session")
+  vim.cmd("tabclose!")
   vim.cmd("argdelete *")
   fn.delete(project, "d")
 

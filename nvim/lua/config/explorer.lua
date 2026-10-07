@@ -23,6 +23,15 @@ local function narrow()
   return vim.o.columns < 110
 end
 
+-- A full-window tree covers the file being edited; a file opened from it keeps
+-- that one as its alternate, so Space b - still returns to it
+local covered
+local function cover()
+  if narrow() and vim.bo.filetype ~= "NvimTree" then
+    covered = vim.api.nvim_get_current_buf()
+  end
+end
+
 require("nvim-tree").setup({
   hijack_netrw = false,
   hijack_directories = { enable = false },
@@ -36,7 +45,12 @@ require("nvim-tree").setup({
   on_attach = function(buf)
     api.map.on_attach.default(buf)
     local function open()
-      api.node.open.edit(nil, { quit_on_open = narrow() })
+      local quit = narrow()
+      api.node.open.edit(nil, { quit_on_open = quit })
+      local buf = vim.api.nvim_get_current_buf()
+      if quit and covered and covered ~= buf and vim.api.nvim_buf_is_valid(covered) and vim.bo[buf].filetype ~= "NvimTree" then
+        vim.fn.setreg("#", covered)
+      end
     end
     for _, key in ipairs({ "<CR>", "o", "<2-LeftMouse>" }) do
       vim.keymap.set("n", key, open, { buffer = buf, nowait = true, silent = true, desc = "nvim-tree: Open" })
@@ -45,29 +59,33 @@ require("nvim-tree").setup({
 })
 
 vim.keymap.set("n", "<leader>ee", function()
+  cover()
   api.tree.toggle({ current_window = narrow(), focus = true })
 end, { desc = "Show or hide the file tree" })
 vim.keymap.set("n", "<leader>er", function()
+  cover()
   api.tree.find_file({ open = true, focus = true, current_window = narrow() })
 end, { desc = "Find this file in the tree" })
 
 -- `nvim DIR`, as the workspace's editor pane runs, opens the tree in place of
--- the directory listing
+-- that directory's listing; a file a +command opened, or a restored session,
+-- stays as it is
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = function()
-    local dir = vim.fn.argc() == 1 and vim.fn.argv(0) or ""
-    if vim.fn.isdirectory(dir) == 0 then
+    local listing = vim.api.nvim_get_current_buf()
+    local dir = vim.fn.argc() == 1 and vim.uv.fs_realpath(vim.fn.argv(0)) or nil
+    if not dir or vim.fn.isdirectory(dir) == 0 or vim.v.this_session ~= ""
+      or vim.uv.fs_realpath(vim.api.nvim_buf_get_name(listing)) ~= dir or vim.bo[listing].modified then
       return
     end
-    local listing = vim.api.nvim_get_current_buf()
     if narrow() then
       api.tree.open({ path = dir, current_window = true })
     else
       vim.cmd.enew()
       api.tree.open({ path = dir })
     end
-    if listing ~= vim.api.nvim_get_current_buf() then
-      vim.api.nvim_buf_delete(listing, { force = true })
+    if api.tree.is_visible() and listing ~= vim.api.nvim_get_current_buf() then
+      vim.api.nvim_buf_delete(listing, {})
     end
   end,
 })
