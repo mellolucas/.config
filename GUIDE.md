@@ -6,7 +6,7 @@ A field guide to the shortcuts this setup adds. Run `keys` to pick a task, or `k
 
 ## Workspace: Start a workspace
 
-Open a project as one Ghostty tab: editor left, two shells in the middle, agent right.
+Open a project as one Ghostty tab, or as tmux panes elsewhere: editor left, two shells in the middle, agent right.
 
 | Run | Result |
 | --- | --- |
@@ -17,8 +17,9 @@ Open a project as one Ghostty tab: editor left, two shells in the middle, agent 
 | `workspace --middle-top ''` | Leave a pane at its prompt |
 | `workspace --help` | Every option and its default |
 
-- macOS only. Focus starts in the larger middle-bottom shell.
-- `Ctrl+Tab` and `Ctrl+Shift+Tab` switch tabs; Tab completes flags and directories.
+- Focus starts in the larger middle-bottom shell.
+- Outside Ghostty on macOS, the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux it opens a new window instead.
+- `Ctrl+Tab` and `Ctrl+Shift+Tab` switch Ghostty tabs; Tab completes flags and directories.
 
 ## Files: Find a file
 
@@ -65,7 +66,7 @@ Move around and build commands without retyping.
 
 ## Panes: Move between panes
 
-Ghostty owns these chords in every program.
+Ghostty owns these chords in every program; without Ghostty, tmux takes them in a `workspace` or `tmux` session.
 
 | Press | Result |
 | --- | --- |
@@ -99,6 +100,7 @@ Ghostty's browse mode scrolls and copies terminal history without touching the r
 | `Esc`, `q`, `i`, or `Option+b` | Leave browse mode |
 
 - Browse mode belongs to the pane: resize, equalize, zoom, and close (`Option+Shift+h/j/k/l`, `Option+=`, `Option+z`, `Option+q`) work while browsing; leave it before moving to another pane or splitting.
+- Without Ghostty, `Option+b` opens tmux's copy mode with the same keys: search shows matches without the extra `Esc`, `:` runs tmux commands, and the mouse wheel scrolls into it.
 
 ## Documents: Read a document
 

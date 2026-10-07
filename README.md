@@ -6,7 +6,7 @@ Colors follow Catppuccin: Mocha in dark mode and Latte in light. Ghostty switche
 
 ## Get started
 
-macOS is the primary platform; Linux is supported best-effort, and workspace automation is macOS-only. You need Git and zsh: macOS ships zsh, and its `git` offers to install the Command Line Tools on first use. The installer adds Homebrew, and the Brewfile adds Ghostty 1.3+ (on macOS), Neovim 0.12+, and the rest.
+macOS is the primary platform. Linux, WSL, and GitHub Codespaces are supported best-effort, with tmux where Ghostty is absent (see [Without Ghostty](#without-ghostty)). You need Git and zsh: macOS ships zsh, and its `git` offers to install the Command Line Tools on first use. The installer adds Homebrew, and the Brewfile adds Ghostty 1.3+ (on macOS), Neovim 0.12+, and the rest.
 
 Clone anywhere outside `$XDG_CONFIG_HOME` (normally `~/.config`), which the installer links into, then install:
 
@@ -30,9 +30,14 @@ Open Ghostty, then:
 5. If you use Time Machine, run `tmutil addexclusion ~/.cache` once: it skips `~/Library/Caches` but not `~/.cache`.
 6. Run `dotfiles doctor`; it ends with "no problems found" once everything is in place.
 
-### Linux
+## Without Ghostty
 
-Make zsh your login shell (`chsh -s "$(command -v zsh)"`), since `~/.zshenv` is zsh's entrypoint, and install Ghostty and Claude Code with their own installers: the Brewfile installs them only on macOS. Ghostty on Linux wraps split navigation around at the window's edges, so with several panes `Option+h/j/k/l` never reaches Neovim; `Ctrl+W h/j/k/l` moves between Neovim windows instead.
+Where Ghostty is absent (GitHub Codespaces, WSL, SSH sessions, other terminals), tmux takes over its panes with the same keys and no prefix key: the `Option` chords, browse mode on `Option+b` (tmux's copy mode, where `:` runs tmux commands), and `workspace`, which lays out a tmux session named after the directory and reattaches it when you rerun it there. The shell, prompt, Neovim, and Git need nothing extra.
+
+- **GitHub Codespaces**: in your GitHub settings, under Codespaces, turn on *Automatically install dotfiles* and choose this repository. Each new codespace runs `install.sh` with the lean package set and makes zsh the login shell, so `gh codespace ssh` lands in zsh. VS Code's terminal in the default image still opens bash: set `"terminal.integrated.defaultProfile.linux": "zsh"` in VS Code's settings, which Settings Sync carries to every codespace.
+- **WSL**: in Ubuntu, run `sudo apt install zsh build-essential procps curl file git`, follow [Get started](#get-started) with the checkout in the Linux file system (not under `/mnt/c`), and run `chsh -s "$(command -v zsh)"`. In Windows Terminal 1.22 or newer, add the [Catppuccin schemes](https://github.com/catppuccin/windows-terminal), set `"theme": "system"`, and give the WSL profile `"colorScheme": {"dark": "Catppuccin Mocha", "light": "Catppuccin Latte"}` and `"environment": {"COLORTERM": "truecolor"}`.
+- **VS Code's terminal** (Codespaces or any machine): use the [Catppuccin theme](https://github.com/catppuccin/vscode) with `window.autoDetectColorScheme`. On a Mac, set `"terminal.integrated.macOptionIsMeta": true` so Option chords reach the shell. VS Code keeps `Alt+Z` for itself; add `{"key": "alt+z", "command": "-workbench.action.terminal.sizeToContentWidth"}` to its keybindings so `Option+z` zooms.
+- **Linux desktops**: make zsh your login shell (`chsh -s "$(command -v zsh)"`), since `~/.zshenv` is zsh's entrypoint, and install Ghostty and Claude Code with their own installers if you want them: the Brewfile installs them only on macOS. Ghostty on Linux wraps split navigation around at the window's edges, so with several panes `Option+h/j/k/l` never reaches Neovim; `Ctrl+W h/j/k/l` moves between Neovim windows instead.
 
 ## Find your flow
 

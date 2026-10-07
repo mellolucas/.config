@@ -13,6 +13,11 @@ Changes since `v0.0.1`.
 - `keys` opens a task-oriented field guide; `GUIDE.md` holds the same pages.
 - Ghostty owns Option-key pane navigation, browse mode, and splits; Neovim
   keeps native window controls and handles the chords at pane edges.
+- Where Ghostty is absent (GitHub Codespaces, WSL, SSH, other terminals),
+  tmux (`tmux/tmux.conf`) provides the same panes: the Option chords with no
+  prefix key, browse mode on Option+b, and `workspace`, which lays out a tmux
+  session named after the directory and reattaches it when rerun there.
+  Codespaces install the lean package set and make zsh the login shell.
 - Colors follow Catppuccin, Mocha in dark mode and Latte in light: bat, Delta,
   and Glow's Markdown styling use the terminal palette, so output follows
   Ghostty's theme; Glow code blocks keep Latte colors, readable in both.
@@ -140,5 +145,7 @@ truncate long lines. On Linux, Ghostty wraps split navigation around at the
 window's edges, so `Option+h/j/k/l` reaches Neovim only in a single pane.
 With displays of different scales connected, `workspace` sizes panes for the
 sharpest one, so on a 1× display beside a Retina one its panes come out
-closer to equal.
+closer to equal. Inside tmux, Neovim follows a light/dark switch once tmux
+rereads the terminal's colors: at once in Ghostty, otherwise when the client
+reattaches or resizes.
 Opening netrw files in neighboring Ghostty panes is future work.
