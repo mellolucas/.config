@@ -20,6 +20,7 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: editor l
 | `workspace --help` | Every option and its default |
 
 - Focus starts in the larger middle-bottom shell; `Option+h/j/k/l` moves to the editor and the agent.
+- The editor opens on the project's file tree; `Option+z` widens it to explore (`keys editor`).
 - Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux it opens a new window instead.
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
 - Tab completes `workspace`'s flags and directories.
@@ -51,7 +52,7 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 
 | Press | Result |
 | --- | --- |
-| `Space e e` / `Space e r` | Open the file explorer / return to it |
+| `Space e e` / `Space e r` | Show or hide the file tree / find this file in it |
 | `Space f f` | Find a file by fuzzy name: type part of it, `Tab` completes, `Enter` opens |
 | `Space b l` / `Space b -` | List buffers and pick one (number or name, `Tab` completes) / switch to the previous one |
 | `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
@@ -74,7 +75,8 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
 - `Option+←` / `Option+→` jump words everywhere; while typing and on the command line, `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
 - Undo history survives closing and reopening a file.
-- In the explorer: Enter opens, `p` previews, `v` / `o` split right / below.
+- In the tree: Enter opens (in a narrow pane the file takes the pane), `Tab` previews, `Ctrl+V` / `Ctrl+X` split right / below, `a` / `r` / `d` create / rename / delete, `f` filters, `H` / `I` show hidden / ignored files, `[c` / `]c` jump between changed files, `g?` lists every key.
+- To explore a repository, `Option+z` widens the editor: the tree stays beside the code, `Tab` previews, `Ctrl+]` / `grr` / `gO` follow the code, and `Option+h` returns to the tree. `Option+z` again brings back the shells and agent, and the tree steps aside.
 
 ## Agents: Choose a coding agent
 

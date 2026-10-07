@@ -643,16 +643,112 @@ load_config(vim)
 api.nvim_exec_autocmds("FocusGained", {})
 api.nvim_ui_send = real_ui_send
 assert(vim.deep_equal(sent, { "\027]11;?\007" }), "focus query: " .. vim.inspect(sent))
-assert(vim.tbl_contains(required, "config.lsp"), "language servers: " .. vim.inspect(required))
--- Before 0.12 (no vim.pack), only the language servers stay out.
+assert(vim.deep_equal(required, { "config.options", "config.commands", "config.keymaps", "config.explorer", "config.lsp" }),
+  "with vim.pack: " .. vim.inspect(required))
+-- Before 0.12 (no vim.pack), the file tree and language servers stay out.
 load_config(setmetatable({ pack = false }, { __index = vim }))
 assert(vim.deep_equal(required, { "config.options", "config.commands", "config.keymaps" }),
   "older Neovim: " .. vim.inspect(required))
 
+-- The file tree, with vim.pack, nvim-tree, and mini.icons stubbed: no plugin
+-- or network needed.
+do
+  local calls, packs, tree_config, warned = {}, {}, nil, nil
+  local function record(name)
+    return function(...) calls[#calls + 1] = { name, ... } end
+  end
+  local function last(name)
+    for i = #calls, 1, -1 do
+      if calls[i][1] == name then return calls[i] end
+    end
+  end
+  local real_pack, real_notify, real_columns = vim.pack, vim.notify, vim.o.columns
+  -- An offline first launch warns and keeps netrw on Space e e.
+  vim.pack = { add = function() error("offline") end }
+  vim.notify = function(message) warned = message end
+  dofile("nvim/lua/config/explorer.lua")
+  vim.notify = real_notify
+  assert(warned and warned:find("offline", 1, true), "file tree failure warning: " .. tostring(warned))
+  assert(fn.maparg(" ee", "n", false, true).desc == "Explore files", "netrw stays on Space e e")
+
+  vim.pack = { add = function(specs) for _, spec in ipairs(specs) do packs[#packs + 1] = spec.src end end }
+  package.loaded["mini.icons"] = { setup = function() end, mock_nvim_web_devicons = record("icons") }
+  package.loaded["nvim-tree"] = { setup = function(config) tree_config = config end }
+  package.loaded["nvim-tree.api"] = {
+    tree = {
+      open = record("open"), toggle = record("toggle"), find_file = record("find_file"),
+      close = record("close"), is_visible = function() return true end,
+    },
+    node = { open = { edit = record("edit") } },
+    map = { on_attach = { default = function() end } },
+  }
+  dofile("nvim/lua/config/explorer.lua")
+  assert(vim.deep_equal(packs, { "https://github.com/nvim-tree/nvim-tree.lua", "https://github.com/nvim-mini/mini.icons" }),
+    "file tree plugins: " .. vim.inspect(packs))
+  assert(last("icons"), "nvim-tree gets mini.icons' icons")
+  -- Directory buffers stay Neovim's own; the tree follows the edited file.
+  assert(tree_config.hijack_netrw == false and tree_config.hijack_directories.enable == false)
+  assert(tree_config.update_focused_file.enable == true)
+  assert(vim.tbl_contains(tree_config.filters.custom, "^\\.git$"), "the tree skips .git like rg")
+
+  -- Under 110 columns the tree takes the window and hands it to the opened file.
+  local tree_buf = api.nvim_create_buf(false, true)
+  tree_config.on_attach(tree_buf)
+  for _, case in ipairs({ { 40, true }, { 200, false } }) do
+    vim.o.columns = case[1]
+    fn.maparg(" ee", "n", false, true).callback()
+    assert(vim.deep_equal(last("toggle")[2], { current_window = case[2], focus = true }),
+      "Space e e at " .. case[1] .. ": " .. vim.inspect(last("toggle")))
+    fn.maparg(" er", "n", false, true).callback()
+    assert(vim.deep_equal(last("find_file")[2], { open = true, focus = true, current_window = case[2] }),
+      "Space e r at " .. case[1] .. ": " .. vim.inspect(last("find_file")))
+    api.nvim_buf_call(tree_buf, function()
+      for _, key in ipairs({ "<CR>", "o", "<2-LeftMouse>" }) do
+        fn.maparg(key, "n", false, true).callback()
+        assert(last("edit")[3].quit_on_open == case[2], key .. " at " .. case[1] .. ": " .. vim.inspect(last("edit")))
+      end
+    end)
+  end
+
+  -- Starting on a directory opens the tree there, in place of the listing.
+  local project = fn.tempname()
+  fn.mkdir(project, "p")
+  vim.cmd.argadd(fn.fnameescape(project))
+  vim.o.columns = 40
+  api.nvim_exec_autocmds("VimEnter", {})
+  local opened = last("open")[2]
+  assert(vim.fs.normalize(opened.path) == vim.fs.normalize(project) and opened.current_window == true,
+    "narrow start: " .. vim.inspect(opened))
+  vim.cmd.tabnew()
+  local listing = api.nvim_get_current_buf()
+  api.nvim_buf_set_name(listing, project) -- as a directory listing is named
+  vim.o.columns = 200
+  api.nvim_exec_autocmds("VimEnter", {})
+  opened = last("open")[2]
+  assert(vim.fs.normalize(opened.path) == vim.fs.normalize(project) and opened.current_window == nil,
+    "wide start: " .. vim.inspect(opened))
+  assert(not api.nvim_buf_is_valid(listing), "wide start keeps the directory listing")
+  vim.cmd.tabclose()
+  vim.cmd("argdelete *")
+  fn.delete(project, "d")
+
+  -- Narrowing (Option+z unzooms) closes a sidebar beside other windows.
+  vim.cmd.vsplit()
+  local closes = #vim.tbl_filter(function(call) return call[1] == "close" end, calls)
+  vim.o.columns = 40
+  api.nvim_exec_autocmds("VimResized", {})
+  assert(#vim.tbl_filter(function(call) return call[1] == "close" end, calls) > closes, "narrowing keeps the sidebar")
+  vim.cmd.only()
+
+  vim.pack, vim.o.columns = real_pack, real_columns
+  package.loaded["mini.icons"], package.loaded["nvim-tree"], package.loaded["nvim-tree.api"] = nil, nil, nil
+  dofile("nvim/lua/config/keymaps.lua")
+end
+
 -- :grep runs grepprg through the shell: an unmatched zsh glob would silently
 -- empty the results, and nested repositories' .git folders must stay out.
 fn.executable = real_executable
-local passed = "Markdown preview, DiffSaved, GitDiff, and focus background query tests passed"
+local passed = "Markdown preview, DiffSaved, GitDiff, file tree, and focus background query tests passed"
 if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   dofile("nvim/lua/config/options.lua")
   vim.o.shell = "zsh"
@@ -682,7 +778,7 @@ if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   assert(fn.bufname("%") == "second", ":find opened " .. fn.bufname("%"))
   vim.cmd.cd(cwd)
   fn.delete(tree, "rf")
-  passed = "Markdown preview, DiffSaved, GitDiff, focus background query, :grep, and :find tests passed"
+  passed = "Markdown preview, DiffSaved, GitDiff, file tree, focus background query, :grep, and :find tests passed"
 else
   print("SKIP: :grep and :find tests need rg and zsh")
 end

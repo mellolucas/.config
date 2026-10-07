@@ -160,7 +160,7 @@ map("n", "<leader>b-", "<C-^>", { desc = "Switch to the previous buffer" })
 map("n", "<leader>bww", "<cmd>w<CR>", { desc = "Save buffer" })
 map("n", "<leader>bwq", "<cmd>wq<CR>", { desc = "Save and quit" })
 
--- Explore: <leader>e
+-- Explore: <leader>e (netrw; config.explorer swaps in the file tree when its plugins load)
 map("n", "<leader>ee", vim.cmd.Explore, {
   desc = "Explore files",
 })

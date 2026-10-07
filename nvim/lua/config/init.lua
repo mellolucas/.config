@@ -1,6 +1,6 @@
 -- Load user configuration modules
 -- Convention: the module that uses a plugin owns its vim.pack.add call
--- Keymaps load before lsp: vim.pack.add clones on first launch and may fail offline
+-- Keymaps load before the plugin modules: vim.pack.add clones on first launch and may fail offline
 require("config.options")
 pcall(vim.cmd.colorscheme, "catppuccin") -- bundled from nvim 0.12; older builds keep the default scheme
 -- Nvim asks the terminal for its background only at startup; asking again on
@@ -17,5 +17,6 @@ require("config.keymaps")
 -- vim.pack arrives in Nvim 0.12; older builds, as Linux distributions ship,
 -- go without plugins and language servers instead of failing at startup
 if vim.pack then
+  require("config.explorer")
   require("config.lsp")
 end
