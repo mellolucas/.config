@@ -119,7 +119,8 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
       while tmux has-session -t "=$name" 2>/dev/null; do
         name=$base-$(( ++n ))
       done
-      top=$(tmux new-session -d -P -F '#{pane_id}' -s "$name" -c "$dir") || return
+      # Sized like this terminal: tmux keeps no shares when attaching resizes it
+      top=$(tmux new-session -d -x - -y - -P -F '#{pane_id}' -s "$name" -c "$dir") || return
     fi
     # Widths 20/40/40 and middle heights 30/70: each split takes a share of
     # the pane it divides.
@@ -138,7 +139,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
   if [[ -t 0 && -t 1 ]]; then
     tmux attach-session -t "=$name"
   else
-    print -r -- "workspace: tmux session $name is ready; attach with: tmux attach -t $name"
+    print -r -- "workspace: tmux session $name is ready; attach with: tmux attach -t ${(q-):-=$name}"
   fi
   return
 fi

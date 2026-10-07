@@ -192,10 +192,12 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   tmux() {
     print -r -- "${(j: :)${(qq)@}}" >> "$temporary/calls"
     # Pane ids from the log: the function captures output in subshells
-    if [[ $1 == (new-window|split-window) ]]; then
-      local -a made=(${(M)${(f)"$(<"$temporary/calls")"}:#\'(new-window|split-window)\'*})
-      print -r -- "%$#made"
-    fi
+    case $1 in
+      has-session) return 1 ;;
+      new-session|new-window|split-window)
+        local -a made=(${(M)${(f)"$(<"$temporary/calls")"}:#\'(new-session|new-window|split-window)\'*})
+        print -r -- "%$#made" ;;
+    esac
   }
   output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 OSTYPE=darwin23 TERM_PROGRAM=ghostty \
     workspace --middle-top '' --agent 'agent $(chat)' "$temporary/work dir" < /dev/null) || fail 'inside tmux'
@@ -210,6 +212,24 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     "'select-pane' '-t' '%4'"
   )
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "inside tmux calls: $(<"$temporary/calls")"
+
+  # Outside tmux and without a terminal: a session sized like the terminal
+  # when there is one, and a hint that names it exactly.
+  : > "$temporary/calls"
+  output=$(PATH=$temporary/bin:$PATH workspace --middle-top '' "$temporary/work dir" < /dev/null) ||
+    fail 'outside tmux'
+  [[ $output == "workspace: tmux session work dir is ready; attach with: tmux attach -t '=work dir'" ]] ||
+    fail "outside tmux printed: $output"
+  expected=(
+    "'list-sessions' '-F' '#{session_name}:#{session_path}'"
+    "'has-session' '-t' '=work dir'"
+    "'new-session' '-d' '-x' '-' '-y' '-' '-P' '-F' '#{pane_id}' '-s' 'work dir' '-c' '$temporary/work dir'"
+    ${expected[2,4]}
+    "'send-keys' '-t' '%3' '-l' '--' 'nvim .'" "'send-keys' '-t' '%3' 'Enter'"
+    "'send-keys' '-t' '%2' '-l' '--' 'ocode'" "'send-keys' '-t' '%2' 'Enter'"
+    "'select-pane' '-t' '%4'"
+  )
+  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "outside tmux calls: $(<"$temporary/calls")"
   unfunction tmux
   # .tests/tmux.zsh runs workspace against a real tmux server.
   print -r -- 'ok: tmux route'

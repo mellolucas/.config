@@ -213,10 +213,11 @@ fpath=("$repo/zsh/functions" $fpath)
 autoload -Uz workspace
 export DOTFILES_WORKSPACE_EDITOR_CMD="echo ED''ITOR" DOTFILES_WORKSPACE_AGENT_CMD="echo AG''ENT" \
   DOTFILES_WORKSPACE_MIDDLE_TOP_CMD="echo T''OP" DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD="echo BOT''TOM"
-mkdir -p "$HOME/work dir" "$HOME/proj.v1" "$HOME/other/proj.v1"
+mkdir -p "$HOME/work dir" "$HOME/proj.v1" "$HOME/other/proj.v1" "$HOME/sized"
 builtin cd -- "$HOME/work dir"
 output=$(workspace < /dev/null)
-[[ $output == *' work dir is ready;'* ]] || fail "hint: $output"
+[[ $output == "workspace: tmux session work dir is ready; attach with: tmux attach -t '=work dir'" ]] ||
+  fail "hint: $output"
 output=$(workspace < /dev/null)
 [[ $output == *' work dir is ready;'* ]] || fail "rerun did not reattach: $output"
 builtin cd -- "$HOME/proj.v1"
@@ -254,4 +255,19 @@ for role output in editor EDITOR agent AGENT top TOP bottom BOTTOM; do
   wait_for "the $role pane did not run its command" "ran $pane[$role] $output"
 done
 [[ $(tmux display -p -t '=work dir:' '#{pane_id}') == $pane[bottom] ]] || fail 'focus is not the middle-bottom shell'
-print -r -- 'ok: workspace sessions and commands'
+
+# From a terminal, the session takes its size before attaching, so the shares
+# hold: columns 20/40/40 and middle rows 30/70, within two cells.
+builtin cd -- "$HOME/sized"
+version[sized]='fixture 1.0'
+zpty -b sized 'trap - EXIT; stty rows 50 cols 200; workspace'
+wait_for 'workspace did not attach' '[[ -n $(tmux list-clients -t "=sized" 2>/dev/null) ]]'
+roles sized
+integer columns=$(tmux display -p -t '=sized:' '#{window_width}')
+integer rows=$(tmux display -p -t '=sized:' '#{window_height}')
+(( columns == 200 )) || fail "attached at $columns columns"
+near() { (( $2 * 100 - $3 * $4 >= -200 && $2 * 100 - $3 * $4 <= 200 )) || fail "$1: $2 of $4"; }
+near 'editor width' $width[editor] 20 $columns
+near 'middle width' $width[top] 40 $columns
+near 'middle-top height' $height[top] 30 $rows
+print -r -- 'ok: workspace sessions, commands, and proportions'
