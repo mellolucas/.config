@@ -133,8 +133,9 @@ answer() {
 # Answer until the terminals fall quiet, as a real terminal answers before the
 # next key: tmux asks for colors again after each light/dark report.
 settle() {
-  local -F quiet=$(( EPOCHREALTIME + 0.05 ))
+  local -F quiet=$(( EPOCHREALTIME + 0.05 )) deadline=$(( EPOCHREALTIME + 5 ))
   while (( EPOCHREALTIME < quiet )); do
+    (( EPOCHREALTIME < deadline )) || fail 'the terminals never fell quiet'
     answer
     (( ! heard )) || quiet=$(( EPOCHREALTIME + 0.05 ))
     sleep 0.005
