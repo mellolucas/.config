@@ -1,9 +1,11 @@
 # Machine-local zsh overrides (copy to `local.zsh`; sourced last by .zshrc).
 # Untracked by design. Set only overrides; unset values use repository defaults.
 # XDG roots must be set before shell startup, not in this late interactive file.
+# Only interactive shells read it: commands that apps start (agents, editors)
+# see ~/.zshenv alone.
 
 # Workspace defaults; command-line flags override these for one invocation.
-# export DOTFILES_WORKSPACE_AGENT_CMD='kiro-cli chat'
+# export DOTFILES_WORKSPACE_AGENT_CMD='claude'
 # export DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
 # export DOTFILES_WORKSPACE_MIDDLE_TOP_CMD='' # Leave the top shell at its prompt
 # export DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD=''
@@ -16,6 +18,12 @@
 # new shells pick this up, so start one before running dotfiles.
 # export HOMEBREW_BUNDLE_CASK_SKIP='obsidian'
 # export HOMEBREW_BUNDLE_BREW_SKIP='container'
+
+# Install casks elsewhere; an explicit --appdir= wins over the non-admin default.
+# export HOMEBREW_CASK_OPTS='--appdir=/Applications'
+
+# Machine-only OpenCode interface settings (JSON), kept out of opencode/cli.json.
+# export OPENCODE_CLI_CONFIG_CONTENT='{"animations": false}'
 
 # export SOME_TOOL_HOME="$XDG_CONFIG_HOME/some-tool"
 # export AWS_CONFIG_FILE="$XDG_CONFIG_HOME/aws/config"
