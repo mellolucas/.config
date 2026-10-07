@@ -920,4 +920,21 @@ if github-open "$test_root/missing" 2>/dev/null; then
   fail 'missing path must fail'
 fi
 
+# Full startup without a terminal, as agents and editors start interactive
+# shells: .zshenv, .zprofile, and .zshrc from tracked files only, in a
+# throwaway home, print nothing to stderr. zsh -n accepts a misspelled
+# setopt; startup does not.
+startup_home=$test_root/startup-home
+for file in ${(0)"$($git_bin -C "$repo" ls-files -z -- zsh)"}; do
+  /bin/mkdir -p "$startup_home/.config/${file:h}"
+  /bin/cp "$repo/$file" "$startup_home/.config/$file"
+done
+/bin/ln -s "$startup_home/.config/zsh/.zshenv" "$startup_home/.zshenv"
+startup_out=$(cd "$startup_home" && /usr/bin/env -i HOME="$startup_home" TERM=xterm-256color \
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" -lic 'print -r -- "$ZDOTDIR ${+aliases[gs]}"' \
+  2> "$test_root/startup-errors" < /dev/null)
+startup_errors=$(<"$test_root/startup-errors")
+[[ -z $startup_errors ]] || fail "startup wrote to stderr: $startup_errors"
+expect "$startup_home/.config/zsh 1" "$startup_out" 'full startup loads .zshrc'
+
 print -r -- 'ok: zsh syntax, cask policy, startup wiring, and hermetic alias/function regression checks'
