@@ -73,21 +73,29 @@ Deliberate duplication that must stay behavior-identical across copies:
 
 1. **Option-chord split surface**: `ghostty/vim.ghostty` (hand-written) owns
    split management and browse mode via global Option chords that work in any
-   program. Its four `performable:alt+h/j/k/l` navigation binds pair with
-   nvim's `<A-h/j/k/l>` window maps in `nvim/lua/config/keymaps.lua` — the
-   normal-mode pass-through layer when no Ghostty split exists in that
-   direction; nvim's insert, visual, and command-line modes ignore those
-   chords. The matching insert-mode no-op bindings in `zsh/.zshrc` prevent
-   those pass-through chords from dropping the shell into vi command mode.
-   Ghostty takes precedence over internal editor windows. Change all three
-   together. Inside `vim.ghostty`, the browse table repeats the Option chords
-   that act on the browsed pane (resize, equalize, zoom, close) and omits the
-   ones that move focus or split; `.tests/zsh.sh` enforces both.
-2. **macOS word keys**: Ghostty sends Option+←/→ as `ESC b`/`ESC f` and
-   Option+Backspace as `ESC DEL`. `zsh/.zshrc` binds the arrows in vi insert
-   and command mode and Option+Backspace in insert mode, with vi word
-   boundaries, and `nvim/lua/config/keymaps.lua` maps `<M-b>`/`<M-f>`/`<M-BS>`,
-   so a word means the same at the prompt and in Neovim. Change both together.
+   program. Where Ghostty is absent, `tmux/tmux.conf` mirrors the Option-chord
+   surface and its browse operations without a prefix key (copy mode is browse
+   mode), passing edge chords to the program as the `performable:` binds do,
+   with documented terminal-specific differences: it resizes by cells, and
+   passes ESC b (Option+Left) through from Ghostty. Ghostty's four
+   `performable:alt+h/j/k/l` navigation binds pair with nvim's `<A-h/j/k/l>`
+   window maps in `nvim/lua/config/keymaps.lua` — the normal-mode pass-through
+   layer when no Ghostty split or tmux pane exists in that direction; nvim's
+   insert, visual, and command-line modes ignore those chords. The matching
+   insert-mode no-op bindings in `zsh/.zshrc` prevent those pass-through chords
+   from dropping the shell into vi command mode. The pane layer takes
+   precedence over internal editor windows. Change all four together. Inside
+   `vim.ghostty`, the browse table repeats the Option chords that act on the
+   browsed pane (resize, equalize, zoom, close) and omits the ones that move
+   focus or split; `.tests/zsh.sh` and `.tests/tmux.zsh` enforce these.
+2. **Word and line keys**: Ghostty sends Option+←/→ as `ESC b`/`ESC f`,
+   Option+Backspace as `ESC DEL`, and Cmd+←/→ as Ctrl+A/E; other terminals
+   and tmux send xterm forms for the arrows, Home, and End. `zsh/.zshrc` binds
+   them in vi insert and command mode (Option+Backspace in insert mode only),
+   with vi word boundaries, and `nvim/lua/config/keymaps.lua` maps
+   `<M-b>`/`<M-f>`, `<M-Left>`/`<M-Right>`, and `<M-BS>`, plus `<C-a>`/`<C-e>`
+   while typing, so word navigation and insert-mode line navigation match at
+   the prompt and in Neovim. Change both together.
 
 ## Agent working rules
 
