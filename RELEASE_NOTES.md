@@ -11,6 +11,10 @@ Changes since `v0.0.1`.
   deploys configuration without touching packages; `check-updates` fetches
   and checks without applying updates.
 - `keys` opens a task-oriented field guide; `GUIDE.md` holds the same pages.
+  `keys WORDS` searches every line of it, tips included, and each result
+  names its page. `help --help` explains `help`, a bare `help` points to
+  `keys`, and `help` and `delta` complete as themselves (zsh's SCCS
+  completion had claimed both).
 - Ghostty owns Option-key pane navigation, browse mode, and splits; Neovim
   keeps native window controls and handles the chords at pane edges.
 - Where Ghostty is absent (GitHub Codespaces, WSL, SSH, other terminals),
@@ -32,8 +36,8 @@ Changes since `v0.0.1`.
   colors readable in both modes.
 - Claude Code is a shared Homebrew package; Copilot CLI and Codex are shared
   npm packages declared in the Brewfile, because their casks are unnotarized
-  and macOS blocks them. `dotfiles update` upgrades Brewfile npm packages,
-  which Homebrew Bundle only installs.
+  and macOS blocks them. `dotfiles update` and `bundle` upgrade Brewfile npm
+  packages, which Homebrew Bundle only installs.
 - Every file follows the XDG layout by its nature. `zsh/xdg.sh`, read by
   shells and the installer, points tools without native support there: agent
   homes live in `~/.local/share`, Codex's database in `~/.local/state`, npm,
