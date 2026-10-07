@@ -239,7 +239,7 @@ print -r -- "$(<"$repo/zsh/functions/keys")" > "$fixture_repo/zsh/functions/keys
 print -r -- "$(<"$repo/fzf/fzfrc")" > "$fixture_repo/fzf/fzfrc"
 repo=${fixture_repo:A}
 topics=() labels=() pages=() titles=()
-all=$'# Fixture guide\n'
+all=$'# Fixture guide\n\nFixture **introduction** with `code`\n'
 print -rn -- "$all" > "$repo/GUIDE.md"
 for number in {1..12}; do
   topic="topic$number"
@@ -249,6 +249,8 @@ for number in {1..12}; do
   labels+=("$topic"$'\t'"Task $number - Intent $number" "$topic"$'\t'"  Body $number")
   print -r -- "## Topic$number: Task $number"$'\n\n'"Intent $number"$'\n\n'"Body $number" >> "$repo/GUIDE.md"
 done
+# Introduction lines come last, under all, without Markdown markers.
+labels+=("all"$'\t'"  Fixture introduction with code")
 with_topics
 picker=${picker%%FZF:ENV*}"FZF:ENV::$repo/fzf/fzfrc"$'\nFZF:INPUT\n'"${(F)entries}"$'\nFZF:END\n'
 for topic in "${topics[@]}"; do

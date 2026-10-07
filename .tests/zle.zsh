@@ -81,8 +81,11 @@ if [[ $1 == --child ]]; then
     bindkey -M "$keymap" '^X^G' _test_glob
     bindkey -M "$keymap" '^X^L' list-choices
   done
-  zle-line-init() { print -r -- 'ZLE-READY'; }
-  zle -N zle-line-init
+  # The marker joins zsh's hook dispatcher after the tracked line-init hooks;
+  # defining zle-line-init itself would replace them.
+  _test_ready() { print -r -- 'ZLE-READY'; }
+  autoload -Uz add-zle-hook-widget
+  add-zle-hook-widget line-init _test_ready
   # Expansion runs outside completion, after the tracked options and integrations.
   print -r -- "EXPANSION:$(print -r -- glob/*):END-EXPANSION"
   buffer=''
@@ -307,6 +310,22 @@ for mode in native fzf; do
   zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
     "$zsh_bin" -dfi
   zpty -w shell "source ${(q)self} --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --commands"
+  wait_for 'ZLE-READY'
+  # At a real prompt, Enter restores the terminal's cursor for the command and
+  # the next prompt sets the bar; beside Ghostty's integration the hooks stay quiet.
+  zpty -w -n shell $'\x18\x12true\r'
+  wait_for 'ZLE-READY'
+  (( ++checks ))
+  [[ $transcript == *$'\e[0 q'*$'\e[5 q'*ZLE-READY* ]] ||
+    { print -ru2 -- "FAIL [commands]: cursor reset, then bar at the next prompt: ${(qqqq)transcript}"; (( ++failures )); }
+  zpty -w -n shell $'\x18\x12_ghostty_zle_keymap_select() { :; }\r'
+  wait_for 'ZLE-READY'
+  snapshot $'\x18\x12abc\e'
+  expect 'Esc beside Ghostty integration' abc vicmd
+  (( ++checks ))
+  [[ $transcript != *$'\e['[0-9]' q'* ]] ||
+    { print -ru2 -- "FAIL [commands]: cursor shape set beside Ghostty's integration"; (( ++failures )); }
+  zpty -w -n shell $'\x18\x12unfunction _ghostty_zle_keymap_select\r'
   wait_for 'ZLE-READY'
   for helper in workspace dotscode; do
     for option in agent editor middle-top middle-bottom; do
