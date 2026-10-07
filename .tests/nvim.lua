@@ -629,6 +629,7 @@ assert(vim.deep_equal(sent, { "\027]11;?\007" }), "focus query: " .. vim.inspect
 -- :grep runs grepprg through the shell: an unmatched zsh glob would silently
 -- empty the results, and nested repositories' .git folders must stay out.
 fn.executable = real_executable
+local passed = "Markdown preview, DiffSaved, GitDiff, and focus background query tests passed"
 if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   dofile("nvim/lua/config/options.lua")
   vim.o.shell = "zsh"
@@ -640,18 +641,27 @@ if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   vim.cmd("silent grep! needle")
   local found = vim.tbl_map(function(entry) return fn.bufname(entry.bufnr) end, fn.getqflist())
   assert(vim.deep_equal(found, { "file" }), ":grep results: " .. vim.inspect(found))
-  -- :find matches fuzzily over the same files, listed once per command line.
+  -- :find matches fuzzily over the same files, listed once per command line;
+  -- rg's diagnostics (here a symlink loop) never become candidates.
+  package.loaded["config.commands"] = commands
   assert(vim.o.findfunc == "v:lua.require'config.commands'.find_files")
   assert(fn.maparg(" ff", "n") == ":find ")
-  assert(vim.deep_equal(commands.find_files("fle", true), { "file" }))
+  assert(vim.deep_equal(fn.getcompletion("find fle", "cmdline"), { "file" }))
   fn.writefile({}, tree .. "/second")
+  fn.mkdir(tree .. "/sub", "p")
+  assert(vim.uv.fs_symlink("..", tree .. "/sub/loop"))
   assert(vim.deep_equal(commands.find_files("", true), { "file" }), "file list not cached")
   api.nvim_exec_autocmds("CmdlineEnter", { pattern = ":" })
   local listed = commands.find_files("", true)
   table.sort(listed)
-  assert(vim.deep_equal(listed, { "file", "second" }), "file list not refreshed: " .. vim.inspect(listed))
+  assert(vim.deep_equal(listed, { "file", "second" }), "file list: " .. vim.inspect(listed))
+  vim.cmd("find sec")
+  assert(fn.bufname("%") == "second", ":find opened " .. fn.bufname("%"))
   vim.cmd.cd(cwd)
   fn.delete(tree, "rf")
+  passed = "Markdown preview, DiffSaved, GitDiff, focus background query, :grep, and :find tests passed"
+else
+  print("SKIP: :grep and :find tests need rg and zsh")
 end
 
-print("Markdown preview, DiffSaved, GitDiff, focus background query, :grep, and :find tests passed")
+print(passed)

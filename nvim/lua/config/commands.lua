@@ -147,10 +147,14 @@ end, {
 })
 
 -- Fuzzy :find over the files rg lists, with the shell's ignore rules
--- (:help fuzzy-file-picker). The list is read once per command line.
+-- (:help fuzzy-file-picker). The list is read once per command line, from
+-- stdout only: rg reports symlink loops and unreadable paths on stderr.
 local find_cache
 local function find_files(arg)
-  find_cache = find_cache or vim.fn.systemlist({ "rg", "--files", "--hidden", "--follow", "--glob=!.git" })
+  if not find_cache then
+    local listing = vim.system({ "rg", "--files", "--hidden", "--follow", "--glob=!.git" }, { text = true }):wait()
+    find_cache = vim.split(listing.stdout or "", "\n", { trimempty = true })
+  end
   return arg == "" and find_cache or vim.fn.matchfuzzy(find_cache, arg)
 end
 
