@@ -109,7 +109,7 @@ for topic in "${topics[@]}"; do
   all+=$'\n'"$pages[$topic]"
 done
 index+=$'\n`keys all` reads everything. `keys --plain` needs no viewer.\n'
-navigation=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task; `q` leaves the reader.\n'
+navigation=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task'
 picker=$'FZF:ARGS:--layout=reverse|--no-multi|--wrap|--delimiter=\t|--with-nth=2..|--prompt=Find a task > |--header=Working here\nEnter reads a page. Esc returns to the shell.\nFZF:ENV::'"$repo"$'/fzf/fzfrc\nFZF:INPUT\n'
 picker+="${(F)labels}"$'\nFZF:END\n'
 
@@ -136,6 +136,8 @@ check() {
     *) content=$pages[$topic] ;;
   esac
   content+=$navigation
+  (( ! uses_glow )) || content+='; `q` leaves the reader'
+  content+=$'.\n'
   if (( uses_picker )) && [[ $mode == (cancel|no-match|picker-error) ]]; then
     [[ $mode != picker-error ]] || result=23
   elif (( uses_glow )); then

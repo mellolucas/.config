@@ -83,9 +83,16 @@ case $topic in
     [[ -n ${pages[$topic]-} ]] || { print -ru2 -- "keys: unknown topic '$topic'; run keys --help"; return 1 }
     content=$pages[$topic] ;;
 esac
-content+=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task; `q` leaves the reader.\n'
+content+=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task'
 
+local reader=0
 if (( ! plain )) && [[ -t 1 ]] && command -v glow >/dev/null 2>&1 && command -v less >/dev/null 2>&1; then
+  reader=1
+  content+='; `q` leaves the reader'
+fi
+content+=$'.\n'
+
+if (( reader )); then
   local width=$(( COLUMNS > 0 && COLUMNS < 80 ? COLUMNS : 80 ))
   print -r -- "$content" | PAGER='less -R' LESS=-R glow --style "$repo/glow/guide.json" --width "$width" --pager -
 else

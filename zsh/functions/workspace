@@ -101,7 +101,7 @@ dir=${directories[1]:-$PWD}
 local script=${DOTFILES_WORKSPACE_SCRIPT:-${XDG_CONFIG_HOME:-$HOME/.config}/ghostty/workspace.applescript}
 [[ -r $script ]] || {
   print -r -u2 -- "workspace: missing script: $script"
-  print -u2 -- 'hint: run: dotfiles install'
+  print -u2 -- 'hint: run: dotfiles link'
   return 1
 }
 
