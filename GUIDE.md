@@ -57,6 +57,7 @@ Move around and build commands without retyping.
 | --- | --- |
 | `Option+c` | Pick a directory below here and change to it |
 | `Ctrl+T` | Insert file paths into the command line |
+| `↑` / `↓` | Earlier / later commands that start with what you've typed |
 | `Ctrl+R` | Search history; Enter inserts without running |
 | `Ctrl+X` `Ctrl+E` | Edit the command line in Neovim; save and quit to bring it back for review |
 | `Tab` | Complete, ignoring case and including hidden files, even mid-name (`conf` finds `.config`); press again for a menu |

@@ -94,6 +94,13 @@ autoload -Uz edit-command-line
 zle -N edit-command-line
 bindkey -M viins '^X^E' edit-command-line
 bindkey -M vicmd '^X^E' edit-command-line
+# Up and Down while typing step through earlier commands that start with the
+# text so far (in either cursor-key form)
+autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
+zle -N up-line-or-beginning-search
+zle -N down-line-or-beginning-search
+bindkey -M viins '^[[A' up-line-or-beginning-search '^[OA' up-line-or-beginning-search
+bindkey -M viins '^[[B' down-line-or-beginning-search '^[OB' down-line-or-beginning-search
 
 setopt interactive_comments
 setopt prompt_subst

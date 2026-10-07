@@ -55,13 +55,22 @@ if [[ $1 == --child ]]; then
     HISTSIZE=100
     fc -p
     print -s -- 'zle-test-command history-sentinel'
+  else
+    # History for the Up/Down prefix-search checks; zsh takes the last entry
+    # added here for the line being edited, so a filler ends the list.
+    HISTSIZE=100
+    fc -p
+    print -s -- 'echo alpha'
+    print -s -- 'printf beta'
+    print -s -- 'echo beta'
+    print -s -- 'true'
   fi
   cd "$HOME/fixtures"
   _test_snapshot() {
     print -r -- "ZLE-PWD:$PWD:END-PWD"
     print -r -- "ZLE-SNAPSHOT:${(qqqq)BUFFER}|$KEYMAP:END-SNAPSHOT"
   }
-  _test_reset() { BUFFER=''; CURSOR=0; zle -K viins; }
+  _test_reset() { zle end-of-history; BUFFER=''; CURSOR=0; zle -K viins; }
   _test_glob() { BUFFER="$(print -r -- glob/*)"; CURSOR=$#BUFFER; }
   zle -N _test_snapshot
   zle -N _test_reset
@@ -258,6 +267,14 @@ for mode in native fzf; do
     snapshot $'\x18\x12one two\x01'"$key"X
     expect "word forward: ${(V)key}" 'one Xtwo'
   done
+  # Up and Down while typing search history by the text so far; presses stay
+  # in one snapshot, since the search continues only across consecutive keys.
+  snapshot $'\x18\x12echo\e[A'
+  expect 'Up finds the latest command that starts with the text' 'echo beta'
+  snapshot $'\x18\x12echo\e[A\eOA'
+  expect 'Up again, in application cursor form, keeps the prefix' 'echo alpha'
+  snapshot $'\x18\x12echo\e[A\eOA\e[B'
+  expect 'Down returns toward the latest' 'echo beta'
   snapshot $'\x18\x12cd foo/bar.baz\ebX'
   expect 'Option+Left stops at punctuation, like Neovim' 'cd foo/bar.Xbaz'
   snapshot $'\x18\x12one two\e\x7fX'
