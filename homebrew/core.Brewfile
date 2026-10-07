@@ -1,6 +1,7 @@
 # The shell, editor, Git, and pane essentials, on every platform. On its own
-# this is the lean set for GitHub Codespaces and dev containers, which bring
-# their own toolchains (zsh/homebrew.sh); the Brewfile adds the workstation.
+# this is the lean set for containers (GitHub Codespaces, dev containers, Docker,
+# Podman), which bring their own toolchains (zsh/homebrew.sh); the Brewfile adds
+# the workstation.
 brew "git"
 brew "neovim"
 brew "ripgrep"
