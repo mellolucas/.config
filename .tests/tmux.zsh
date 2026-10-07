@@ -72,9 +72,8 @@ for line in ${(M)lines:#keybind = (performable:|)alt+*}; do
       [[ $command == *"pane_at_$edge[$direction]"*"send-keys $key"*"select-pane -$flag[$direction]"* ]] ;;
     new_split:down) [[ $command == split-window\ -v* ]] ;;
     new_split:right) [[ $command == split-window\ -h* ]] ;;
-    resize_split:*)
-      direction=${${action#*:}%%,*}
-      [[ $command == "resize-pane -$flag[$direction] ${action##*,}" ]] ;;
+    # Ghostty steps in pixels, tmux in cells: only the direction matches.
+    resize_split:*) [[ $command == "resize-pane -$flag[${${action#*:}%%,*}]"* ]] ;;
     equalize_splits) [[ $command == 'select-layout -E' ]] ;;
     toggle_split_zoom) [[ $command == 'resize-pane -Z' ]] ;;
     close_surface) [[ $command == *kill-pane* ]] ;;
