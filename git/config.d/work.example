@@ -3,7 +3,19 @@
 [user]
   name = Your Profile Name
   email = your.login.username@example.com
-  signingKey = YOUR_SIGNING_KEY
+  signingKey = ~/.ssh/id_ed25519_work.pub
 
 [commit]
   gpgSign = true # Sign all commits by default
+
+[tag]
+  gpgSign = true # Sign all tags by default
+
+[gpg]
+  format = ssh
+
+[gpg "ssh"]
+  allowedSignersFile = ~/.ssh/allowed_signers
+
+# One-time provisioning: the steps in personal.example, with a work key
+# (~/.ssh/id_ed25519_work) and your work email.
