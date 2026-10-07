@@ -232,6 +232,12 @@ for mode in native fzf; do
   expect 'Option+Left stops at punctuation, like Neovim' 'cd foo/bar.Xbaz'
   snapshot $'\x18\x12one two\e\x7fX'
   expect 'Option+Backspace deletes a word and keeps typing' 'one X'
+  snapshot $'\x18\x12alpha omega\e\x7f\ep'
+  expect 'Option+Backspace keeps the word for a vi paste' 'alpha omega' vicmd
+  snapshot $'\x18\x12alpha omega\x17\ep'
+  expect 'Ctrl+W keeps the word for a vi paste' 'alpha omega' vicmd
+  snapshot $'\x18\x12alpha beta gamma\x17\x17\ep'
+  expect 'consecutive Ctrl+W keep the last word, as zsh vi kills do' 'alpha beta ' vicmd
   snapshot $'\x18\x12one two\ea\x17'
   expect 'Ctrl+W deletes past where typing began' 'one ' main
   snapshot $'\x18\x12one two\ea\x15'

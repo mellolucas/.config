@@ -55,7 +55,8 @@ KEYTIMEOUT=1
 backward-kill-vi-word() {
   local end=$CURSOR
   zle vi-backward-word
-  BUFFER=$LBUFFER${BUFFER:$end}
+  MARK=$end
+  zle kill-region
 }
 zle -N backward-kill-vi-word
 bindkey -M viins '^[b' vi-backward-word
