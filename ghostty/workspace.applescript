@@ -19,6 +19,10 @@
 --   │        │               │               │
 --   └────────┴───────────────┴───────────────┘
 
+use AppleScript version "2.4"
+use framework "AppKit"
+use scripting additions
+
 on run argv
 	if (count of argv) < 3 then
 		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [MIDDLE_TOP_CMD] [MIDDLE_BOTTOM_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT]"
@@ -41,8 +45,15 @@ on run argv
 	-- One divider move per axis reaches the target ratios: resize_split moves
 	-- the divider of the pane's nearest ancestor split, and nested splits
 	-- redistribute proportionally, so 50/25/25 -> 20/40/40 and 50/50 -> 30/70.
-	set widthDelta to round (contentWidth * 0.3)
-	set heightDelta to round (contentHeight * 0.2)
+	-- CSI 14 t counts device pixels but resize_split moves points; with mixed
+	-- displays the largest scale errs toward smaller moves.
+	set pixelsPerPoint to 1
+	repeat with screen in (current application's NSScreen's screens() as list)
+		set screenScale to (screen's backingScaleFactor()) as real
+		if screenScale > pixelsPerPoint then set pixelsPerPoint to screenScale
+	end repeat
+	set widthDelta to round (contentWidth * 0.3 / pixelsPerPoint)
+	set heightDelta to round (contentHeight * 0.2 / pixelsPerPoint)
 	
 	tell application "Ghostty"
 		activate

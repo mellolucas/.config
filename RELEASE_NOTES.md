@@ -48,6 +48,8 @@ Changes since `v0.0.1`.
   `Space g d`, `Space e r`, and `Space f f`, which makes `:find` a fuzzy file
   picker over the files `rg` lists.
 - Interactive non-login shells (common on Linux) now set up Homebrew too.
+- `workspace` keeps its proportions on Retina displays: the window size it
+  measures in pixels is converted to the points Ghostty resizes by.
 - Option+Left and Option+Right jump words at the prompt and in Neovim instead
   of dropping into vi command mode or Neovim's normal mode. At the prompt,
   Option+Backspace deletes a word, Ctrl+W and Ctrl+U reach past where typing
