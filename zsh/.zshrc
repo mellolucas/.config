@@ -7,6 +7,11 @@
 # tmux panes and other programs started here run zsh, even where the
 # environment names another shell (GitHub Codespaces' default image)
 (( $+commands[zsh] )) && export SHELL=$commands[zsh]
+# Most remote hosts, GitHub Codespaces included, lack Ghostty's terminfo entry,
+# and tmux won't start without it; locally, Ghostty sets TERMINFO
+if [[ $TERM == xterm-ghostty && -z $TERMINFO ]] && ! infocmp xterm-ghostty &> /dev/null; then
+  export TERM=xterm-256color
+fi
 
 fpath=("$ZDOTDIR/functions" $fpath)
 fns=("$ZDOTDIR/functions"/*(.N:t))

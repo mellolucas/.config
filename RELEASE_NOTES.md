@@ -17,7 +17,9 @@ Changes since `v0.0.1`.
   tmux (`tmux/tmux.conf`) provides the same panes: the Option chords with no
   prefix key, browse mode on Option+b, and `workspace`, which lays out a tmux
   session named after the directory and reattaches it when rerun there.
-  Codespaces install the lean package set and make zsh the login shell.
+  Codespaces install the lean package set and make zsh the login shell. Over
+  SSH from Ghostty, zsh switches to xterm-256color where Ghostty's terminfo
+  entry is missing, as on codespaces, so tmux starts.
 - Colors follow Catppuccin, Mocha in dark mode and Latte in light: bat, Delta,
   and Glow's Markdown styling use the terminal palette, so output follows
   Ghostty's theme; Glow code blocks keep Latte colors, readable in both.

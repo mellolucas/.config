@@ -947,5 +947,17 @@ startup_errors=$(<"$test_root/startup-errors")
 [[ -z $startup_errors ]] || fail "startup wrote to stderr: $startup_errors"
 # An image that exports SHELL=/bin/bash (Codespaces) still gets zsh tmux panes
 expect "$startup_home/.config/zsh 1 zsh" "$startup_out" 'full startup loads .zshrc'
+# From Ghostty over SSH: a host without its terminfo entry gets xterm-256color,
+# which tmux accepts; an entry on the host, or Ghostty's TERMINFO, keeps it.
+/bin/mkdir -p "$test_root/terminfo"
+print -r -- $'xterm-ghostty|fixture,\n\tuse=xterm-256color,' > "$test_root/ghostty.ti"
+/usr/bin/tic -x -o "$test_root/terminfo" "$test_root/ghostty.ti" || fail 'compile the fixture terminfo entry'
+for extra expected in '' xterm-256color "TERMINFO_DIRS=$test_root/terminfo" xterm-ghostty \
+  "TERMINFO=$test_root/terminfo" xterm-ghostty; do
+  term_out=$(cd "$startup_home" && /usr/bin/env -i HOME="$startup_home" TERM=xterm-ghostty ${extra:+"$extra"} \
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" -lic 'print -r -- "$TERM"' 2> "$test_root/term-errors" < /dev/null)
+  [[ -z $(<"$test_root/term-errors") ]] || fail "startup as xterm-ghostty wrote to stderr: $(<"$test_root/term-errors")"
+  expect "$expected" "$term_out" "TERM from Ghostty with ${extra:-no terminfo entry}"
+done
 
 print -r -- 'ok: zsh syntax, cask policy, startup wiring, and hermetic alias/function regression checks'
