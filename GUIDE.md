@@ -102,7 +102,8 @@ Ghostty's browse mode scrolls and copies terminal history without touching the r
 | `Esc`, `q`, `i`, or `Option+b` | Leave browse mode |
 
 - Browse mode belongs to the pane: resize, equalize, zoom, and close (`Option+Shift+h/j/k/l`, `Option+=`, `Option+z`, `Option+q`) work while browsing; leave it before moving to another pane or splitting.
-- Without Ghostty, `Option+b` opens tmux's copy mode with the same keys: search shows matches without the extra `Esc`, `:` runs tmux commands, and the mouse wheel scrolls into it. From Ghostty, as over SSH, `Option+b` stays Ghostty's, so browse a tmux pane with the mouse wheel.
+- Without Ghostty, `Option+b` opens tmux's copy mode with the same keys: search shows matches without the extra `Esc`, `:` runs tmux commands, and the mouse wheel scrolls into it. There `y` copies (not `Cmd+C`), and a mouse selection copies as you let go and leaves copy mode.
+- From Ghostty, as over SSH, `Option+b` stays Ghostty's, so browse a tmux pane with the mouse wheel.
 
 ## Documents: Read a document
 

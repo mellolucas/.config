@@ -92,7 +92,7 @@ for line in ${(M)lines:#keybind = (performable:|)alt+*}; do
   (( ++chords ))
 done
 (( chords == 14 )) || fail "expected 14 Option chords, found $chords"
-for key command in y 'send-keys -X copy-selection-and-cancel' : command-prompt \
+for key command in y 'send-keys -X copy-selection-no-clear' : command-prompt \
   Escape 'send-keys -X cancel' q 'send-keys -X cancel' i 'send-keys -X cancel'; do
   [[ $(binding copy-mode-vi $key) == "$command" ]] || fail "browse key $key"
 done
@@ -216,6 +216,14 @@ attach ghostty 'ghostty 1.3.1'
 press $'\eb' ghostty
 wait_for 'Option+Left from Ghostty did not reach the program' 'shows $left "^[b"'
 [[ $(state '#{pane_in_mode}') == 0 ]] || fail 'Option+Left from Ghostty entered browse mode'
+# y copies the selection and stays in browse mode, as Ghostty's does.
+press $'\eb'
+wait_for 'Option+b did not enter browse mode' '[[ $(state "#{pane_in_mode}") == 1 ]]'
+for key in g 0 ' ' '$' y; do press $key; done
+wait_for 'y did not copy the selection' '[[ $(tmux show-buffer 2>/dev/null) == *"^[h^B"* ]]'
+[[ $(state '#{pane_in_mode}') == 1 ]] || fail 'y left browse mode'
+press q
+wait_for 'q did not leave browse mode' '[[ $(state "#{pane_in_mode}") == 0 ]]'
 print -r -- 'ok: chords behave through attached clients'
 
 # workspace: a session per directory, reattached on rerun, with its commands

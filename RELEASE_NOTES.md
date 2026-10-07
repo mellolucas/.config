@@ -149,6 +149,8 @@ closer to equal. Inside tmux, Neovim follows a light/dark switch once tmux
 rereads the terminal's colors: at once in Ghostty, otherwise when the client
 reattaches or resizes. tmux's panes match Ghostty's in keys more than in
 measure: resizing moves an edge a cell at a time, and `Option+=` evens out
-only the current pane and its neighbors. From Ghostty, as over SSH, Ghostty
-keeps `Option+b`, so the mouse wheel browses a tmux pane.
+only the current pane and its neighbors. In tmux's browse mode, `y` copies
+(not Cmd+C), and a mouse selection copies as you let go and leaves the mode.
+From Ghostty, as over SSH, Ghostty keeps `Option+b`, so the mouse wheel
+browses a tmux pane.
 Opening netrw files in neighboring Ghostty panes is future work.
