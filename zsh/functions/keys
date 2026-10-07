@@ -6,7 +6,7 @@ local repo=${source_file:h:h:h}
 local guide=$repo/GUIDE.md topic='' plain=0 usage=0
 local arg line previous='' row current='' title='' intro='' content='' index='# Working here'
 local -i labelled=0
-local -a topics labels
+local -a topics labels words
 local -A pages titles
 
 for arg in "$@"; do
@@ -14,15 +14,14 @@ for arg in "$@"; do
     --plain) plain=1 ;;
     -h|--help) usage=1 ;;
     -*) print -ru2 -- "keys: unknown option: $arg"; return 1 ;;
-    *)
-      [[ -z $topic ]] || { print -u2 'usage: keys [TOPIC|all] [--plain]'; return 1 }
-      topic=$arg ;;
+    *) words+=("$arg") ;;
   esac
 done
 [[ -r $guide ]] || { print -ru2 -- "keys: guide not found: $guide"; return 1 }
 
 # Each level-two heading is a page: "## Topic: Task title". The picker lists each
-# page by its first prose line, then each table row so keys and commands match.
+# page by its first prose line, then each table row and bullet, so keys,
+# commands, and tips all match a search.
 while IFS= read -r line || [[ -n $line ]]; do
   if [[ $line == '## '*': '* ]]; then
     current=${${line#'## '}%%:*}
@@ -40,6 +39,8 @@ while IFS= read -r line || [[ -n $line ]]; do
         row=${${line#'| '}%' |'}
         labels+=("$current"$'\t'"  ${${row%% | *}//\`/}  ${${row#* | }//\`/}")
       fi
+    elif [[ $line == '- '* ]]; then
+      labels+=("$current"$'\t'"  ${${line#'- '}//\`/}")
     elif [[ -n $line ]] && (( ! labelled )); then
       labels+=("$current"$'\t'"$title - $line")
       labelled=1
@@ -50,28 +51,56 @@ while IFS= read -r line || [[ -n $line ]]; do
   previous=$line
 done < "$guide"
 (( ${#topics} )) || { print -u2 'keys: guide has no topics'; return 1 }
-index+=$'\n\nChoose a task with `keys TOPIC`.\n\n'
+index+=$'\n\nChoose a task with `keys TOPIC`, or search every line with `keys WORDS`.\n\n'
 for current in "${topics[@]}"; do
   index+="- \`keys $current\` - $titles[$current]"$'\n'
 done
 index+=$'\n`keys all` reads everything. `keys --plain` needs no viewer.\n'
 
 if (( usage )); then
-  print -r -- 'usage: keys [TOPIC|all] [--plain]'
+  print -r -- 'usage: keys [TOPIC|all|WORDS...] [--plain]'
   print -r -- "$index"
   return 0
 fi
+
+# One page name opens that page; any other words search every entry.
+local query=''
+if (( $#words == 1 )) && [[ $words[1] == all || -n ${pages[$words[1]]-} ]]; then
+  topic=$words[1]
+else
+  query=${(j: :)words}
+fi
+# Entries show their topic, so a search keeps each result's page in view.
+local -i pad=0
+for current in "${topics[@]}"; do (( pad = ${#current} > pad ? ${#current} : pad )); done
+local -a entries
+for line in "${labels[@]}"; do
+  current=${line%%$'\t'*}
+  entries+=("$current"$'\t'"${(r:pad+2:)current}${line#*$'\t'}")
+done
+
 if [[ -z $topic && -t 0 && -t 1 ]] && (( ! plain )) && command -v fzf >/dev/null 2>&1; then
   local selection result=0
+  local -a query_option=()
+  [[ -z $query ]] || query_option=("--query=$query")
   # Only the repository's fzf options (colors); personal ones could reshape the picker
-  selection=$(print -rl -- "${labels[@]}" | FZF_DEFAULT_OPTS= FZF_DEFAULT_OPTS_FILE=$repo/fzf/fzfrc \
-    fzf --layout=reverse --no-multi --wrap --delimiter=$'\t' --with-nth=2.. \
+  selection=$(print -rl -- "${entries[@]}" | FZF_DEFAULT_OPTS= FZF_DEFAULT_OPTS_FILE=$repo/fzf/fzfrc \
+    fzf --layout=reverse --no-multi --wrap --delimiter=$'\t' --with-nth=2.. $query_option \
       --prompt='Find a task > ' --header=$'Working here\nEnter reads a page. Esc returns to the shell.') || result=$?
   case $result in
     0) topic=${selection%%$'\t'*} ;;
     1|130) return 0 ;;
     *) return $result ;;
   esac
+elif [[ -n $query ]]; then
+  # Without the picker, print the entries that hold every word.
+  setopt local_options extended_glob
+  local word
+  local -a found=("${entries[@]}")
+  for word in ${=query}; do found=(${(M)found:#(#i)*${word}*}); done
+  (( $#found )) || { print -ru2 -- "keys: nothing matches '$query'; run keys --help for the topics"; return 1 }
+  print -rl -- "${found[@]#*$'\t'}"
+  return 0
 fi
 
 case $topic in

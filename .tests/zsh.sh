@@ -255,7 +255,7 @@ STUB
     done
     outputs+=("$section" "$plain")
   done
-  for args in '--invalid' 'help' 'missing-topic' 'files extra' 'all files' '--plain files extra'; do
+  for args in '--invalid' 'zz-no-such-word' 'zz-no-such words'; do
     if keys ${=args} > "$test_root/keys-error" 2>&1; then
       fail "keys rejects $args"
     fi
@@ -263,6 +263,11 @@ STUB
     [[ -n $error ]] || fail "keys explains invalid input: $args"
     outputs+=("$error")
   done
+  # Words that name no page search every entry, bullets included, by topic.
+  output=$(keys detach) || fail 'keys search status'
+  [[ $output == 'panes '*detach* && $output != *$'\n'*'Option+h'* ]] || fail "keys search: $output"
+  output=$(keys --plain browse mode leave) || fail 'keys multi-word search status'
+  [[ $output == 'reading '*'Leave browse mode'* ]] || fail "keys multi-word search: $output"
 
   # Present viewers must remain unused for redirected or explicitly plain output.
   fzf() { fail 'keys unexpectedly invoked the picker'; }

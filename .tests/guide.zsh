@@ -91,6 +91,9 @@ while IFS= read -r line || [[ -n $line ]]; do
         cells=("${(@s: | :)${${line#'| '}%' |'}}")
         labels+=("$current"$'\t'"  ${cells[1]//\`/}  ${(j: | :)cells[2,-1]//\`/}")
       fi
+    elif [[ $line == '- '* ]]; then
+      # Bullets are entries too, so their tips match a search.
+      labels+=("$current"$'\t'"  ${${line#'- '}//\`/}")
     elif (( needs_label )) && [[ -n $line ]]; then
       labels+=("$current"$'\t'"$titles[$current] - $line")
       needs_label=0
@@ -102,7 +105,7 @@ while IFS= read -r line || [[ -n $line ]]; do
 done < "$repo/GUIDE.md"
 [[ ${(j: :)topics} == 'workspace files shell panes reading documents editor git agents maintain' ]] ||
   fail 'guide topic contract'
-index=$'# Working here\n\nChoose a task with `keys TOPIC`.\n\n'
+index=$'# Working here\n\nChoose a task with `keys TOPIC`, or search every line with `keys WORDS`.\n\n'
 all=$intro
 for topic in "${topics[@]}"; do
   index+="- \`keys $topic\` - $titles[$topic]"$'\n'
@@ -110,8 +113,20 @@ for topic in "${topics[@]}"; do
 done
 index+=$'\n`keys all` reads everything. `keys --plain` needs no viewer.\n'
 navigation=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task'
+# Entries show their topic, padded past the longest name.
+typeset -a entries
+with_topics() {
+  local line topic
+  local -i pad=0
+  for topic in "${topics[@]}"; do (( pad = ${#topic} > pad ? ${#topic} : pad )); done
+  entries=()
+  for line in "${labels[@]}"; do
+    entries+=("${line%%$'\t'*}"$'\t'"${(r:pad+2:)${line%%$'\t'*}}${line#*$'\t'}")
+  done
+}
+with_topics
 picker=$'FZF:ARGS:--layout=reverse|--no-multi|--wrap|--delimiter=\t|--with-nth=2..|--prompt=Find a task > |--header=Working here\nEnter reads a page. Esc returns to the shell.\nFZF:ENV::'"$repo"$'/fzf/fzfrc\nFZF:INPUT\n'
-picker+="${(F)labels}"$'\nFZF:END\n'
+picker+="${(F)entries}"$'\nFZF:END\n'
 
 checks=0
 check() {
@@ -119,14 +134,20 @@ check() {
   shift 3
   local label="$mode / width=$width / selection=$selected / args=$*"
   local expected=$'BEGIN\n' content=$index result=0 uses_picker=0 uses_glow=1 plain=0
-  local arg topic='' chunk transcript=''
+  local arg topic='' query='' chunk transcript=''
   local -F deadline=$(( SECONDS + 5 ))
   for arg in "$@"; do
-    if [[ $arg == --plain ]]; then plain=1; else topic=$arg; fi
+    if [[ $arg == --plain ]]; then plain=1
+    elif [[ $arg == all || -n ${pages[$arg]-} ]]; then topic=$arg
+    else query+=${query:+ }$arg
+    fi
   done
   if [[ -z $topic && $mode != (no-fzf|bare|non-tty|stdin-null) ]] && (( ! plain )); then
     uses_picker=1
-    expected+=$picker
+    # Search words reach the picker as its starting query.
+    if [[ -n $query ]]; then expected+=${picker/--with-nth=2..|/--with-nth=2..|--query=$query|}
+    else expected+=$picker
+    fi
     topic=$selected
   fi
   [[ $mode != (no-glow|no-less|bare|non-tty) ]] && (( ! plain )) || uses_glow=0
@@ -196,6 +217,8 @@ for width in 40 80 120; do
   check cancel "$width" files
   check no-match "$width" files
   check picker-error "$width" files
+  check picker "$width" panes detach
+  check picker "$width" reading browse mode leave
 done
 
 # A separate source tree exercises multi-digit label counts without changing the guide.
@@ -215,7 +238,8 @@ for number in {1..12}; do
   labels+=("$topic"$'\t'"Task $number - Intent $number")
   print -r -- "## Topic$number: Task $number"$'\n\n'"Intent $number"$'\n\n'"Body $number" >> "$repo/GUIDE.md"
 done
-picker=${picker%%FZF:ENV*}"FZF:ENV::$repo/fzf/fzfrc"$'\nFZF:INPUT\n'"${(F)labels}"$'\nFZF:END\n'
+with_topics
+picker=${picker%%FZF:ENV*}"FZF:ENV::$repo/fzf/fzfrc"$'\nFZF:INPUT\n'"${(F)entries}"$'\nFZF:END\n'
 for topic in "${topics[@]}"; do
   check picker 80 "$topic"
 done
