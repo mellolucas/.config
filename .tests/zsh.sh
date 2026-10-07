@@ -501,15 +501,29 @@ done
     expect "$default" "$HOMEBREW_CASK_OPTS" 'failed group lookup does not grant admin status'
   )
 
-  # Codespaces and dev containers get the lean Brewfile unless one is chosen.
-  for environment expected in \
-    'CODESPACES=true' "$test_root/config/homebrew/core.Brewfile" \
-    'REMOTE_CONTAINERS=true' "$test_root/config/homebrew/core.Brewfile" \
-    "CODESPACES=true HOMEBREW_BUNDLE_FILE_GLOBAL=$test_root/chosen" "$test_root/chosen" \
-    'CODESPACES=false' unset; do
+  # Containers get the lean Brewfile unless one is chosen: Codespaces and dev
+  # containers by their variables, Docker and Podman by their marker files,
+  # which this copy of the policy looks for under the test root instead of /.
+  policy=$(<"$repo/zsh/homebrew.sh")
+  [[ $policy == *' /.dockerenv '*' /run/.containerenv '* ]] || fail 'container marker fixture'
+  policy=${policy// \/.dockerenv / $test_root/markers/.dockerenv }
+  policy=${policy// \/run\/.containerenv / $test_root/markers/run/.containerenv }
+  print -r -- "$policy" > "$test_root/homebrew-policy.sh"
+  lean=$test_root/config/homebrew/core.Brewfile
+  for marker environment expected in \
+    '' 'CODESPACES=true' "$lean" \
+    '' 'REMOTE_CONTAINERS=true' "$lean" \
+    '' "CODESPACES=true HOMEBREW_BUNDLE_FILE_GLOBAL=$test_root/chosen" "$test_root/chosen" \
+    '' 'CODESPACES=false' unset \
+    .dockerenv '' "$lean" \
+    run/.containerenv '' "$lean" \
+    .dockerenv "HOMEBREW_BUNDLE_FILE_GLOBAL=$test_root/chosen" "$test_root/chosen"; do
+    /bin/rm -rf "$test_root/markers"
+    /bin/mkdir -p "$test_root/markers/run"
+    [[ -z $marker ]] || : > "$test_root/markers/$marker"
     actual=$(/usr/bin/env -i HOME="$test_root" XDG_CONFIG_HOME="$test_root/config" ${=environment} \
-      /bin/sh -c '. "$1/zsh/homebrew.sh"; printf %s "${HOMEBREW_BUNDLE_FILE_GLOBAL-unset}"' policy "$repo")
-    expect "$expected" "$actual" "lean Brewfile with $environment"
+      /bin/sh -c '. "$1"; printf %s "${HOMEBREW_BUNDLE_FILE_GLOBAL-unset}"' policy "$test_root/homebrew-policy.sh")
+    expect "$expected" "$actual" "lean Brewfile with ${marker:-no marker file} and ${environment:-no variables}"
   done
 
   # Ruby is a test-only oracle for Homebrew's Shellwords split and last-wins appdir.

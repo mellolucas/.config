@@ -19,9 +19,11 @@ case "${OSTYPE:-$(uname -s)}" in
     ;;
 esac
 
-# GitHub Codespaces and dev containers bring their own toolchains: unless a
+# Containers bring their own toolchains: GitHub Codespaces, dev containers, and
+# Docker or Podman containers, known by the files Homebrew checks too. Unless a
 # Brewfile is chosen, Homebrew installs only the essentials there.
 if [ -z "${HOMEBREW_BUNDLE_FILE_GLOBAL:-}" ] &&
-  { [ "${CODESPACES:-}" = true ] || [ "${REMOTE_CONTAINERS:-}" = true ]; }; then
+  { [ "${CODESPACES:-}" = true ] || [ "${REMOTE_CONTAINERS:-}" = true ] ||
+    [ -f /.dockerenv ] || [ -f /run/.containerenv ]; }; then
   export HOMEBREW_BUNDLE_FILE_GLOBAL="${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/core.Brewfile"
 fi
