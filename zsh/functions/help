@@ -11,12 +11,13 @@ if [[ $1 == (-h|--help) ]]; then
   return 0
 fi
 
-# Accept literal words, quotes and escaped characters, not shell expressions.
+# Accept literal words, quotes, escaped characters, and Git's @{...} revisions
+# (no comma or .., so never brace expansion), not shell expressions.
 local -a cmd=("$1")
 local -A seen
 local expression token previous
 local -i editor_alias=0
-local literal_word='^([a-zA-Z0-9_./:@%+,=!-]+|\\.|'"'[^']*'"'|"[^"$`\\]*")+$'
+local literal_word='^([a-zA-Z0-9_./:@%+,=!-]+|@\{[a-zA-Z0-9_-]+\}|\\.|'"'[^']*'"'|"[^"$`\\]*")+$'
 local -a words
 while (( ${+aliases[$cmd[1]]} )); do
   if (( ${+seen[$cmd[1]]} )); then

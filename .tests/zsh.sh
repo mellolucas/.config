@@ -654,6 +654,11 @@ editor() { record editor "$@"; }
   alias help-first='help-second --first' help-second='editor --second'
   help help-first 'user argument'
   expect $'editor\n--second\n--first\nuser argument\n--help' "$(recorded)" 'plain alias chain'
+  # Git's @{...} revisions pass (gdo, gdi); brace expansion still does not.
+  alias help-upstream='editor HEAD...@{upstream}' help-brace='editor {a,b}'
+  help help-upstream
+  expect $'editor\nHEAD...@{upstream}\n--help' "$(recorded)" 'alias with a Git upstream revision'
+  if help help-brace 2>/dev/null; then fail 'help ran an alias with brace expansion'; fi
 
   source /dev/stdin <<< "$alias_block"
   # Only bsd-tool has a manual; it rejects --help like caffeinate.
@@ -859,6 +864,9 @@ for helper in github-open github-view; do
     output=$($helper "$flag") || fail "$helper $flag status"
     [[ $output == "usage: $helper "* ]] || fail "$helper $flag usage"
   done
+  # help COMMAND ARGS puts --help after the arguments.
+  output=$($helper "$root/$rel" --help) || fail "$helper PATH --help status"
+  [[ $output == "usage: $helper "* ]] || fail "$helper PATH --help usage"
 done
 [[ ! -s $test_root/gh ]] || fail 'helper usage invoked gh'
 github-open "$root/$rel"

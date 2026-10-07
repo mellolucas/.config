@@ -3,7 +3,7 @@
 emulate -L zsh
 setopt extended_glob
 
-if [[ $1 == (-h|--help) ]]; then
+if (( ${argv[(I)(-h|--help)]} )); then
   print -r -- 'usage: github-view [--remote] [PATH]'
   print -r -- "Render the README nearest PATH (default: the current directory); --remote"
   print -r -- "renders the repository's README from GitHub at the current branch."
