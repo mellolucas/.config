@@ -89,6 +89,11 @@ bindkey -M vicmd '^[f' vi-forward-word
     bindkey -M $keymap '^[[3~' delete-char
   done
 }
+# Ctrl+X Ctrl+E edits the command line in the editor, like OpenCode's leader e
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey -M viins '^X^E' edit-command-line
+bindkey -M vicmd '^X^E' edit-command-line
 
 setopt interactive_comments
 setopt prompt_subst

@@ -17,6 +17,10 @@ if [[ $1 == --child ]]; then
   eval "$config"
   # help completes commands and their arguments, not zsh's SCCS subcommands
   [[ ${_comps[help]-} == _help ]] || { print -u2 "FAIL: help completes with ${_comps[help]-nothing}"; exit 1; }
+  # Ctrl+X Ctrl+E opens the command line in the editor from either vi mode
+  for keymap in viins vicmd; do
+    [[ $(bindkey -M $keymap '^X^E') == *' edit-command-line' ]] || { print -u2 "FAIL: $keymap Ctrl+X Ctrl+E"; exit 1; }
+  done
   # Completion must never invoke the helpers or pane commands.
   workspace keys dotfiles zle-test-command() { print -r -- "$0 $*" >> "$HOME/helper-calls"; }
   config=$(<"$repo/zsh/.zshrc")
