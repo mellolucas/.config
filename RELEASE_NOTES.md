@@ -54,8 +54,9 @@ Changes since `v0.0.1`.
   `~/.cache/Homebrew/npm_cache`.
 - `dotfiles doctor` lists hidden entries in `$HOME` outside the XDG layout,
   replacing its fixed list of legacy files. It calls a link to nothing broken,
-  checks that zsh is the login shell and that tmux is current, names a fix for
-  each problem, and exits 1 until none remain.
+  checks that zsh is the login shell, that tmux is current, and that Git has
+  the identity it requires before a first commit, names a fix for each
+  problem, and exits 1 until none remain.
 - `dotfiles link` and `uninstall` remove the links left behind by
   configuration folders this repository no longer has.
 - Node and Python are shared runtimes alongside Go and Bun.
@@ -68,7 +69,8 @@ Changes since `v0.0.1`.
   diagnostics in Neovim, and `.tests/run` lints with it.
 - New helpers: `workspace` flags, `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
   `Space g d`, `Space e r`, and `Space f f`, which makes `:find` a fuzzy file
-  picker over the files `rg` lists.
+  picker over the files `rg` lists. `Space b l` waits for a buffer's number
+  or name after listing them.
 - Interactive non-login shells (common on Linux) now set up Homebrew too.
 - `workspace` keeps its proportions on Retina displays: the window size it
   measures in pixels is converted to the points Ghostty resizes by.
@@ -82,10 +84,15 @@ Changes since `v0.0.1`.
   Neovim's last insert. The word, Home, End, and Delete keys that Windows
   Terminal, VS Code, and tmux send work at the prompt too, and their
   Alt+Left/Right jump words in Neovim.
+- At the prompt, Up and Down step through earlier commands that start with
+  what's typed, Ctrl+X Ctrl+E edits the command line in Neovim, and the
+  cursor shows the vi mode (a block in command mode, a bar while typing) in
+  tmux and other terminals, as Ghostty's shell integration does in Ghostty.
 - Browse mode also scrolls with the Up and Down arrows, copies with Cmd+C,
-  keeps the Option chords that act on its own pane (resize, equalize, zoom,
-  close), and Option+b leaves it again; Ghostty's own Cmd+Option and Cmd+Ctrl
-  arrow chords move between and resize panes.
+  jumps between prompts with Cmd+Up and Cmd+Down, keeps the Option chords
+  that act on its own pane (resize, equalize, zoom, close), and Option+b
+  leaves it again; Ghostty's own Cmd+Option and Cmd+Ctrl arrow chords move
+  between and resize panes.
 - Neovim's `:grep` searches with ripgrep like the shell's `rg`: hidden files
   included, ignore files respected, and every `.git` folder skipped, nested
   repositories' too.
