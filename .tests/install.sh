@@ -17,6 +17,8 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 unset GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR
 unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_TEMPLATE_DIR
+# Never the Codespaces or dev container path by accident: it runs sudo chsh.
+unset CODESPACES REMOTE_CONTAINERS
 # Tool homes follow each test's XDG homes, never the caller's environment.
 xdg_vars=$(sed -n 's/^export \([A-Z_][A-Z0-9_]*\)=.*/\1/p' "$repo/zsh/xdg.sh")
 # shellcheck disable=SC2086 # one variable name per word
@@ -805,6 +807,8 @@ run_doctor() (
   gh() { return 1; }
   ghostty() { :; }
   nvim() { :; }
+  tmux() { printf 'tmux 3.1a\n'; }
+  login_shell() { printf '/bin/bash\n'; }
   doctor_dotfiles
 )
 : > "$HOME/.zshrc"
@@ -828,6 +832,9 @@ if grep -Fq 'home .zprofile' "$test_root/doctor.log"; then fail 'doctor reported
 check grep -Fq 'gh auth: not authenticated' "$test_root/doctor.log"
 check grep -Fqx "link zsh: broken symlink -> $test_root/missing" "$test_root/doctor.log"
 check grep -Fqx 'link retired: orphaned; dotfiles link removes it' "$test_root/doctor.log"
+# shellcheck disable=SC2016 # the hint shows the command to type
+check grep -Fqx 'login shell: /bin/bash; run: chsh -s "$(command -v zsh)"' "$test_root/doctor.log"
+check grep -Fqx 'tmux: 3.1 (< 3.2; upgrade recommended)' "$test_root/doctor.log"
 check grep -Eqx '[0-9]+ problems found; dotfiles link repairs links, backing up what it replaces' "$test_root/doctor.log"
 rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.dangling"
 rm "$XDG_CONFIG_HOME/zsh"
@@ -846,11 +853,36 @@ check grep -Fqx 'home: nothing outside the XDG layout' "$test_root/doctor.log"
   HOMEBREW_BUNDLE_FILE_GLOBAL="$test_root/Brewfile"
   brew_bin() { printf '%s\n' "$test_root/brew"; }
   is_darwin() { return 1; }
+  login_shell() { printf '/usr/bin/zsh\n'; }
   gh() { :; }
   ghostty() { printf 'Ghostty 1.3.1\n'; }
   nvim() { printf 'NVIM v0.12.5\n'; }
+  tmux() { printf 'tmux 3.7c\n'; }
   doctor_dotfiles
 ) > "$test_root/doctor.log" 2>&1 || fail "doctor found problems in a complete setup: $(cat "$test_root/doctor.log")"
 check grep -Fqx 'no problems found' "$test_root/doctor.log"
+
+# Codespaces and dev containers install unattended in bash: install switches
+# the login shell to zsh through passwordless sudo, and nowhere else.
+(
+  zsh=$(command -v zsh)
+  user=$(id -un)
+  sudo() { printf '%s\n' "$*" >> "$test_root/sudo.log"; }
+  login_shell() { printf '/bin/bash\n'; }
+  for environment in CODESPACES REMOTE_CONTAINERS; do
+    : > "$test_root/sudo.log"
+    (export "$environment=true"; use_zsh_login_shell) > "$test_root/shell.log"
+    check test "$(cat "$test_root/sudo.log")" = "-n chsh -s $zsh $user"
+    check grep -Fqx "login shell: $zsh" "$test_root/shell.log"
+  done
+  : > "$test_root/sudo.log"
+  use_zsh_login_shell > "$test_root/shell.log"
+  (export CODESPACES=false; use_zsh_login_shell) >> "$test_root/shell.log"
+  (login_shell() { printf '/bin/zsh\n'; }; export CODESPACES=true; use_zsh_login_shell) >> "$test_root/shell.log"
+  check test ! -s "$test_root/sudo.log"
+  check test ! -s "$test_root/shell.log"
+  (sudo() { return 1; }; export CODESPACES=true; use_zsh_login_shell) > "$test_root/shell.log"
+  check grep -Fqx "skip: could not switch the login shell; run: sudo chsh -s $zsh $user" "$test_root/shell.log"
+)
 
 printf 'ok: lifecycle regression checks\n'

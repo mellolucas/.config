@@ -38,7 +38,8 @@ Changes since `v0.0.1`.
   `~/.cache/Homebrew/npm_cache`.
 - `dotfiles doctor` lists hidden entries in `$HOME` outside the XDG layout,
   replacing its fixed list of legacy files. It calls a link to nothing broken,
-  names a fix for each problem, and exits 1 until none remain.
+  checks that zsh is the login shell and that tmux is current, names a fix for
+  each problem, and exits 1 until none remain.
 - `dotfiles link` and `uninstall` remove the links left behind by
   configuration folders this repository no longer has.
 - Node and Python are shared runtimes alongside Go and Bun.

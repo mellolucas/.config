@@ -78,6 +78,15 @@ is_admin() (
 )
 timestamp() { date +%Y%m%d%H%M%S; }
 
+# The account's login shell, from the directory service or passwd.
+login_shell() {
+  if is_darwin; then
+    dscl . -read "/Users/$(id -un)" UserShell 2>/dev/null | awk '{ print $2 }'
+  else
+    getent passwd "$(id -un)" 2>/dev/null | cut -d: -f7
+  fi
+}
+
 require_separate_checkout() {
   # -ef is supported by the macOS/Linux shells and catches case-equivalent paths.
   # shellcheck disable=SC3013
@@ -219,6 +228,24 @@ link_npm_global_config() {
   link_path "$repo_dir/homebrew/npmrc" "$npmrc"
 }
 
+# GitHub Codespaces and dev containers start users in bash and install
+# unattended; GitHub documents switching the login shell from dotfiles.
+use_zsh_login_shell() {
+  [ "${CODESPACES:-}" = true ] || [ "${REMOTE_CONTAINERS:-}" = true ] || return 0
+  case "$(login_shell)" in
+    */zsh) return 0 ;;
+  esac
+  zsh=$(command -v zsh) || {
+    printf 'skip: zsh is not installed, so the login shell stays as it is\n'
+    return 0
+  }
+  if sudo -n chsh -s "$zsh" "$(id -un)" >/dev/null 2>&1; then
+    printf 'login shell: %s\n' "$zsh"
+  else
+    printf 'skip: could not switch the login shell; run: sudo chsh -s %s %s\n' "$zsh" "$(id -un)"
+  fi
+}
+
 ensure_homebrew() {
   if brew_bin >/dev/null 2>&1; then
     printf 'ok: Homebrew already installed\n'
@@ -280,6 +307,7 @@ link_dotfiles() {
 # Links land first so a brew-phase failure leaves a partially-usable setup.
 install_dotfiles() {
   link_dotfiles
+  use_zsh_login_shell
   ensure_homebrew
   bundle_dotfiles
 
@@ -823,6 +851,18 @@ doctor_dotfiles() {
     problems=$((problems + 1))
   fi
 
+  printf 'login shell: '
+  shell=$(login_shell || true)
+  case "$shell" in
+    */zsh) printf '%s\n' "$shell" ;;
+    '') printf 'unknown\n' ;;
+    *)
+      # shellcheck disable=SC2016 # the hint shows the command to type
+      printf '%s; run: chsh -s "$(command -v zsh)"\n' "$shell"
+      problems=$((problems + 1))
+      ;;
+  esac
+
   # Loops run in this shell, not a pipe, so their problems count.
   for src in "$repo_dir"/*; do
     [ -d "$src" ] || continue
@@ -852,6 +892,16 @@ doctor_dotfiles() {
   if command -v nvim >/dev/null 2>&1; then
     version=$(nvim --version 2>/dev/null | awk 'NR == 1 { sub(/^v/, "", $2); print $2 }' || true)
     print_version_check "$version" 0 12 || problems=$((problems + 1))
+  else
+    printf 'not found; run: dotfiles bundle\n'
+    problems=$((problems + 1))
+  fi
+
+  printf 'tmux: '
+  if command -v tmux >/dev/null 2>&1; then
+    # Releases carry a letter (3.7c); development builds a prefix (next-3.8)
+    version=$(tmux -V 2>/dev/null | awk '{ sub(/^next-/, "", $2); sub(/[a-z]+$/, "", $2); print $2 }' || true)
+    print_version_check "$version" 3 2 || problems=$((problems + 1))
   else
     printf 'not found; run: dotfiles bundle\n'
     problems=$((problems + 1))
