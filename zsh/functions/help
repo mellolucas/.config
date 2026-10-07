@@ -68,8 +68,12 @@ if (( ${+builtins[$cmd[1]]} )); then
   return $?
 fi
 
+local -a request=("${cmd[@]}" "${@[2,-1]}")
+# Git opens a subcommand's manual only for `git SUBCOMMAND --help`; options or
+# revisions in between get a usage error instead (gdo, gdf).
+[[ $request[1] == git && $request[2] == [^-]* ]] && request=(git "$request[2]")
 local output result=0
-output=$("${cmd[@]}" "${@[2,-1]}" --help 2>&1) || result=$?
+output=$("${request[@]}" --help 2>&1) || result=$?
 # BSD tools such as caffeinate reject --help; their manual is the help.
 if (( result )) && man -w "$cmd[1]" >/dev/null 2>&1; then
   man "$cmd[1]"

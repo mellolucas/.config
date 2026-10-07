@@ -663,6 +663,16 @@ editor() { record editor "$@"; }
   help help-upstream
   expect $'editor\nHEAD...@{upstream}\n--help' "$(recorded)" 'alias with a Git upstream revision'
   if help help-brace 2>/dev/null; then fail 'help ran an alias with brace expansion'; fi
+  # Real Git answers `git diff REV --help` with a usage error (exit 129), so
+  # help asks for the subcommand's manual without the words in between.
+  git() { record git "$@"; }
+  alias help-gdo='git diff @{upstream}...@' help-gdf='git diff --name-status'
+  help help-gdo
+  expect $'git\ndiff\n--help' "$(recorded)" 'git alias with a revision'
+  help help-gdf --cached
+  expect $'git\ndiff\n--help' "$(recorded)" 'git alias with options and user arguments'
+  help git log --graph
+  expect $'git\nlog\n--help' "$(recorded)" 'git subcommand with arguments'
 
   source /dev/stdin <<< "$alias_block"
   # Only bsd-tool has a manual; it rejects --help like caffeinate.
@@ -738,7 +748,7 @@ editor() { record editor "$@"; }
   alias gs='git status --ignored'
   git() { record git "$@"; }
   help gs
-  expect $'git\nstatus\n--ignored\n--help' "$(recorded)" 'help git subcommand alias'
+  expect $'git\nstatus\n--help' "$(recorded)" 'help git subcommand alias'
 
   functions[help-cycle]='record help-cycle "$@"'
   alias help-cycle='editor --outer' editor='help-cycle --inner'
