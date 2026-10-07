@@ -1,8 +1,8 @@
 # Machine-local zsh overrides (copy to `local.zsh`; sourced last by .zshrc).
 # Untracked by design. Set only overrides; unset values use repository defaults.
 # XDG roots must be set before shell startup, not in this late interactive file.
-# Only interactive shells read it: commands that apps start (agents, editors)
-# see ~/.zshenv alone.
+# Only interactive shells read it: `zsh -c` and `zsh -lc` commands that apps
+# start (some agents and editors) skip it.
 
 # Workspace defaults; command-line flags override these for one invocation.
 # export DOTFILES_WORKSPACE_AGENT_CMD='claude'
