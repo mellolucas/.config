@@ -312,7 +312,7 @@ install_dotfiles() {
   bundle_dotfiles
 
   printf '\ndone.\n'
-  printf 'restart your shell or run: exec zsh -l\n'
+  printf 'restart your shell or run: exec zsh -l; then keys shows what this setup adds\n'
 }
 
 # Follows `brew bundle --global` Brewfile resolution (HOMEBREW_BUNDLE_FILE_GLOBAL
@@ -1006,30 +1006,34 @@ uninstall_dotfiles() {
 
 usage() {
   cat <<EOF
-usage: dotfiles [install|link|bundle|update|check-updates|status|doctor|uninstall|help]
+usage: dotfiles COMMAND
 
 commands:
-  install     link configs into XDG_CONFIG_HOME, ensure Homebrew, brew bundle
-  link        link configs into XDG_CONFIG_HOME without touching packages
-  bundle      run brew bundle, then update the Brewfile's npm packages
-  update      fetch upstream, fast-forward when clean, then reinstall
-  check-updates  fetch and compare dotfiles; run brew bundle check (no arguments)
-  status      show dotfiles repo status
-  doctor      check the setup and name fixes; exits 1 on problems
-  uninstall   remove symlinks owned by this repo
-  help        show this usage help message
+  install        link configs, ensure Homebrew, and apply the Brewfile; in
+                 Codespaces and dev containers, make zsh the login shell too
+  check-updates  fetch and compare dotfiles, check the Brewfile; applies nothing
+  update         fetch upstream, fast-forward when clean, then relink and
+                 apply the Brewfile
+  bundle         apply the Brewfile, then update its npm packages
+  link           relink configs into XDG_CONFIG_HOME without touching packages
+  status         show the dotfiles repository's state
+  doctor         check the setup and name fixes; exits 1 on problems
+  uninstall      remove the symlinks this repository owns
+  help           show this help
 
 update options:
-  --discard   review and discard local repo changes, then reset to upstream
-  --yes       skip the --discard confirmation prompt
+  --discard      review and discard local repo changes, then reset to upstream
+  -y, --yes      skip the --discard confirmation prompt
 
 check-updates exit codes:
-  0           inspection completed and the Brewfile is satisfied
-  1           inspection incomplete, or the Brewfile is unmet
+  0              inspection completed and the Brewfile is satisfied
+  1              inspection incomplete, or the Brewfile is unmet
 
 default command:
-  install     when executed directly as install.sh
-  help        when invoked as dotfiles
+  install        when run directly as install.sh
+  help           when run as dotfiles
+
+The shortcuts and helpers this setup adds: run keys (keys WORDS searches).
 EOF
 }
 
