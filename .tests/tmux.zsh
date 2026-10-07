@@ -39,7 +39,8 @@ stop() {
   done
 }
 trap stop EXIT
-tmux new-session -d -s test -x 120 -y 40 'cat -v'
+# Raw, as zsh and Neovim read keys: the line discipline would erase on DEL.
+tmux new-session -d -s test -x 120 -y 40 'stty raw -echo; exec cat -v'
 [[ $(tmux show -gv prefix) == None ]] || fail 'XDG tmux.conf not loaded'
 (( $(tmux show -sv escape-time) <= 20 )) || fail "escape-time above Neovim's 10-20 ms"
 
@@ -171,11 +172,14 @@ wait_for 'Option+h at an edge did not reach the program' 'shows $left "^[h"'
 [[ $(state '#{pane_id}') == $left ]] || fail 'Option+h at an edge moved'
 press $'\x02'
 wait_for 'Ctrl+B did not reach the program' 'shows $left "^B"'
-# Word keys from Windows Terminal (Alt+Left) and VS Code or Linux (Ctrl+Right)
+# Word keys from Windows Terminal (Alt+Left) and VS Code or Linux (Ctrl+Right),
+# and Option+Backspace, which tmux 3.7 reads as one key
 press $'\e[1;3D'
 wait_for 'Alt+Left did not reach the program' 'shows $left "^[[1;3D"'
 press $'\e[1;5C'
 wait_for 'Ctrl+Right did not reach the program' 'shows $left "^[[1;5C"'
+press $'\e\x7f'
+wait_for 'Option+Backspace did not reach the program' 'shows $left "^[^?"'
 press $'\el'
 wait_for 'Option+l did not move right' '[[ $(state "#{pane_id}") == $right ]]'
 press $'\eb'
@@ -204,6 +208,13 @@ wait_for 'Option+s did not split' '[[ $(state "#{window_panes}") == 3 ]]'
 wait_for 'the new pane does not run zsh' '[[ $(state "#{pane_current_command}") == zsh ]]'
 press $'\eq'
 wait_for 'Option+q did not close a pane at its prompt' '[[ $(state "#{window_panes}") == 2 ]]'
+# Ghostty keeps Option+b for its own browse mode, so from Ghostty ESC b is
+# Option+Left: a word jump for the program. Ghostty names itself so.
+tmux select-pane -t "$left"
+attach ghostty 'ghostty 1.3.1'
+press $'\eb' ghostty
+wait_for 'Option+Left from Ghostty did not reach the program' 'shows $left "^[b"'
+[[ $(state '#{pane_in_mode}') == 0 ]] || fail 'Option+Left from Ghostty entered browse mode'
 print -r -- 'ok: chords behave through attached clients'
 
 # workspace: a session per directory, reattached on rerun, with its commands
