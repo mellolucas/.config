@@ -183,6 +183,20 @@ check test -L "$XDG_CONFIG_HOME/renamed"
 rm "$XDG_CONFIG_HOME/elsewhere" "$XDG_CONFIG_HOME/renamed"
 uninstall_dotfiles >> "$test_root/uninstall.log"
 
+# Links at managed names that point elsewhere belong to someone else.
+mkdir -p "$test_root/other/zsh"
+ln -s "$test_root/other/zsh" "$XDG_CONFIG_HOME/zsh"
+ln -s "$test_root/other/dotfiles" "$HOME/.local/bin/dotfiles"
+ln -s "$test_root/other/zshenv" "$HOME/.zshenv"
+uninstall_dotfiles > "$test_root/uninstall.log"
+check test -L "$XDG_CONFIG_HOME/zsh"
+check test -L "$HOME/.local/bin/dotfiles"
+check test -L "$HOME/.zshenv"
+for path in "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.zshenv"; do
+  check grep -Fqx "skip: not owned by this repo: $path" "$test_root/uninstall.log"
+done
+rm "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.zshenv"
+
 # Exercise native dispatch without invoking real Homebrew or npm.
 mkdir "$test_root/package-bin"
 cat > "$test_root/package-bin/brew" <<'EOF'
