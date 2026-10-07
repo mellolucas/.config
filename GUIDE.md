@@ -105,6 +105,7 @@ Ghostty's browse mode scrolls and copies terminal history without touching the r
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` | Full page down / up |
 | `gg` / `G` | Top / bottom |
+| `Cmd+↑` / `Cmd+↓` | Previous / next prompt, to read a command's output from its start; also outside browse mode |
 | `/` | Search: type, Enter, then `Esc` hands keys back to browse mode |
 | `n` / `N` | Next / previous match |
 | `y` or `Cmd+C` | Copy the mouse selection to the clipboard |
@@ -112,9 +113,8 @@ Ghostty's browse mode scrolls and copies terminal history without touching the r
 | `Esc`, `q`, `i`, or `Option+b` | Leave browse mode |
 
 - Browse mode belongs to the pane: resize, equalize, zoom, and close (`Option+Shift+h/j/k/l`, `Option+=`, `Option+z`, `Option+q`) work while browsing; leave it before moving to another pane or splitting.
-- Outside browse mode, `Cmd+↑` / `Cmd+↓` jump between prompts, so a long command's output starts at the top.
 - Full-screen programs (Neovim, less, OpenCode) keep their own history, out of browse mode's reach: scroll inside them.
-- Without Ghostty, `Option+b` opens tmux's copy mode with the same keys: search shows matches without the extra `Esc`, `:` runs tmux commands, and the mouse wheel scrolls into it. There `y` copies to the clipboard (not `Cmd+C`): select with the mouse, or with `Space` (`V` for whole lines) and the movement keys. A mouse selection copies as you let go and leaves copy mode.
+- Without Ghostty, `Option+b` opens tmux's copy mode with the same keys: search shows matches without the extra `Esc`, `:` runs tmux commands, and the mouse wheel scrolls into it. There `y` copies to the clipboard (`Cmd+C` and the prompt jumps are Ghostty's): select with the mouse, or with `Space` (`V` for whole lines) and the movement keys. A mouse selection copies as you let go and leaves copy mode.
 - From Ghostty, as over SSH, `Option+b` stays Ghostty's, so browse a tmux pane with the mouse wheel.
 
 ## Documents: Read a document

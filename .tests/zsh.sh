@@ -602,6 +602,10 @@ RUBY
   done
   (( chords )) || fail 'no pane-local Option chords found'
   (( ${ghostty_lines[(Ie)keybind = browse/alt+b=deactivate_key_table]} )) || fail 'browse mode Option+b exit'
+  # Ghostty's prompt jumps keep working while browsing.
+  for binding in super+arrow_up=jump_to_prompt:-1 super+arrow_down=jump_to_prompt:1; do
+    (( ${ghostty_lines[(Ie)keybind = browse/$binding]} )) || fail "browse mode lacks $binding"
+  done
 )
 
 git() {

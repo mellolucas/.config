@@ -27,6 +27,8 @@ keybind = browse/ctrl+b=scroll_page_up
 keybind = browse/ctrl+f=scroll_page_down
 keybind = browse/g>g=scroll_to_top
 keybind = browse/shift+g=scroll_to_bottom
+keybind = browse/super+arrow_up=jump_to_prompt:-1
+keybind = browse/super+arrow_down=jump_to_prompt:1
 keybind = browse/slash=start_search
 keybind = browse/n=navigate_search:next
 keybind = browse/shift+n=navigate_search:previous
