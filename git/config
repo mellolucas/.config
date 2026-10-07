@@ -67,7 +67,7 @@
 
 [delta]
   syntax-theme = ansi # Terminal palette colors follow the terminal's light/dark theme
-  side-by-side = true
+  line-numbers = true # Unified: fits a workspace pane; git -c delta.side-by-side=true diff splits
   line-numbers-left-format = ""
   line-numbers-right-format = "│{nm:<2}┊{np:>2}│"
   line-numbers-minus-style = red # Palette colors instead of fixed grays and dark tones

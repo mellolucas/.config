@@ -191,7 +191,7 @@ Resume a repository, review your changes, and compare before sharing.
 - Entering another repository prints its card; counts are as fresh as your last fetch.
 - `gcl` also takes GitHub URLs, and `gh:owner/repo` works wherever Git takes a URL.
 - `gp` stops when histories diverge: `gp --rebase` replays your commits on top, setting uncommitted edits aside meanwhile. A new branch's first `git push` sets its upstream.
-- `ga -p` stages hunk by hunk. Side-by-side diffs need width: `Option+z` zooms the pane first.
+- `ga -p` stages hunk by hunk. Diffs are unified to fit a pane; for side by side, run `git -c delta.side-by-side=true diff`, after `Option+z` for width.
 - For full long lines without Delta: `git -c core.pager='less -R' diff`.
 
 ## Agents: Choose a coding agent

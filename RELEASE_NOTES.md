@@ -34,6 +34,8 @@ Changes since `v0.0.1`.
   styling: the prompt's branch, `git-glance`, Glow's headings and inline code,
   Git's hashes, tags, and log details, and Delta's line numbers use palette
   colors readable in both modes.
+- Delta shows unified diffs with both line numbers, which fit a workspace
+  pane; `git -c delta.side-by-side=true diff` splits them side by side.
 - Claude Code is a shared Homebrew package; Copilot CLI and Codex are shared
   npm packages declared in the Brewfile, because their casks are unnotarized
   and macOS blocks them. `dotfiles update` and `bundle` upgrade Brewfile npm
