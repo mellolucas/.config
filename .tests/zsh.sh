@@ -959,5 +959,13 @@ for extra expected in '' xterm-256color "TERMINFO_DIRS=$test_root/terminfo" xter
   [[ -z $(<"$test_root/term-errors") ]] || fail "startup as xterm-ghostty wrote to stderr: $(<"$test_root/term-errors")"
   expect "$expected" "$term_out" "TERM from Ghostty with ${extra:-no terminfo entry}"
 done
+# Linux without any locale (containers, minimal images) gets UTF-8, so zsh
+# measures the prompt's multibyte characters; a locale already set wins.
+for ostype preset expected in linux-gnu '' C.UTF-8 linux-gnu LANG=en_US.UTF-8 en_US.UTF-8 \
+  linux-gnu LC_ALL=C.UTF-8 unset darwin23 '' unset; do
+  locale_out=$(/usr/bin/env -i HOME="$test_root" ${preset:+"$preset"} "$zsh_bin" -fc \
+    'OSTYPE=$1; source "$2/zsh/.zshenv"; print -r -- "${LANG-unset}"' locale "$ostype" "$repo")
+  expect "$expected" "$locale_out" "locale on $ostype with ${preset:-none set}"
+done
 
 print -r -- 'ok: zsh syntax, cask policy, startup wiring, and hermetic alias/function regression checks'

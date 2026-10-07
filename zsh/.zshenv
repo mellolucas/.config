@@ -12,6 +12,9 @@ skip_global_compinit=1
 
 # Apple Terminal session restore writes .zsh_sessions into ZDOTDIR (= this repo)
 [[ "$OSTYPE" == darwin* ]] && export SHELL_SESSIONS_DISABLE=1
+# Containers and minimal Linux images often set no locale, and zsh then counts
+# the prompt's multibyte characters as bytes; glibc and musl build in C.UTF-8
+[[ $OSTYPE == linux* && -z ${LC_ALL:-${LC_CTYPE:-${LANG:-}}} ]] && export LANG=C.UTF-8
 
 export EDITOR="${EDITOR:-nvim}"
 export VISUAL="${VISUAL:-$EDITOR}"
