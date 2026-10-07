@@ -65,7 +65,7 @@ Move around and build commands without retyping.
 | `Cmd+←` / `Cmd+→` | Jump to the start / end of the line |
 | `Option+Backspace` or `Ctrl+W` / `Cmd+Backspace` or `Ctrl+U` | Delete the word / everything before the cursor |
 
-- Typing a directory name alone changes into it.
+- Typing a directory name alone changes into it; `zsh/local.zsh.example` shows how to reach any project by its name (`cdpath`).
 - The prompt uses vi keys: Esc enters command mode, `i` returns to typing. In Ghostty the cursor shows which: a block in command mode, a bar while typing.
 - A red `❯` means the last command failed; an unfinished rebase or merge shows beside the branch (`main|rebase-i`).
 - Start a command with a space to keep it out of history.
