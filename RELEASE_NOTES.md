@@ -2,6 +2,8 @@
 
 ## Native-First Environment Consolidation
 
+Changes since `v0.0.1`.
+
 ### Changes
 
 - `dotfiles` is the single lifecycle command: `install`, `link`, `bundle`,
@@ -31,8 +33,9 @@
   their Linux locations in `~/.cache`; other command-line tools keep macOS's
   `~/Library` defaults.
 - The installer links `homebrew/npmrc` as npm's global config in Homebrew's
-  prefix, so npm keeps its cache in `~/.cache/npm` even when Homebrew Bundle
-  runs it without the shell's variables.
+  prefix, so npm commands Homebrew Bundle runs without the shell's variables
+  keep npm's cache in `~/.cache/npm`; Bundle's own npm installs cache in
+  `~/.cache/Homebrew/npm_cache`.
 - `dotfiles doctor` lists hidden entries in `$HOME` outside the XDG layout,
   replacing its fixed list of legacy files. It calls a link to nothing broken,
   names a fix for each problem, and exits 1 until none remain.
@@ -80,9 +83,11 @@
 - `dotfiles install` now links and provisions packages, replacing
   `bootstrap`; `update` reinstalls the same way. Use `dotfiles link` for the
   former link-only `install`.
-- Use `workspace` instead of `dotfiles workspace` or `dotfiles code`.
+- Use `workspace` instead of `dotfiles workspace`, `dotfiles code`, or the
+  `dotsws` alias.
 - `l`, `ll`, and `lll` are the listings; use eza flags such as
-  `ll --sort=age` for other orders.
+  `ll --sort=age` or `ll --inode` (formerly `lli`) for other views. `ls` is
+  the system's own again.
 - In `HOMEBREW_CASK_OPTS`, use `--appdir=/path`; Homebrew ignores the
   `--appdir /path` spelling.
 - Agent homes moved to `~/.local/share/copilot`, `codex`, and `claude`. On a
@@ -119,5 +124,6 @@ and Ubuntu. Fresh-machine installs are not yet validated on Linux.
 
 Known limits: workspace sizing uses the invoking pane's dimensions; Markdown
 previews render the saved file with approximate positioning; Delta can
-truncate long lines. Opening netrw files in neighboring Ghostty panes is
-future work.
+truncate long lines. On Linux, Ghostty wraps split navigation around at the
+window's edges, so `Option+h/j/k/l` reaches Neovim only in a single pane.
+Opening netrw files in neighboring Ghostty panes is future work.
