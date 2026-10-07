@@ -84,10 +84,11 @@ Changes since `v0.0.1`.
   Neovim's last insert. The word, Home, End, and Delete keys that Windows
   Terminal, VS Code, and tmux send work at the prompt too, and their
   Alt+Left/Right jump words in Neovim.
-- At the prompt, Up and Down step through earlier commands that start with
-  what's typed, Ctrl+X Ctrl+E edits the command line in Neovim, and the
-  cursor shows the vi mode (a block in command mode, a bar while typing) in
-  tmux and other terminals, as Ghostty's shell integration does in Ghostty.
+- While typing at the prompt, Up and Down step through earlier commands that
+  start with the text so far, Ctrl+X Ctrl+E edits the command line in Neovim,
+  and the cursor shows the vi mode (a block in command mode, a bar while
+  typing) in tmux and other terminals that support cursor shapes, as Ghostty's
+  shell integration does in Ghostty.
 - Browse mode also scrolls with the Up and Down arrows, copies with Cmd+C,
   jumps between prompts with Cmd+Up and Cmd+Down, keeps the Option chords
   that act on its own pane (resize, equalize, zoom, close), and Option+b
