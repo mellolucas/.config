@@ -67,6 +67,16 @@ api.nvim_feedkeys(api.nvim_replace_termcodes("0v<M-f>y", true, false, true), "xt
 assert(fn.getreg('"') == "one t")
 api.nvim_feedkeys(api.nvim_replace_termcodes(":let g:jump = 'ab'<C-b><M-f><M-f><M-f>'x'..<CR>", true, false, true), "xt", false)
 assert(vim.g.jump == "xab")
+-- The xterm forms (<M-Left>/<M-Right>) from Windows Terminal and tmux land alike.
+api.nvim_buf_set_lines(typing, 0, -1, false, { "one two three" })
+api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-Left>X<Esc>0i<M-Right>Y<Esc>", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one Ytwo Xthree")
+-- Cmd+Left/Right (<C-a>/<C-e>) reach the line's start and end.
+api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
+api.nvim_feedkeys(api.nvim_replace_termcodes("A<C-a>X<C-e>Y<Esc>", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "Xone twoY")
+api.nvim_feedkeys(api.nvim_replace_termcodes(":let g:ends = 'b'<C-a><M-f><M-f><M-f>'a'..<C-e>..'c'<CR>", true, false, true), "xt", false)
+assert(vim.g.ends == "abc")
 -- Option+Backspace deletes a word; Ctrl+Space (OpenCode's leader) does nothing.
 api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
 api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-BS>X<C-Space><C-@>Y<Esc>", true, false, true), "xt", false)

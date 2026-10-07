@@ -139,7 +139,7 @@ Render Markdown and read long text comfortably.
 
 - Native language-server keys: `K` hover, `grn` rename, `gra` actions, `grr` references, `[d` / `]d` diagnostics.
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
-- `Option+←` / `Option+→` jump a word back / forward and `Option+Backspace` deletes one, also while typing and on the command line.
+- `Option+←` / `Option+→` jump a word back / forward and `Option+Backspace` deletes one, also while typing and on the command line; `Cmd+←` / `Cmd+→` reach the line's start / end there.
 - In the explorer: Enter opens, `p` previews, `v` / `o` split right / below.
 
 ## Git: Understand Git state

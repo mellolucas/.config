@@ -186,12 +186,21 @@ map("n", "<A-l>", "<C-w>l", { desc = "Go to right window" })
 for _, key in ipairs({ "h", "j", "k", "l" }) do
   map({ "i", "v", "c" }, "<A-" .. key .. ">", "<Nop>", { desc = "Ignore pane-edge Option chord" })
 end
--- Option+Left/Right arrive as <M-b>/<M-f> (Ghostty's macOS word jumps); unmapped,
--- they too would read as Esc+motion.
-map({ "i", "c" }, "<M-b>", "<S-Left>", { desc = "Word back" })
-map({ "i", "c" }, "<M-f>", "<S-Right>", { desc = "Word forward" })
-map({ "n", "x" }, "<M-b>", "b", { desc = "Word back" })
-map({ "n", "x" }, "<M-f>", "w", { desc = "Word forward" })
+-- Option+Left/Right arrive as <M-b>/<M-f> (Ghostty's macOS word jumps) or as
+-- <M-Left>/<M-Right> (Windows Terminal, tmux); unmapped, they too would read
+-- as Esc+motion.
+for _, back in ipairs({ "<M-b>", "<M-Left>" }) do
+  map({ "i", "c" }, back, "<S-Left>", { desc = "Word back" })
+  map({ "n", "x" }, back, "b", { desc = "Word back" })
+end
+for _, forward in ipairs({ "<M-f>", "<M-Right>" }) do
+  map({ "i", "c" }, forward, "<S-Right>", { desc = "Word forward" })
+  map({ "n", "x" }, forward, "w", { desc = "Word forward" })
+end
+-- Cmd+Left/Right arrive as Ctrl+A/E (Ghostty, VS Code on macOS): the line's
+-- start and end, as at the prompt, instead of Vim's insert-mode repeats.
+map({ "i", "c" }, "<C-a>", "<Home>", { desc = "Line start" })
+map("i", "<C-e>", "<End>", { desc = "Line end" })
 -- Option+Backspace arrives as <M-BS>; delete a word as at the prompt.
 map({ "i", "c" }, "<M-BS>", "<C-w>", { desc = "Delete word back" })
 -- Ctrl+Space is OpenCode's leader; typed here (as <C-Space> or NUL) it would
