@@ -19,8 +19,8 @@
 # export HOMEBREW_BUNDLE_CASK_SKIP='obsidian'
 # export HOMEBREW_BUNDLE_BREW_SKIP='container'
 
-# The lean package set (homebrew/core.Brewfile) on this machine; Codespaces
-# and dev containers choose it themselves.
+# The lean package set (homebrew/core.Brewfile) on this machine; containers
+# (Codespaces, dev containers, Docker, Podman) choose it themselves.
 # export HOMEBREW_BUNDLE_FILE_GLOBAL="$XDG_CONFIG_HOME/homebrew/core.Brewfile"
 
 # Install casks elsewhere; an explicit --appdir= wins over the non-admin default.
