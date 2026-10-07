@@ -62,6 +62,7 @@ with zsh 'workspace' zsh -f .tests/workspace.zsh
 with 'zsh tmux' 'tmux' zsh -f .tests/tmux.zsh
 with zsh 'field guide' zsh -f .tests/guide.zsh
 with 'nvim git' 'nvim commands' nvim --headless -u NONE -l .tests/nvim.lua
+with nvim 'file tree' nvim --headless -u NONE -i NONE -l .tests/tree.lua
 
 if [ -n "$missing" ]; then
   printf 'skipped (missing):%s\n' "$missing"
