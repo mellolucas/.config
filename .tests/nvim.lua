@@ -627,14 +627,24 @@ assert(ok, err)
 
 -- Focus re-asks the terminal for its background, so 'background' follows a
 -- light/dark switch made while Neovim runs.
-local sent = {}
+local sent, required = {}, {}
 local real_ui_send = api.nvim_ui_send
 api.nvim_ui_send = function(data) sent[#sent + 1] = data end
-local config_env = setmetatable({ require = function() end }, { __index = _G })
-assert(loadfile("nvim/lua/config/init.lua", "t", config_env))()
+local function load_config(editor)
+  required = {}
+  local record = function(name) required[#required + 1] = name end
+  local config_env = setmetatable({ vim = editor, require = record }, { __index = _G })
+  assert(loadfile("nvim/lua/config/init.lua", "t", config_env))()
+end
+load_config(vim)
 api.nvim_exec_autocmds("FocusGained", {})
 api.nvim_ui_send = real_ui_send
 assert(vim.deep_equal(sent, { "\027]11;?\007" }), "focus query: " .. vim.inspect(sent))
+assert(vim.tbl_contains(required, "config.lsp"), "language servers: " .. vim.inspect(required))
+-- Before 0.12 (no vim.pack), only the language servers stay out.
+load_config(setmetatable({ pack = false }, { __index = vim }))
+assert(vim.deep_equal(required, { "config.options", "config.commands", "config.keymaps" }),
+  "older Neovim: " .. vim.inspect(required))
 
 -- :grep runs grepprg through the shell: an unmatched zsh glob would silently
 -- empty the results, and nested repositories' .git folders must stay out.

@@ -14,4 +14,8 @@ if vim.api.nvim_ui_send then
 end
 require("config.commands")
 require("config.keymaps")
-require("config.lsp")
+-- vim.pack arrives in Nvim 0.12; older builds, as Linux distributions ship,
+-- go without plugins and language servers instead of failing at startup
+if vim.pack then
+  require("config.lsp")
+end

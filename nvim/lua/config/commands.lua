@@ -158,7 +158,8 @@ local function find_files(arg)
   return arg == "" and find_cache or vim.fn.matchfuzzy(find_cache, arg)
 end
 
-if vim.fn.executable("rg") == 1 then
+-- 'findfunc' arrives in Nvim 0.11
+if vim.fn.executable("rg") == 1 and vim.fn.exists("+findfunc") == 1 then
   vim.o.findfunc = "v:lua.require'config.commands'.find_files"
   vim.api.nvim_create_autocmd("CmdlineEnter", {
     pattern = ":",
