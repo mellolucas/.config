@@ -206,7 +206,7 @@ STUB
 )
 
 (
-  topics=(workspace files shell panes reading documents editor git agents maintain)
+  topics=(workspace panes editor agents git shell files browse documents maintain)
   typeset -A sections titles topic_outputs
   current=''
   guide_topics=()
@@ -267,7 +267,7 @@ STUB
   output=$(keys detach) || fail 'keys search status'
   [[ $output == 'panes '*detach* && $output != *$'\n'*'Option+h'* ]] || fail "keys search: $output"
   output=$(keys --plain browse mode leave) || fail 'keys multi-word search status'
-  [[ $output == 'reading '*'Leave browse mode'* ]] || fail "keys multi-word search: $output"
+  [[ $output == 'browse '*'Leave browse mode'* ]] || fail "keys multi-word search: $output"
 
   # Present viewers must remain unused for redirected or explicitly plain output.
   fzf() { fail 'keys unexpectedly invoked the picker'; }

@@ -109,7 +109,7 @@ while IFS= read -r line || [[ -n $line ]]; do
   previous=$line
 done < "$repo/GUIDE.md"
 labels+=("${intro_labels[@]}")
-[[ ${(j: :)topics} == 'workspace files shell panes reading documents editor git agents maintain' ]] ||
+[[ ${(j: :)topics} == 'workspace panes editor agents git shell files browse documents maintain' ]] ||
   fail 'guide topic contract'
 index=$'# Working here\n\nChoose a task with `keys TOPIC`, or search every line with `keys WORDS`.\n\n'
 all=$intro
@@ -141,13 +141,17 @@ check() {
   local label="$mode / width=$width / selection=$selected / args=$*"
   local expected=$'BEGIN\n' content=$index result=0 uses_picker=0 uses_glow=1 plain=0
   local arg topic='' query='' chunk transcript=''
+  local -a words
   local -F deadline=$(( SECONDS + 5 ))
   for arg in "$@"; do
-    if [[ $arg == --plain ]]; then plain=1
-    elif [[ $arg == all || -n ${pages[$arg]-} ]]; then topic=$arg
-    else query+=${query:+ }$arg
-    fi
+    if [[ $arg == --plain ]]; then plain=1; else words+=("$arg"); fi
   done
+  # One page name opens that page; any other words search.
+  if (( $#words == 1 )) && [[ $words[1] == all || -n ${pages[$words[1]]-} ]]; then
+    topic=$words[1]
+  else
+    query=${(j: :)words}
+  fi
   if [[ -z $topic && $mode != (no-fzf|bare|non-tty|stdin-null) ]] && (( ! plain )); then
     uses_picker=1
     # Search words reach the picker as its starting query.
@@ -224,7 +228,8 @@ for width in 40 80 120; do
   check no-match "$width" files
   check picker-error "$width" files
   check picker "$width" panes detach
-  check picker "$width" reading browse mode leave
+  # Several words search, even when the first names a page.
+  check picker "$width" browse browse mode leave
 done
 
 # A separate source tree exercises multi-digit label counts without changing the guide.

@@ -24,30 +24,106 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: editor l
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
 - Tab completes `workspace`'s flags and directories.
 
-## Files: Find a file
+## Panes: Move between panes
 
-List what is here, then find a file by name or by content.
+Ghostty owns these chords in every program; without Ghostty, tmux takes them in a `workspace` or `tmux` session.
+
+| Press | Result |
+| --- | --- |
+| `Option+h/j/k/l` | Move left, down, up, right |
+| `Option+v` / `Option+s` | Split: new pane right / below |
+| `Option+Shift+h/j/k/l` | Resize |
+| `Option+=` | Equalize sizes |
+| `Option+z` | Zoom the current pane (press again to return) |
+| `Option+q` | Close the current pane |
+| `Cmd+Option+arrows` / `Cmd+Ctrl+arrows` | Move / resize with arrow keys (Ghostty's defaults) |
+
+- At an edge, `Option+h/j/k/l` reaches Neovim, which moves between its windows (normal mode).
+- `Ctrl+W h/j/k/l` or `Ctrl+W` arrows always mean Neovim windows; `Option+q` closes a terminal pane, not a buffer.
+- `Option+←` / `Option+→` jump words, never panes.
+- In tmux, `Option+Shift+h/j/k/l` moves an edge by one cell, and `Option+=` evens out only the current pane and its neighbors.
+- tmux has no prefix key: `Option+b` then `:` runs its commands, such as `detach`, `new-window`, `next-window`, or `choose-tree`.
+- In tmux, click a pane to focus it and drag a border to resize it.
+
+## Editor: Edit in Neovim
+
+`Space` is the leader key, pressed in normal mode: the next key picks an area (`e` explorer, `f` find, `b` buffers, `t` toggles), and a doubled key runs an area's main action (`Space e e`, `Space f f`, `Space q q`).
+
+| Press | Result |
+| --- | --- |
+| `Space e e` / `Space e r` | Open the file explorer / return to it |
+| `Space f f` | Find a file by fuzzy name: type part of it, `Tab` completes, `Enter` opens |
+| `Space b l` / `Space b -` | List buffers and pick one (number or name, `Tab` completes) / switch to the previous one |
+| `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
+| `Space b w w` / `Space b w q` | Save / save and quit |
+| `Space q q` / `Space q !` | Quit / quit without saving |
+| `Space t w` / `Space t d` / `Space t h` | Toggle wrap / inline diagnostics / search highlight |
+| `Space c f` | Format with the language server |
+| `Space d q` | Diagnostics into the quickfix list |
+| `:grep TEXT` | Search the project with rg into the quickfix list |
+| `]q` / `[q` / `:copen` / `:cclose` | Next / previous quickfix entry / show / hide the list |
+| `K` / `grn` / `gra` | Hover / rename / code actions |
+| `grr` / `gri` / `grt` | References / implementations / type definition |
+| `Ctrl+]` / `Ctrl+T` | Jump to the definition / back |
+| `[d` / `]d` / `gO` | Previous / next diagnostic / list the file's symbols |
+| `"+y` / `"+p` | Copy to / paste from the system clipboard (plain `y` stays in Neovim) |
+| `Space g d` | Saved file against the Git index (`:GitDiff`) |
+| `:DiffSaved` | Compare unsaved edits with the saved file |
+| `Esc Esc` | Leave terminal mode (then `:q` closes `:GitDiff`) |
+
+- Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
+- `Option+←` / `Option+→` jump words everywhere; while typing and on the command line, `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
+- Undo history survives closing and reopening a file.
+- In the explorer: Enter opens, `p` previews, `v` / `o` split right / below.
+
+## Agents: Choose a coding agent
+
+Run a coding agent beside your editor.
 
 | Run | Result |
 | --- | --- |
-| `l` | Names, including hidden entries |
-| `ll` | Long view: sizes, Git status, relative ages |
-| `lll` | `ll` plus directory totals and line counts (slower) |
-| `llt` / `lld` | Two-level tree / directories only |
-| `lc` | Lines of code by language |
-| `v FILE` / `view FILE` | Edit / read-only in your editor |
-| `fzfv` | Search names with a preview; Enter opens the file |
-| `fzfe` | The same picker without a preview |
-| `rg TEXT` | Search contents, including hidden files |
-| `rga TEXT` | Also search files that Git ignores (`rgfa`, `rgca` for files / counts) |
-| `rgf TEXT` / `rgc TEXT` | Matching files only / matching-line counts per file |
-| `rgw TEXT` | Whole words only (combine: `rgwa`, `rgwc`, `rgwca`) |
+| `workspace` | OpenCode in the right pane (the default) |
+| `ocode` | OpenCode in the current pane |
+| `Ctrl+Space` then `:` (in OpenCode) | OpenCode's command palette; `Ctrl+Space` is its leader |
+| `PageUp` / `PageDown` or `Ctrl+Option+U` / `Ctrl+Option+D` (in OpenCode) | Scroll the conversation by a page / half a page |
+| `Ctrl+Space` then `y` / `l` (in OpenCode) | Copy a message / list sessions |
+| `Ctrl+O` (in OpenCode) | Reopen a recent session |
+| `workspace --agent claude` | Claude Code |
+| `workspace --agent copilot` | GitHub Copilot CLI (`gh copilot` runs it too) |
+| `workspace --agent codex` | Codex |
 
-In `fzfv`: `Ctrl+D` / `Ctrl+U` scroll the preview (first 500 lines), `Option+t` toggles wrapping, Esc cancels.
+- Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
+- In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C` or `Ctrl+Space` then `q`.
+- Repository guidance lives in `AGENTS.md`; Claude Code reads it directly.
+- Set a different default in `zsh/local.zsh`: `export DOTFILES_WORKSPACE_AGENT_CMD='claude'`.
 
-- Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.
-- `rg`, `:grep`, and Neovim's `/` are smart-case: all-lowercase text ignores case.
-- Pipe a list into the pickers: `rgf TEXT | fzfv`.
+## Git: Understand Git state
+
+Resume a repository, review your changes, and compare before sharing.
+
+| Run | Result |
+| --- | --- |
+| `gg` | Repository card: branch, upstream, worktree, recent commits |
+| `ggg` | The card plus a language summary |
+| `gs` | Status, including ignored files |
+| `gd` / `gds` / `gda` | Unstaged / staged / all tracked changes since the last commit |
+| `gdo` / `gdi` | Committed changes outgoing to / incoming from the upstream |
+| `gdm` | Committed changes since branching from `origin/HEAD` |
+| `gl` / `gls` | Log / log with file stats |
+| `glg` / `glga` | Branch graph / graph of all refs |
+| `glc A...B` | Commits unique to each side |
+| `ga` / `gc` / `gcm MSG` / `gca` | Stage / commit / commit with a message / amend the last commit |
+| `gf` / `gp` | Fetch / pull (fast-forward only) |
+| `ghopen [PATH]` / `ghview` | Open this directory or a file on GitHub at the current branch / read the README |
+| `gcl owner/repo` | Clone into `~/code/owner/repo` |
+
+- Add `f` after `gd` to list files only (`gdf`, `gdfs`, `gdfo`…); add `t` for tip-to-tip comparisons (`gdot`, `gdit`, `gdmt`).
+- Graphs take `s` for file stats too (`glgs`, `glgsa`); `gft` also fetches tags; `ghview --remote` reads the README on GitHub.
+- Entering another repository prints its card; counts are as fresh as your last fetch.
+- `gcl` also takes GitHub URLs, and `gh:owner/repo` works wherever Git takes a URL.
+- `gp` stops when histories diverge: `gp --rebase` replays your commits on top, setting uncommitted edits aside meanwhile. A new branch's first `git push` sets its upstream.
+- `ga -p` stages hunk by hunk. Diffs are unified to fit a pane; for side by side, run `git -c delta.side-by-side=true diff`, after `Option+z` for width.
+- For full long lines without Delta: `git -c core.pager='less -R' diff`.
 
 ## Shell: Work at the prompt
 
@@ -73,28 +149,32 @@ Move around and build commands without retyping.
 - Start a command with a space to keep it out of history.
 - `Ctrl+D` does not close the shell; type `exit`.
 
-## Panes: Move between panes
+## Files: Find a file
 
-Ghostty owns these chords in every program; without Ghostty, tmux takes them in a `workspace` or `tmux` session.
+List what is here, then find a file by name or by content.
 
-| Press | Result |
+| Run | Result |
 | --- | --- |
-| `Option+h/j/k/l` | Move left, down, up, right |
-| `Option+v` / `Option+s` | Split: new pane right / below |
-| `Option+Shift+h/j/k/l` | Resize |
-| `Option+=` | Equalize sizes |
-| `Option+z` | Zoom the current pane (press again to return) |
-| `Option+q` | Close the current pane |
-| `Cmd+Option+arrows` / `Cmd+Ctrl+arrows` | Move / resize with arrow keys (Ghostty's defaults) |
+| `l` | Names, including hidden entries |
+| `ll` | Long view: sizes, Git status, relative ages |
+| `lll` | `ll` plus directory totals and line counts (slower) |
+| `llt` / `lld` | Two-level tree / directories only |
+| `lc` | Lines of code by language |
+| `v FILE` / `view FILE` | Edit / read-only in your editor |
+| `fzfv` | Search names with a preview; Enter opens the file |
+| `fzfe` | The same picker without a preview |
+| `rg TEXT` | Search contents, including hidden files |
+| `rga TEXT` | Also search files that Git ignores (`rgfa`, `rgca` for files / counts) |
+| `rgf TEXT` / `rgc TEXT` | Matching files only / matching-line counts per file |
+| `rgw TEXT` | Whole words only (combine: `rgwa`, `rgwc`, `rgwca`) |
 
-- At an edge, `Option+h/j/k/l` reaches Neovim, which moves between its windows (normal mode).
-- `Ctrl+W h/j/k/l` or `Ctrl+W` arrows always mean Neovim windows; `Option+q` closes a terminal pane, not a buffer.
-- `Option+←` / `Option+→` jump words, never panes.
-- In tmux, `Option+Shift+h/j/k/l` moves an edge by one cell, and `Option+=` evens out only the current pane and its neighbors.
-- tmux has no prefix key: `Option+b` then `:` runs its commands, such as `detach`, `new-window`, `next-window`, or `choose-tree`.
-- In tmux, click a pane to focus it and drag a border to resize it.
+In `fzfv`: `Ctrl+D` / `Ctrl+U` scroll the preview (first 500 lines), `Option+t` toggles wrapping, Esc cancels.
 
-## Reading: Read terminal output
+- Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.
+- `rg`, `:grep`, and Neovim's `/` are smart-case: all-lowercase text ignores case.
+- Pipe a list into the pickers: `rgf TEXT | fzfv`.
+
+## Browse: Read terminal output
 
 Ghostty's browse mode scrolls and copies terminal history without touching the running program.
 
@@ -136,86 +216,6 @@ Render Markdown and read long text comfortably.
 
 - `b FILE` shows a file with syntax colors; `cat` is bat without decoration.
 - Previews render the saved file, not unsaved edits; very long renders can lose their beginning. Toggle again after resizing.
-
-## Editor: Edit in Neovim
-
-`Space` is the leader key, pressed in normal mode: the next key picks an area (`e` explorer, `f` find, `b` buffers, `t` toggles), and a doubled key runs an area's main action (`Space e e`, `Space f f`, `Space q q`).
-
-| Press | Result |
-| --- | --- |
-| `Space e e` / `Space e r` | Open the file explorer / return to it |
-| `Space f f` | Find a file by fuzzy name: type part of it, `Tab` completes, `Enter` opens |
-| `Space b l` / `Space b -` | List buffers and pick one (number or name, `Tab` completes) / switch to the previous one |
-| `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
-| `Space b w w` / `Space b w q` | Save / save and quit |
-| `Space q q` / `Space q !` | Quit / quit without saving |
-| `Space t w` / `Space t d` / `Space t h` | Toggle wrap / inline diagnostics / search highlight |
-| `Space c f` | Format with the language server |
-| `Space d q` | Diagnostics into the quickfix list |
-| `:grep TEXT` | Search the project with rg into the quickfix list |
-| `]q` / `[q` / `:copen` / `:cclose` | Next / previous quickfix entry / show / hide the list |
-| `K` / `grn` / `gra` | Hover / rename / code actions |
-| `grr` / `gri` / `grt` | References / implementations / type definition |
-| `Ctrl+]` / `Ctrl+T` | Jump to the definition / back |
-| `[d` / `]d` / `gO` | Previous / next diagnostic / list the file's symbols |
-| `"+y` / `"+p` | Copy to / paste from the system clipboard (plain `y` stays in Neovim) |
-| `Space g d` | Saved file against the Git index (`:GitDiff`) |
-| `:DiffSaved` | Compare unsaved edits with the saved file |
-| `Esc Esc` | Leave terminal mode (then `:q` closes `:GitDiff`) |
-
-- Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
-- `Option+←` / `Option+→` jump words everywhere; while typing and on the command line, `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
-- Undo history survives closing and reopening a file.
-- In the explorer: Enter opens, `p` previews, `v` / `o` split right / below.
-
-## Git: Understand Git state
-
-Resume a repository, review your changes, and compare before sharing.
-
-| Run | Result |
-| --- | --- |
-| `gg` | Repository card: branch, upstream, worktree, recent commits |
-| `ggg` | The card plus a language summary |
-| `gs` | Status, including ignored files |
-| `gd` / `gds` / `gda` | Unstaged / staged / all tracked changes since the last commit |
-| `gdo` / `gdi` | Committed changes outgoing to / incoming from the upstream |
-| `gdm` | Committed changes since branching from `origin/HEAD` |
-| `gl` / `gls` | Log / log with file stats |
-| `glg` / `glga` | Branch graph / graph of all refs |
-| `glc A...B` | Commits unique to each side |
-| `ga` / `gc` / `gcm MSG` / `gca` | Stage / commit / commit with a message / amend the last commit |
-| `gf` / `gp` | Fetch / pull (fast-forward only) |
-| `ghopen [PATH]` / `ghview` | Open this directory or a file on GitHub at the current branch / read the README |
-| `gcl owner/repo` | Clone into `~/code/owner/repo` |
-
-- Add `f` after `gd` to list files only (`gdf`, `gdfs`, `gdfo`…); add `t` for tip-to-tip comparisons (`gdot`, `gdit`, `gdmt`).
-- Graphs take `s` for file stats too (`glgs`, `glgsa`); `gft` also fetches tags; `ghview --remote` reads the README on GitHub.
-- Entering another repository prints its card; counts are as fresh as your last fetch.
-- `gcl` also takes GitHub URLs, and `gh:owner/repo` works wherever Git takes a URL.
-- `gp` stops when histories diverge: `gp --rebase` replays your commits on top, setting uncommitted edits aside meanwhile. A new branch's first `git push` sets its upstream.
-- `ga -p` stages hunk by hunk. Diffs are unified to fit a pane; for side by side, run `git -c delta.side-by-side=true diff`, after `Option+z` for width.
-- For full long lines without Delta: `git -c core.pager='less -R' diff`.
-
-## Agents: Choose a coding agent
-
-Run a coding agent beside your editor.
-
-| Run | Result |
-| --- | --- |
-| `workspace` | OpenCode in the right pane (the default) |
-| `ocode` | OpenCode in the current pane |
-| `Ctrl+Space` then `:` (in OpenCode) | OpenCode's command palette; `Ctrl+Space` is its leader |
-| `PageUp` / `PageDown` or `Ctrl+Option+U` / `Ctrl+Option+D` (in OpenCode) | Scroll the conversation by a page / half a page |
-| `Ctrl+Space` then `y` / `l` (in OpenCode) | Copy a message / list sessions |
-| `Ctrl+O` (in OpenCode) | Reopen a recent session |
-| `workspace --agent claude` | Claude Code |
-| `workspace --agent copilot` | GitHub Copilot CLI (`gh copilot` runs it too) |
-| `workspace --agent codex` | Codex |
-
-- Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
-- In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C` or `Ctrl+Space` then `q`.
-- Repository guidance lives in `AGENTS.md`; Claude Code reads it directly.
-- Set a different default in `zsh/local.zsh`: `export DOTFILES_WORKSPACE_AGENT_CMD='claude'`.
 
 ## Maintain: Maintain the setup
 
