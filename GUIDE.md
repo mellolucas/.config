@@ -137,20 +137,21 @@ Render Markdown and read long text comfortably.
 
 ## Editor: Edit in Neovim
 
-`Space` is the leader key, pressed in normal mode: the next key picks an area (`e` explorer, `f` find, `b` buffers, `t` toggles), and pressing it again does the obvious thing (`Space e e`).
+`Space` is the leader key, pressed in normal mode: the next key picks an area (`e` explorer, `f` find, `b` buffers, `t` toggles), and a doubled key runs an area's main action (`Space e e`, `Space f f`, `Space q q`).
 
 | Press | Result |
 | --- | --- |
 | `Space e e` / `Space e r` | Open the file explorer / return to it |
 | `Space f f` | Find a file by fuzzy name: type part of it, `Tab` completes, `Enter` opens |
 | `Space b l` / `Space b -` | List buffers / switch to the previous one |
+| `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
 | `Space b w w` / `Space b w q` | Save / save and quit |
 | `Space q q` / `Space q !` | Quit / quit without saving |
 | `Space t w` / `Space t d` / `Space t h` | Toggle wrap / inline diagnostics / search highlight |
 | `Space c f` | Format with the language server |
 | `Space d q` | Diagnostics into the quickfix list |
 | `:grep TEXT` | Search the project with rg into the quickfix list |
-| `]q` / `[q` | Next / previous quickfix entry |
+| `]q` / `[q` / `:copen` / `:cclose` | Next / previous quickfix entry / show / hide the list |
 | `K` / `grn` / `gra` | Hover / rename / code actions |
 | `grr` / `gri` / `grt` | References / implementations / type definition |
 | `Ctrl+]` / `Ctrl+T` | Jump to the definition / back |
@@ -161,7 +162,7 @@ Render Markdown and read long text comfortably.
 | `Esc Esc` | Leave terminal mode (then `:q` closes `:GitDiff`) |
 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
-- `Option+←` / `Option+→` jump a word back / forward, also while typing and on the command line, where `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
+- `Option+←` / `Option+→` jump words everywhere; while typing and on the command line, `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
 - Undo history survives closing and reopening a file.
 - In the explorer: Enter opens, `p` previews, `v` / `o` split right / below.
 
@@ -202,13 +203,15 @@ Run a coding agent beside your editor.
 | `workspace` | OpenCode in the right pane (the default) |
 | `ocode` | OpenCode in the current pane |
 | `Ctrl+Space` then `:` (in OpenCode) | OpenCode's command palette; `Ctrl+Space` is its leader |
+| `PageUp` / `PageDown` or `Ctrl+Option+U` / `Ctrl+Option+D` (in OpenCode) | Scroll the conversation by a page / half a page |
+| `Ctrl+Space` then `y` / `l` (in OpenCode) | Copy a message / list sessions |
+| `Ctrl+O` (in OpenCode) | Reopen a recent session |
 | `workspace --agent claude` | Claude Code |
 | `workspace --agent copilot` | GitHub Copilot CLI (`gh copilot` runs it too) |
 | `workspace --agent codex` | Codex |
 
 - Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
 - In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C` or `Ctrl+Space` then `q`.
-- In OpenCode, `PageUp` / `PageDown` or `Ctrl+Option+U` / `Ctrl+Option+D` scroll the conversation, `Ctrl+Space` then `y` copies a message, `Ctrl+Space` then `l` lists sessions, and `Ctrl+O` reopens a recent one.
 - Repository guidance lives in `AGENTS.md`; Claude Code reads it directly.
 - Set a different default in `zsh/local.zsh`: `export DOTFILES_WORKSPACE_AGENT_CMD='claude'`.
 
