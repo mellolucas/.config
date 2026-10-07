@@ -80,7 +80,7 @@ Set only what differs from the defaults; updates never rewrite local files. Vari
 
 Notes:
 
-- Shells that apps start for their own commands (agents, editors) read only `~/.zshenv`: they get the XDG layout and `~/.local/bin`, but not Homebrew's `PATH` or `zsh/local.zsh`, which load with login and interactive shells.
+- What a zsh loads depends on how it starts: every zsh reads `~/.zshenv` (the XDG layout, tool homes, and `~/.local/bin`), login shells add `zsh/.zprofile` (Homebrew's `PATH`), and interactive shells add `zsh/.zshrc`, which sets up Homebrew too and loads `zsh/local.zsh` last. A plain `zsh -c` that an app starts (some agents and editors) therefore gets neither Homebrew's `PATH` nor `local.zsh` unless it inherits them, and `zsh -lc` gets Homebrew but not `local.zsh`.
 - `git config --global` writes to the tracked `git/config` here; use `git config --file "$XDG_CONFIG_HOME/git/config.d/local"` for machine settings.
 - zsh ignores `~/.zshrc` and `~/.zprofile` because this setup sets `ZDOTDIR`; `dotfiles doctor` flags them so their lines can move to `zsh/local.zsh`.
 - Non-admin macOS users get casks in `~/Applications`; an explicit `--appdir=` in `HOMEBREW_CASK_OPTS` wins.
@@ -93,7 +93,7 @@ Notes:
 1. Follow [Get started](#get-started), including [First run](#first-run).
 2. Restore the private files Git does not carry: SSH keys in `~/.ssh`, and the local files above (`zsh/local.zsh`, `git/config.d/personal` or `work`, `homebrew/local.Brewfile`), then run `dotfiles bundle` if `local.Brewfile` came back.
 3. On a machine set up with an earlier version, follow the Migration steps in [RELEASE_NOTES.md](RELEASE_NOTES.md); `dotfiles doctor` lists leftovers.
-4. Check the result: `sh .tests/run` passes; switching the system appearance recolors Ghostty, the prompt, and Neovim (once its pane regains focus); `Option+h/j/k/l` crosses panes and reaches Neovim windows at the edges; `keys` opens the guide; each agent starts logged in; and a test commit is signed (`git log --show-signature -1`).
+4. Check the result: `sh .tests/run` passes; switching the system appearance recolors Ghostty, the prompt, and Neovim (once its pane regains focus); `Option+h/j/k/l` crosses panes and, on macOS, reaches Neovim windows at the edges; `keys` opens the guide; each agent starts logged in; and a test commit is signed (`git log --show-signature -1`).
 
 ## Development
 

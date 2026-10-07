@@ -128,4 +128,7 @@ Known limits: workspace sizing uses the invoking pane's dimensions; Markdown
 previews render the saved file with approximate positioning; Delta can
 truncate long lines. On Linux, Ghostty wraps split navigation around at the
 window's edges, so `Option+h/j/k/l` reaches Neovim only in a single pane.
+With displays of different scales connected, `workspace` sizes panes for the
+sharpest one, so on a 1× display beside a Retina one its panes come out
+closer to equal.
 Opening netrw files in neighboring Ghostty panes is future work.
