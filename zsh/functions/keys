@@ -4,9 +4,9 @@ emulate -L zsh
 local source_file=${${(%):-%x}:A}
 local repo=${source_file:h:h:h}
 local guide=$repo/GUIDE.md topic='' plain=0 usage=0
-local arg line previous='' row current='' title='' intro='' content='' index='# Working here'
+local arg line previous='' row current='' title='' intro='' content='' index='# Working here' text
 local -i labelled=0
-local -a topics labels words
+local -a topics labels words intro_labels
 local -A pages titles
 
 for arg in "$@"; do
@@ -33,6 +33,7 @@ while IFS= read -r line || [[ -n $line ]]; do
     labelled=0
   elif [[ -n $current ]]; then
     pages[$current]+="$line"$'\n'
+    text=${${line//\`/}//\*\*/}
     if [[ $line == '| '* ]]; then
       # Rows below the header and separator; previous line is part of the table.
       if [[ $previous == '|'* && $line != '| ---'* ]]; then
@@ -40,16 +41,21 @@ while IFS= read -r line || [[ -n $line ]]; do
         labels+=("$current"$'\t'"  ${${row%% | *}//\`/}  ${${row#* | }//\`/}")
       fi
     elif [[ $line == '- '* ]]; then
-      labels+=("$current"$'\t'"  ${${line#'- '}//\`/}")
+      labels+=("$current"$'\t'"  ${text#'- '}")
     elif [[ -n $line ]] && (( ! labelled )); then
-      labels+=("$current"$'\t'"$title - $line")
+      labels+=("$current"$'\t'"$title - $text")
       labelled=1
+    elif [[ -n $line ]]; then
+      labels+=("$current"$'\t'"  $text")
     fi
   else
     intro+="$line"$'\n'
+    # The introduction's lines open the whole guide.
+    [[ -z $line || $line == '#'* ]] || intro_labels+=("all"$'\t'"  ${${line//\`/}//\*\*/}")
   fi
   previous=$line
 done < "$guide"
+labels+=("${intro_labels[@]}")
 (( ${#topics} )) || { print -u2 'keys: guide has no topics'; return 1 }
 index+=$'\n\nChoose a task with `keys TOPIC`, or search every line with `keys WORDS`.\n\n'
 for current in "${topics[@]}"; do

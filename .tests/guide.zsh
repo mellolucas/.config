@@ -72,10 +72,11 @@ path=()
 
 fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 
-typeset -a topics labels
+typeset -a topics labels intro_labels
 typeset -A pages titles
 current='' intro='' previous=''
 while IFS= read -r line || [[ -n $line ]]; do
+  plain_line=${${line//\`/}//\*\*/}
   if [[ $line == '## '* ]]; then
     heading=${line#'## '}
     current=${(L)${heading%%:*}}
@@ -92,17 +93,22 @@ while IFS= read -r line || [[ -n $line ]]; do
         labels+=("$current"$'\t'"  ${cells[1]//\`/}  ${(j: | :)cells[2,-1]//\`/}")
       fi
     elif [[ $line == '- '* ]]; then
-      # Bullets are entries too, so their tips match a search.
-      labels+=("$current"$'\t'"  ${${line#'- '}//\`/}")
+      # Bullets and later prose are entries too, so every tip matches a search.
+      labels+=("$current"$'\t'"  ${plain_line#'- '}")
     elif (( needs_label )) && [[ -n $line ]]; then
-      labels+=("$current"$'\t'"$titles[$current] - $line")
+      labels+=("$current"$'\t'"$titles[$current] - $plain_line")
       needs_label=0
+    elif [[ -n $line ]]; then
+      labels+=("$current"$'\t'"  $plain_line")
     fi
   else
     intro+="$line"$'\n'
+    # Introduction lines come last and open the whole guide.
+    [[ -z $line || $line == '#'* ]] || intro_labels+=("all"$'\t'"  $plain_line")
   fi
   previous=$line
 done < "$repo/GUIDE.md"
+labels+=("${intro_labels[@]}")
 [[ ${(j: :)topics} == 'workspace files shell panes reading documents editor git agents maintain' ]] ||
   fail 'guide topic contract'
 index=$'# Working here\n\nChoose a task with `keys TOPIC`, or search every line with `keys WORDS`.\n\n'
@@ -235,7 +241,7 @@ for number in {1..12}; do
   topics+=("$topic")
   titles[$topic]="Task $number"
   pages[$topic]="# Task $number"$'\n\n'"Intent $number"$'\n\n'"Body $number"$'\n'
-  labels+=("$topic"$'\t'"Task $number - Intent $number")
+  labels+=("$topic"$'\t'"Task $number - Intent $number" "$topic"$'\t'"  Body $number")
   print -r -- "## Topic$number: Task $number"$'\n\n'"Intent $number"$'\n\n'"Body $number" >> "$repo/GUIDE.md"
 done
 with_topics
