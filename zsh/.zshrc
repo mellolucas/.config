@@ -101,6 +101,23 @@ zle -N up-line-or-beginning-search
 zle -N down-line-or-beginning-search
 bindkey -M viins '^[[A' up-line-or-beginning-search '^[OA' up-line-or-beginning-search
 bindkey -M viins '^[[B' down-line-or-beginning-search '^[OB' down-line-or-beginning-search
+# The cursor shows the vi mode, a block in command mode and a bar while typing,
+# as Ghostty's shell integration does in the shells it starts; elsewhere (tmux,
+# other terminals) these hooks do it, and commands get the terminal's own cursor.
+_vi_mode_cursor() {
+  (( $+functions[_ghostty_zle_keymap_select] )) && return
+  case $KEYMAP in
+    vicmd|visual) print -n '\e[1 q' ;;
+    *) print -n '\e[5 q' ;;
+  esac
+}
+_vi_mode_cursor_reset() {
+  (( $+functions[_ghostty_zle_keymap_select] )) || print -n '\e[0 q'
+}
+autoload -Uz add-zle-hook-widget
+add-zle-hook-widget keymap-select _vi_mode_cursor
+add-zle-hook-widget line-init _vi_mode_cursor
+add-zle-hook-widget line-finish _vi_mode_cursor_reset
 
 setopt interactive_comments
 setopt prompt_subst

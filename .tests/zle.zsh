@@ -275,6 +275,16 @@ for mode in native fzf; do
   expect 'Up again, in application cursor form, keeps the prefix' 'echo alpha'
   snapshot $'\x18\x12echo\e[A\eOA\e[B'
   expect 'Down returns toward the latest' 'echo beta'
+  # Without Ghostty's integration, the cursor shows the vi mode (each snapshot's
+  # transcript holds just its own output)
+  snapshot $'\x18\x12abc\e'
+  expect 'Esc reaches command mode' abc vicmd
+  (( ++checks ))
+  [[ $transcript == *$'\e[1 q'* ]] || { print -ru2 -- "FAIL [$mode]: no block cursor in command mode"; (( ++failures )); }
+  snapshot i
+  expect 'i returns to typing' abc main
+  (( ++checks ))
+  [[ $transcript == *$'\e[5 q'* ]] || { print -ru2 -- "FAIL [$mode]: no bar cursor while typing"; (( ++failures )); }
   snapshot $'\x18\x12cd foo/bar.baz\ebX'
   expect 'Option+Left stops at punctuation, like Neovim' 'cd foo/bar.Xbaz'
   snapshot $'\x18\x12one two\e\x7fX'
