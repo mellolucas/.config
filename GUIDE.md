@@ -1,12 +1,14 @@
 # Working here
 
-A field guide to the shortcuts this setup adds. Run `keys` to pick a task, or `keys TOPIC` to read one page.
+A field guide to the shortcuts this setup adds. Run `keys` to pick a task, `keys TOPIC` to read one page, or `keys WORDS` to search every line; `help COMMAND` explains any command.
 
-**Notation:** `Option+b` is a chord: hold left Option and press b. Right Option still types accents, except where a Ghostty shortcut takes the chord. `Space t m` is a sequence typed in Neovim normal mode. Case matters: `n` and `N` differ.
+**Notation:** `Option+b` is a chord: hold left Option and press b (Alt on Linux and WSL). Right Option still types accents, except where a Ghostty shortcut takes the chord. `Space t m` is a sequence typed in Neovim normal mode. Case matters (`n` and `N` differ), except in Ctrl chords: `Ctrl+T` is Ctrl and t.
+
+Each tool also lists its own keys: `:nmap <Space>` in Neovim, `Cmd+Shift+P` in Ghostty, `Ctrl+Option+K` in OpenCode.
 
 ## Workspace: Start a workspace
 
-Open a project as one Ghostty tab, or as tmux panes elsewhere: editor left, two shells in the middle, agent right.
+Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: editor left, two shells in the middle, agent right.
 
 | Run | Result |
 | --- | --- |
@@ -17,9 +19,10 @@ Open a project as one Ghostty tab, or as tmux panes elsewhere: editor left, two 
 | `workspace --middle-top ''` | Leave a pane at its prompt |
 | `workspace --help` | Every option and its default |
 
-- Focus starts in the larger middle-bottom shell.
-- Outside Ghostty on macOS, the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux it opens a new window instead.
-- `Ctrl+Tab` and `Ctrl+Shift+Tab` switch Ghostty tabs; Tab completes flags and directories.
+- Focus starts in the larger middle-bottom shell; `Option+h/j/k/l` moves to the editor and the agent.
+- Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux it opens a new window instead.
+- `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
+- Tab completes `workspace`'s flags and directories.
 
 ## Files: Find a file
 
@@ -43,6 +46,8 @@ List what is here, then find a file by name or by content.
 In `fzfv`: `Ctrl+D` / `Ctrl+U` scroll the preview (first 500 lines), `Option+t` toggles wrapping, Esc cancels.
 
 - Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.
+- `rg`, `:grep`, and Neovim's `/` are smart-case: all-lowercase text ignores case.
+- Pipe a list into the pickers: `rgf TEXT | fzfv`.
 
 ## Shell: Work at the prompt
 
@@ -53,15 +58,17 @@ Move around and build commands without retyping.
 | `Option+c` | Pick a directory below here and change to it |
 | `Ctrl+T` | Insert file paths into the command line |
 | `Ctrl+R` | Search history; Enter inserts without running |
-| `Tab` | Complete; press again to choose from a menu |
+| `Tab` | Complete, ignoring case and including hidden files, even mid-name (`conf` finds `.config`); press again for a menu |
 | `v **` then `Tab` | Fuzzy-pick paths for any command |
 | `cd -` | Return to the previous directory |
 | `Option+←` / `Option+→` | Jump a word back / forward |
 | `Cmd+←` / `Cmd+→` | Jump to the start / end of the line |
-| `Option+Backspace` or `Ctrl+W` / `Ctrl+U` | Delete the word / everything before the cursor |
+| `Option+Backspace` or `Ctrl+W` / `Cmd+Backspace` or `Ctrl+U` | Delete the word / everything before the cursor |
 
 - Typing a directory name alone changes into it.
-- The prompt uses vi keys: Esc enters command mode, `i` returns to typing.
+- The prompt uses vi keys: Esc enters command mode, `i` returns to typing. In Ghostty the cursor shows which: a block in command mode, a bar while typing.
+- A red `❯` means the last command failed; an unfinished rebase or merge shows beside the branch (`main|rebase-i`).
+- Start a command with a space to keep it out of history.
 - `Ctrl+D` does not close the shell; type `exit`.
 
 ## Panes: Move between panes
@@ -71,7 +78,7 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 | Press | Result |
 | --- | --- |
 | `Option+h/j/k/l` | Move left, down, up, right |
-| `Option+v` / `Option+s` | New pane right / below |
+| `Option+v` / `Option+s` | Split: new pane right / below |
 | `Option+Shift+h/j/k/l` | Resize |
 | `Option+=` | Equalize sizes |
 | `Option+z` | Zoom the current pane (press again to return) |
@@ -83,6 +90,7 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 - `Option+←` / `Option+→` jump words, never panes.
 - In tmux, `Option+Shift+h/j/k/l` moves an edge by one cell, and `Option+=` evens out only the current pane and its neighbors.
 - tmux has no prefix key: `Option+b` then `:` runs its commands, such as `detach`, `new-window`, `next-window`, or `choose-tree`.
+- In tmux, click a pane to focus it and drag a border to resize it.
 
 ## Reading: Read terminal output
 
@@ -97,12 +105,14 @@ Ghostty's browse mode scrolls and copies terminal history without touching the r
 | `gg` / `G` | Top / bottom |
 | `/` | Search: type, Enter, then `Esc` hands keys back to browse mode |
 | `n` / `N` | Next / previous match |
-| `y` or `Cmd+C` | Copy the mouse selection |
+| `y` or `Cmd+C` | Copy the mouse selection to the clipboard |
 | `:` | Ghostty command palette |
 | `Esc`, `q`, `i`, or `Option+b` | Leave browse mode |
 
 - Browse mode belongs to the pane: resize, equalize, zoom, and close (`Option+Shift+h/j/k/l`, `Option+=`, `Option+z`, `Option+q`) work while browsing; leave it before moving to another pane or splitting.
-- Without Ghostty, `Option+b` opens tmux's copy mode with the same keys: search shows matches without the extra `Esc`, `:` runs tmux commands, and the mouse wheel scrolls into it. There `y` copies (not `Cmd+C`), and a mouse selection copies as you let go and leaves copy mode.
+- Outside browse mode, `Cmd+↑` / `Cmd+↓` jump between prompts, so a long command's output starts at the top.
+- Full-screen programs (Neovim, less, OpenCode) keep their own history, out of browse mode's reach: scroll inside them.
+- Without Ghostty, `Option+b` opens tmux's copy mode with the same keys: search shows matches without the extra `Esc`, `:` runs tmux commands, and the mouse wheel scrolls into it. There `y` copies to the clipboard (not `Cmd+C`): select with the mouse, or with `Space` (`V` for whole lines) and the movement keys. A mouse selection copies as you let go and leaves copy mode.
 - From Ghostty, as over SSH, `Option+b` stays Ghostty's, so browse a tmux pane with the mouse wheel.
 
 ## Documents: Read a document
@@ -113,10 +123,11 @@ Render Markdown and read long text comfortably.
 | --- | --- |
 | `mdv FILE` | Render Markdown in the pager |
 | `mdv -w 120 FILE` | Wrap at 120 columns instead |
+| `glow` | Browse every Markdown file below here, hidden and ignored ones too |
 | `Space` / `b` (in less) | Page down / up |
 | `/` then `n` / `N` (in less) | Search, next, previous |
 | `-S` then Enter (in less) | Toggle folding and chopping long lines |
-| Left / Right (in less) | Scroll horizontally |
+| `←` / `→` (in less) | Scroll horizontally |
 | `q` (in less) | Back to the shell |
 | `Shift`+drag | Select text while less owns the mouse |
 | `Space t m` (in Neovim) | Swap Markdown source and rendered view |
@@ -126,7 +137,7 @@ Render Markdown and read long text comfortably.
 
 ## Editor: Edit in Neovim
 
-`Space` is the leader key, pressed in normal mode.
+`Space` is the leader key, pressed in normal mode: the next key picks an area (`e` explorer, `f` find, `b` buffers, `t` toggles), and pressing it again does the obvious thing (`Space e e`).
 
 | Press | Result |
 | --- | --- |
@@ -138,13 +149,20 @@ Render Markdown and read long text comfortably.
 | `Space t w` / `Space t d` / `Space t h` | Toggle wrap / inline diagnostics / search highlight |
 | `Space c f` | Format with the language server |
 | `Space d q` | Diagnostics into the quickfix list |
+| `:grep TEXT` | Search the project with rg into the quickfix list |
+| `]q` / `[q` | Next / previous quickfix entry |
+| `K` / `grn` / `gra` | Hover / rename / code actions |
+| `grr` / `gri` / `grt` | References / implementations / type definition |
+| `Ctrl+]` / `Ctrl+T` | Jump to the definition / back |
+| `[d` / `]d` / `gO` | Previous / next diagnostic / list the file's symbols |
+| `"+y` / `"+p` | Copy to / paste from the system clipboard (plain `y` stays in Neovim) |
 | `Space g d` | Saved file against the Git index (`:GitDiff`) |
 | `:DiffSaved` | Compare unsaved edits with the saved file |
 | `Esc Esc` | Leave terminal mode (then `:q` closes `:GitDiff`) |
 
-- Native language-server keys: `K` hover, `grn` rename, `gra` actions, `grr` references, `[d` / `]d` diagnostics.
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
-- `Option+←` / `Option+→` jump a word back / forward and `Option+Backspace` deletes one, also while typing and on the command line; `Cmd+←` / `Cmd+→` reach the line's start / end there.
+- `Option+←` / `Option+→` jump a word back / forward, also while typing and on the command line, where `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
+- Undo history survives closing and reopening a file.
 - In the explorer: Enter opens, `p` previews, `v` / `o` split right / below.
 
 ## Git: Understand Git state
@@ -164,12 +182,15 @@ Resume a repository, review your changes, and compare before sharing.
 | `glc A...B` | Commits unique to each side |
 | `ga` / `gc` / `gcm MSG` / `gca` | Stage / commit / commit with a message / amend the last commit |
 | `gf` / `gp` | Fetch / pull (fast-forward only) |
-| `ghopen` / `ghview` | Open on GitHub / read the README |
+| `ghopen [PATH]` / `ghview` | Open this directory or a file on GitHub at the current branch / read the README |
 | `gcl owner/repo` | Clone into `~/code/owner/repo` |
 
 - Add `f` after `gd` to list files only (`gdf`, `gdfs`, `gdfo`…); add `t` for tip-to-tip comparisons (`gdot`, `gdit`, `gdmt`).
 - Graphs take `s` for file stats too (`glgs`, `glgsa`); `gft` also fetches tags; `ghview --remote` reads the README on GitHub.
 - Entering another repository prints its card; counts are as fresh as your last fetch.
+- `gcl` also takes GitHub URLs, and `gh:owner/repo` works wherever Git takes a URL.
+- `gp` stops when histories diverge: `gp --rebase` replays your commits on top, setting uncommitted edits aside meanwhile. A new branch's first `git push` sets its upstream.
+- `ga -p` stages hunk by hunk. Side-by-side diffs need width: `Option+z` zooms the pane first.
 - For full long lines without Delta: `git -c core.pager='less -R' diff`.
 
 ## Agents: Choose a coding agent
@@ -187,6 +208,7 @@ Run a coding agent beside your editor.
 
 - Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
 - In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C` or `Ctrl+Space` then `q`.
+- In OpenCode, `PageUp` / `PageDown` or `Ctrl+Option+U` / `Ctrl+Option+D` scroll the conversation, `Ctrl+Space` then `y` copies a message, `Ctrl+Space` then `l` lists sessions, and `Ctrl+O` reopens a recent one.
 - Repository guidance lives in `AGENTS.md`; Claude Code reads it directly.
 - Set a different default in `zsh/local.zsh`: `export DOTFILES_WORKSPACE_AGENT_CMD='claude'`.
 
