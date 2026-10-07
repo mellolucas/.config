@@ -798,6 +798,17 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
 done
 check test ! -e "$test_root/cli-home/provision.log"
 
+# git_identity follows Git's own rules: under useConfigOnly, nothing configured
+# fails and a name with an email succeeds.
+(
+  unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL EMAIL
+  printf '[user]\n\tuseConfigOnly = true\n' > "$test_root/identity.gitconfig"
+  export GIT_CONFIG_GLOBAL="$test_root/identity.gitconfig" GIT_CONFIG_NOSYSTEM=1
+  if git_identity; then fail 'git identity found where none is set'; fi
+  printf '\tname = Test\n\temail = test@example.com\n' >> "$test_root/identity.gitconfig"
+  git_identity || fail 'git identity missed a configured one'
+)
+
 # doctor lists hidden home entries outside the XDG layout, points ignored
 # zsh startup files to the local override file, calls a link to nothing
 # broken, and exits 1 while anything needs fixing.
@@ -809,6 +820,7 @@ run_doctor() (
   nvim() { :; }
   tmux() { printf 'tmux 3.5a\n'; }
   login_shell() { printf '/bin/bash\n'; }
+  git_identity() { return 1; }
   doctor_dotfiles
 )
 : > "$HOME/.zshrc"
@@ -835,6 +847,7 @@ check grep -Fqx 'link retired: orphaned; dotfiles link removes it' "$test_root/d
 # shellcheck disable=SC2016 # the hint shows the command to type
 check grep -Fqx 'login shell: /bin/bash; run: chsh -s "$(command -v zsh)"' "$test_root/doctor.log"
 check grep -Fqx 'tmux: 3.5 (< 3.6; upgrade recommended)' "$test_root/doctor.log"
+check grep -Fqx "git identity: missing; copy $XDG_CONFIG_HOME/git/config.d/personal.example to personal (or work) beside it and fill it in" "$test_root/doctor.log"
 check grep -Eqx '[0-9]+ problems found; dotfiles link repairs links, backing up what it replaces' "$test_root/doctor.log"
 rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.dangling"
 rm "$XDG_CONFIG_HOME/zsh"
@@ -858,9 +871,11 @@ check grep -Fqx 'home: nothing outside the XDG layout' "$test_root/doctor.log"
   ghostty() { printf 'Ghostty 1.3.1\n'; }
   nvim() { printf 'NVIM v0.12.5\n'; }
   tmux() { printf 'tmux 3.7c\n'; }
+  git_identity() { :; }
   doctor_dotfiles
 ) > "$test_root/doctor.log" 2>&1 || fail "doctor found problems in a complete setup: $(cat "$test_root/doctor.log")"
 check grep -Fqx 'no problems found' "$test_root/doctor.log"
+check grep -Fqx 'git identity: set' "$test_root/doctor.log"
 
 # Codespaces and dev containers install unattended in bash: install switches
 # the login shell to zsh through passwordless sudo, and nowhere else.

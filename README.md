@@ -28,7 +28,7 @@ Open Ghostty, then:
 3. Log in to each agent you use (`opencode`, `claude`, `copilot`, `codex`) through its own flow.
 4. On macOS, turn off Obsidian's automatic updates in its settings. With more than one input source, also turn off "Select the previous input source" (Ctrl+Space) in System Settings › Keyboard › Keyboard Shortcuts › Input Sources, so OpenCode's leader key reaches it.
 5. If you use Time Machine, run `tmutil addexclusion ~/.cache` once: it skips `~/Library/Caches` but not `~/.cache`.
-6. Run `dotfiles doctor`: it checks the links, tools, login shell, GitHub login, and home folder, names a fix for each problem, and ends with "no problems found" once everything is in place.
+6. Run `dotfiles doctor`: it checks the links, tools, login shell, Git identity, GitHub login, and home folder, names a fix for each problem, and ends with "no problems found" once everything is in place.
 7. In a project, run `workspace`; run `keys` to see everything else this setup adds.
 
 ## Daily use

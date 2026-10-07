@@ -87,6 +87,12 @@ login_shell() {
   fi
 }
 
+# Whether Git can name a commit's author and committer; outside any repository,
+# so only the user's and system's configuration count.
+git_identity() {
+  (cd / && git var GIT_AUTHOR_IDENT && git var GIT_COMMITTER_IDENT) >/dev/null 2>&1
+}
+
 require_separate_checkout() {
   # -ef is supported by the macOS/Linux shells and catches case-equivalent paths.
   # shellcheck disable=SC3013
@@ -920,6 +926,15 @@ doctor_dotfiles() {
     fi
   else
     printf 'missing; run: dotfiles bundle\n'
+    problems=$((problems + 1))
+  fi
+
+  # Git refuses commits until an identity exists (user.useConfigOnly).
+  printf 'git identity: '
+  if git_identity; then
+    printf 'set\n'
+  else
+    printf 'missing; copy %s to personal (or work) beside it and fill it in\n' "$xdg_config_home/git/config.d/personal.example"
     problems=$((problems + 1))
   fi
 
