@@ -495,7 +495,7 @@ printf 'untracked\n' > "$cli_repo/dispatcher-marker"
 
 # In-place installs and updates must reject before any links, provisioning, or Git.
 mkdir -p "$cli_repo/zsh" "$cli_repo/homebrew" "$cli_repo/runtime"
-cp "$repo/zsh/xdg.sh" "$cli_repo/zsh/xdg.sh"
+cp "$repo/zsh/xdg.sh" "$repo/zsh/homebrew.sh" "$cli_repo/zsh/"
 printf '# existing entrypoint\n' > "$cli_repo/zsh/.zshenv"
 printf '# existing Brewfile\n' > "$cli_repo/homebrew/Brewfile"
 printf 'private\n' > "$cli_repo/runtime/data"
@@ -694,8 +694,8 @@ for scenario in equal dirty ahead behind diverged no-common detached unborn no-u
   git -C "$check_repo" reset -q --hard "$initial"
   cp "$repo/install.sh" "$check_repo/install.sh"
   mkdir -p "$check_repo/zsh" "$check_repo/.git/info"
-  cp "$repo/zsh/xdg.sh" "$check_repo/zsh/xdg.sh"
-  printf 'install.sh\nzsh/xdg.sh\n' >> "$check_repo/.git/info/exclude"
+  cp "$repo/zsh/xdg.sh" "$repo/zsh/homebrew.sh" "$check_repo/zsh/"
+  printf 'install.sh\nzsh/xdg.sh\nzsh/homebrew.sh\n' >> "$check_repo/.git/info/exclude"
   git -C "$check_repo" tag local-only "$base_commit"
   git -C "$check_repo" update-ref refs/remotes/origin/keep "$base_commit"
   git -C "$check_repo" config fetch.prune true

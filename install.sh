@@ -305,9 +305,6 @@ bundle_dotfiles() {
     exit 1
   }
 
-  # Non-admin macOS casks default to ~/Applications, as in shell startup.
-  # shellcheck source=zsh/homebrew.sh
-  . "$repo_dir/zsh/homebrew.sh"
   # Fresh installs link before Homebrew exists; Bundle may run npm right away.
   link_npm_global_config
 
@@ -1002,9 +999,11 @@ default_command() {
 }
 
 # CLI dispatcher.
-# Commands see the same tool homes as the shell
+# Commands see the same tool homes and Homebrew policy as the shell
 # shellcheck source=zsh/xdg.sh
 . "$repo_dir/zsh/xdg.sh"
+# shellcheck source=zsh/homebrew.sh
+. "$repo_dir/zsh/homebrew.sh"
 
 if [ "$#" -gt 0 ]; then
   cmd=$1

@@ -475,9 +475,7 @@ done
         unset HOMEBREW_CASK_OPTS
         [[ $cask_opts == unset ]] || export HOMEBREW_CASK_OPTS=$cask_opts
         expected=${HOMEBREW_CASK_OPTS-}
-        expected_mkdir=()
         if [[ $OSTYPE == darwin* && $groups == *admin-helper* ]]; then
-          expected_mkdir=(-p "$HOME/Applications")
           case $cask_opts in
             unset|'') expected=$default ;;
             *--appdir=*) ;;
@@ -489,7 +487,8 @@ done
           mkdir_args=()
           source "$repo/zsh/homebrew.sh"
           expect "$expected" "${HOMEBREW_CASK_OPTS-}" "$label options"
-          expect "${(j:|:)expected_mkdir}" "${(j:|:)mkdir_args}" "$label mkdir arguments"
+          # Every dotfiles command loads the policy, so it must create nothing.
+          expect '' "${(j:|:)mkdir_args}" "$label creates nothing"
         done
       done
     done
@@ -501,6 +500,17 @@ done
     source "$repo/zsh/homebrew.sh"
     expect "$default" "$HOMEBREW_CASK_OPTS" 'failed group lookup does not grant admin status'
   )
+
+  # Codespaces and dev containers get the lean Brewfile unless one is chosen.
+  for environment expected in \
+    'CODESPACES=true' "$test_root/config/homebrew/core.Brewfile" \
+    'REMOTE_CONTAINERS=true' "$test_root/config/homebrew/core.Brewfile" \
+    "CODESPACES=true HOMEBREW_BUNDLE_FILE_GLOBAL=$test_root/chosen" "$test_root/chosen" \
+    'CODESPACES=false' unset; do
+    actual=$(/usr/bin/env -i HOME="$test_root" XDG_CONFIG_HOME="$test_root/config" ${=environment} \
+      /bin/sh -c '. "$1/zsh/homebrew.sh"; printf %s "${HOMEBREW_BUNDLE_FILE_GLOBAL-unset}"' policy "$repo")
+    expect "$expected" "$actual" "lean Brewfile with $environment"
+  done
 
   # Ruby is a test-only oracle for Homebrew's Shellwords split and last-wins appdir.
   if [[ -n $ruby_bin ]]; then
@@ -528,8 +538,8 @@ RUBY
   # Check wiring as text: executing profiles could evaluate a real brew binary.
   [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nsource "$ZDOTDIR/homebrew.sh"\n'* ]] ||
     fail '.zprofile must source the cask policy'
-  [[ $(<"$repo/install.sh") == *$'\n  . "$repo_dir/zsh/homebrew.sh"\n'* ]] ||
-    fail 'install.sh must apply the shared cask policy'
+  [[ $(<"$repo/install.sh") == *$'\n. "$repo_dir/zsh/homebrew.sh"\n'* ]] ||
+    fail 'install.sh must apply the shared Homebrew policy'
   [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nif [[ -o login || -z $HOMEBREW_PREFIX ]]; then\n'* ]] ||
     fail '.zprofile must rerun shellenv for login shells and initialize other shells once'
   [[ $'\n'$(<"$repo/zsh/.zshrc")$'\n' == *$'\n[[ -o login ]] || source "$ZDOTDIR/.zprofile"\n'* ]] ||

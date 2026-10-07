@@ -42,6 +42,10 @@ Changes since `v0.0.1`.
 - `dotfiles link` and `uninstall` remove the links left behind by
   configuration folders this repository no longer has.
 - Node and Python are shared runtimes alongside Go and Bun.
+- `homebrew/core.Brewfile` holds the essentials (Git, Neovim, the shell
+  tools, tmux, gh, OpenCode) that `homebrew/Brewfile` builds on. GitHub
+  Codespaces and dev containers install only that lean set, and any machine
+  can choose it through `HOMEBREW_BUNDLE_FILE_GLOBAL`.
 - ShellCheck joins the Brewfile: bash-language-server uses it for shell
   diagnostics in Neovim, and `.tests/run` lints with it.
 - New helpers: `workspace` flags, `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,

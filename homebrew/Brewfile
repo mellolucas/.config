@@ -1,13 +1,6 @@
+# The workstation: GUI apps, language servers, runtimes, and the other agents,
+# then core.Brewfile's essentials and local.Brewfile.
 brew "mas" if OS.mac? && system("defaults read MobileMeAccounts Accounts >/dev/null 2>&1")
-
-brew "git"
-brew "neovim"
-brew "ripgrep"
-brew "fzf"
-brew "bat"
-brew "eza"
-brew "git-delta"
-brew "glow"
 
 cask "ghostty" if OS.mac?
 brew "container" if OS.mac? && Hardware::CPU.arm? && MacOS.version >= :tahoe
@@ -26,8 +19,6 @@ brew "node"
 brew "bun"
 brew "python"
 
-brew "gh"
-brew "opencode"
 cask "claude-code" if OS.mac?
 # Their casks are unnotarized, so macOS blocks them; npm installs are not quarantined
 npm "@github/copilot"
@@ -35,5 +26,5 @@ npm "@openai/codex"
 
 cask "obsidian" if OS.mac?
 
-local_brewfile = File.expand_path("local.Brewfile", __dir__)
-instance_eval(File.read(local_brewfile)) if File.exist?(local_brewfile)
+core_brewfile = File.expand_path("core.Brewfile", __dir__)
+instance_eval(File.read(core_brewfile), core_brewfile)
