@@ -228,6 +228,30 @@ for mode in native fzf; do
   expect 'Option+Right jumps a word forward and keeps typing' 'one twoX'
   snapshot $'\x18\x12one two\e0\efX'
   expect 'Option+Right in command mode moves a word instead of finding' onetwo vicmd
+  # Cmd+Left/Right (Ctrl+A/E) and Home/End in every form terminals send
+  for key in $'\x01' $'\e[H' $'\eOH' $'\e[1~'; do
+    snapshot $'\x18\x12abc'"$key"X
+    expect "line start: ${(V)key}" Xabc
+  done
+  for key in $'\x05' $'\e[F' $'\eOF' $'\e[4~'; do
+    snapshot $'\x18\x12abc\x01'"$key"X
+    expect "line end: ${(V)key}" abcX
+  done
+  snapshot $'\x18\x12abc\e\x01iX'
+  expect 'Cmd+Left in command mode' Xabc main
+  snapshot $'\x18\x12abc\e\x01\x05iX'
+  expect 'Cmd+Right in command mode lands on the last character' abXc main
+  snapshot $'\x18\x12abc\x01\e[3~X'
+  expect 'Delete removes the character under the cursor' Xbc
+  # xterm word keys: Alt+arrows (Windows Terminal), Ctrl+arrows (VS Code, Linux)
+  for key in $'\e[1;3D' $'\e[1;5D'; do
+    snapshot $'\x18\x12one two'"$key"X
+    expect "word back: ${(V)key}" 'one Xtwo'
+  done
+  for key in $'\e[1;3C' $'\e[1;5C'; do
+    snapshot $'\x18\x12one two\x01'"$key"X
+    expect "word forward: ${(V)key}" 'one Xtwo'
+  done
   snapshot $'\x18\x12cd foo/bar.baz\ebX'
   expect 'Option+Left stops at punctuation, like Neovim' 'cd foo/bar.Xbaz'
   snapshot $'\x18\x12one two\e\x7fX'

@@ -56,6 +56,7 @@ Move around and build commands without retyping.
 | `v **` then `Tab` | Fuzzy-pick paths for any command |
 | `cd -` | Return to the previous directory |
 | `Option+←` / `Option+→` | Jump a word back / forward |
+| `Cmd+←` / `Cmd+→` | Jump to the start / end of the line |
 | `Option+Backspace` or `Ctrl+W` / `Ctrl+U` | Delete the word / everything before the cursor |
 
 - Typing a directory name alone changes into it.

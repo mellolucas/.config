@@ -55,6 +55,9 @@ Changes since `v0.0.1`.
   Option+Backspace deletes a word, Ctrl+W and Ctrl+U reach past where typing
   began, words end at punctuation as in Neovim, and Ctrl+R in command mode is
   vi's redo (fzf's history search keeps Ctrl+R while typing).
+- Cmd+Left and Cmd+Right move to the start and end of the line at the prompt
+  instead of typing ^A and ^E, and the word, Home, End, and Delete keys that
+  Windows Terminal, VS Code, and tmux send work there too.
 - Browse mode also scrolls with the Up and Down arrows, copies with Cmd+C,
   keeps the Option chords that act on its own pane (resize, equalize, zoom,
   close), and Option+b leaves it again; Ghostty's own Cmd+Option and Cmd+Ctrl

@@ -930,11 +930,12 @@ for file in ${(0)"$($git_bin -C "$repo" ls-files -z -- zsh)"}; do
   /bin/cp "$repo/$file" "$startup_home/.config/$file"
 done
 /bin/ln -s "$startup_home/.config/zsh/.zshenv" "$startup_home/.zshenv"
-startup_out=$(cd "$startup_home" && /usr/bin/env -i HOME="$startup_home" TERM=xterm-256color \
-  PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" -lic 'print -r -- "$ZDOTDIR ${+aliases[gs]}"' \
+startup_out=$(cd "$startup_home" && /usr/bin/env -i HOME="$startup_home" TERM=xterm-256color SHELL=/bin/bash \
+  PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" -lic 'print -r -- "$ZDOTDIR ${+aliases[gs]} ${SHELL:t}"' \
   2> "$test_root/startup-errors" < /dev/null)
 startup_errors=$(<"$test_root/startup-errors")
 [[ -z $startup_errors ]] || fail "startup wrote to stderr: $startup_errors"
-expect "$startup_home/.config/zsh 1" "$startup_out" 'full startup loads .zshrc'
+# An image that exports SHELL=/bin/bash (Codespaces) still gets zsh tmux panes
+expect "$startup_home/.config/zsh 1 zsh" "$startup_out" 'full startup loads .zshrc'
 
 print -r -- 'ok: zsh syntax, cask policy, startup wiring, and hermetic alias/function regression checks'

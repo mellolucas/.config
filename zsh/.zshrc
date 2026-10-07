@@ -4,6 +4,9 @@
 # ---- Environment ----
 # Non-login shells (most Linux terminals) still need the session setup
 [[ -o login ]] || source "$ZDOTDIR/.zprofile"
+# tmux panes and other programs started here run zsh, even where the
+# environment names another shell (GitHub Codespaces' default image)
+(( $+commands[zsh] )) && export SHELL=$commands[zsh]
 
 fpath=("$ZDOTDIR/functions" $fpath)
 fns=("$ZDOTDIR/functions"/*(.N:t))
@@ -66,6 +69,19 @@ bindkey -M viins '^W' backward-kill-vi-word
 bindkey -M viins '^U' backward-kill-line
 bindkey -M vicmd '^[b' vi-backward-word
 bindkey -M vicmd '^[f' vi-forward-word
+# Other terminals send xterm sequences for the word keys: Alt+Left/Right in
+# Windows Terminal, Ctrl+Left/Right in VS Code and on Linux. Cmd+Left/Right
+# arrive as Ctrl+A/E; Home and End come in normal, application, and tmux forms.
+() {
+  local keymap key
+  for keymap in viins vicmd; do
+    for key in '^[[1;3D' '^[[1;5D'; do bindkey -M $keymap $key vi-backward-word; done
+    for key in '^[[1;3C' '^[[1;5C'; do bindkey -M $keymap $key vi-forward-word; done
+    for key in '^A' '^[[H' '^[OH' '^[[1~'; do bindkey -M $keymap $key vi-beginning-of-line; done
+    for key in '^E' '^[[F' '^[OF' '^[[4~'; do bindkey -M $keymap $key vi-end-of-line; done
+    bindkey -M $keymap '^[[3~' delete-char
+  done
+}
 
 setopt interactive_comments
 setopt prompt_subst
