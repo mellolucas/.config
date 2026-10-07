@@ -1,4 +1,4 @@
-# Working Here
+# Working here
 
 A field guide to the shortcuts this setup adds. Run `keys` to pick a task, or `keys TOPIC` to read one page.
 
@@ -35,8 +35,8 @@ List what is here, then find a file by name or by content.
 | `fzfv` | Search names with a preview; Enter opens the file |
 | `fzfe` | The same picker without a preview |
 | `rg TEXT` | Search contents, including hidden files |
-| `rga TEXT` | Also search files that Git ignores |
-| `rgf TEXT` / `rgc TEXT` | Matching files only / match counts |
+| `rga TEXT` | Also search files that Git ignores (`rgfa`, `rgca` for files / counts) |
+| `rgf TEXT` / `rgc TEXT` | Matching files only / matching-line counts per file |
 | `rgw TEXT` | Whole words only (combine: `rgwa`, `rgwc`, `rgwca`) |
 
 In `fzfv`: `Ctrl+D` / `Ctrl+U` scroll the preview (first 500 lines), `Option+t` toggles wrapping, Esc cancels.
@@ -156,11 +156,13 @@ Resume a repository, review your changes, and compare before sharing.
 | `gl` / `gls` | Log / log with file stats |
 | `glg` / `glga` | Branch graph / graph of all refs |
 | `glc A...B` | Commits unique to each side |
+| `ga` / `gc` / `gcm MSG` / `gca` | Stage / commit / commit with a message / amend the last commit |
 | `gf` / `gp` | Fetch / pull (fast-forward only) |
 | `ghopen` / `ghview` | Open on GitHub / read the README |
 | `gcl owner/repo` | Clone into `~/code/owner/repo` |
 
 - Add `f` after `gd` to list files only (`gdf`, `gdfs`, `gdfo`…); add `t` for tip-to-tip comparisons (`gdot`, `gdit`, `gdmt`).
+- Graphs take `s` for file stats too (`glgs`, `glgsa`); `gft` also fetches tags; `ghview --remote` reads the README on GitHub.
 - Entering another repository prints its card; counts are as fresh as your last fetch.
 - For full long lines without Delta: `git -c core.pager='less -R' diff`.
 
@@ -184,17 +186,18 @@ Run a coding agent beside your editor.
 
 ## Maintain: Maintain the setup
 
-Inspect and update this setup deliberately; nothing runs at shell startup.
+Inspect and update this setup deliberately; no update check runs at shell startup.
 
 | Run | Result |
 | --- | --- |
-| `dotfiles check-updates` | Fetch and check packages; applies no updates |
+| `dotfiles check-updates` | Fetch the repository and check the Brewfile; applies nothing |
 | `dotfiles update` | Update the repository, relink, apply the Brewfile, and update its npm packages |
+| `dotfiles bundle` | Apply the Brewfile and `local.Brewfile`, then update their npm packages |
 | `dotfiles link` | Relink configuration without touching packages |
-| `dotfiles status` / `dotfiles doctor` | Repository state / environment health |
+| `dotfiles status` / `dotfiles doctor` | Repository state / environment health, with fixes |
 | `help COMMAND` | A command's help, even through an alias; its manual when it has no `--help` |
 | `awake [COMMAND]` | Keep macOS awake (until Ctrl+C, or while COMMAND runs) |
 
-- `dots` is short for `dotfiles`; `dotsup` runs `dotfiles update`. Run `brew update` first to refresh package metadata.
+- `dots` is short for `dotfiles`; `dotsup` runs `dotfiles update`. Homebrew refreshes its package list once it is a day old; run `brew update` first for the very latest.
 - Personal overrides belong in the ignored `local` files described in the README.
 - `dotfiles update --discard` is destructive: it resets local changes.
