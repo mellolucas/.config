@@ -61,11 +61,27 @@ api.nvim_exec_autocmds("VimEnter", {})
 expect({ "tree" }, "narrow start")
 assert(not api.nvim_buf_is_valid(listing), "narrow start keeps the directory listing")
 
+-- ? lists the keys by what they do and closes again; the status line says so.
+assert(vim.wo.statusline == " ? keys", "tree status line: " .. vim.wo.statusline)
+local function help_window()
+  for _, win in ipairs(api.nvim_tabpage_list_wins(0)) do
+    if api.nvim_win_get_config(win).relative ~= "" then return win end
+  end
+end
+press("?")
+local help = help_window()
+assert(help, "? opens no help")
+local header = table.concat(api.nvim_buf_get_lines(api.nvim_win_get_buf(help), 0, 2, false), " ")
+assert(header:find("sort by keymap", 1, true), "help not sorted by description: " .. header)
+press("?")
+assert(not help_window(), "? leaves the help open")
+
 -- Narrow: the tree takes the window and hands it to the opened file, which
 -- keeps the covered file as its alternate.
 select("a.txt")
 press("<CR>")
 expect({ "a.txt" }, "narrow open")
+assert(vim.wo.statusline ~= " ? keys", "the tree's status line stayed on a.txt")
 press(" ee")
 expect({ "tree" }, "narrow Space e e")
 select("b.txt")

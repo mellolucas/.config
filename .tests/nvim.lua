@@ -674,13 +674,19 @@ do
   vim.pack = { add = function(specs) for _, spec in ipairs(specs) do packs[#packs + 1] = spec.src end end }
   package.loaded["mini.icons"] = { setup = function() end, mock_nvim_web_devicons = record("icons") }
   package.loaded["nvim-tree"] = { setup = function(config) tree_config = config end }
+  local on_open
   package.loaded["nvim-tree.api"] = {
     tree = {
       open = record("open"), toggle = record("toggle"), find_file = record("find_file"),
       close = record("close"), is_visible = function() return true end,
+      toggle_help = record("help"), winid = function() return api.nvim_get_current_win() end,
     },
     node = { open = { edit = record("edit") } },
     map = { on_attach = { default = function() end } },
+    events = {
+      Event = { TreeOpen = "TreeOpen" },
+      subscribe = function(event, handler) if event == "TreeOpen" then on_open = handler end end,
+    },
   }
   dofile("nvim/lua/config/explorer.lua")
   assert(vim.deep_equal(packs, { "https://github.com/nvim-tree/nvim-tree.lua", "https://github.com/nvim-mini/mini.icons" }),
@@ -690,10 +696,20 @@ do
   assert(tree_config.hijack_netrw == false and tree_config.hijack_directories.enable == false)
   assert(tree_config.update_focused_file.enable == true)
   assert(vim.tbl_contains(tree_config.filters.custom, "^\\.git$"), "the tree skips .git like rg")
+  -- ? lists the keys by what they do, and the tree's status line says so.
+  assert(tree_config.help.sort_by == "desc", "help order: " .. vim.inspect(tree_config.help))
+  assert(on_open, "no TreeOpen handler")
+  on_open()
+  assert(vim.wo.statusline == " ? keys", "tree status line: " .. vim.wo.statusline)
+  api.nvim_set_option_value("statusline", "", { scope = "local" })
 
   -- Under 110 columns the tree takes the window and hands it to the opened file.
   local tree_buf = api.nvim_create_buf(false, true)
   tree_config.on_attach(tree_buf)
+  api.nvim_buf_call(tree_buf, function()
+    fn.maparg("?", "n", false, true).callback()
+  end)
+  assert(last("help"), "? in the tree opens its help")
   for _, case in ipairs({ { 40, true }, { 200, false } }) do
     vim.o.columns = case[1]
     fn.maparg(" ee", "n", false, true).callback()

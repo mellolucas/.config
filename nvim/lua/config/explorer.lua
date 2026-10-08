@@ -37,6 +37,7 @@ require("nvim-tree").setup({
   hijack_directories = { enable = false },
   update_focused_file = { enable = true }, -- follow the file being edited
   filters = { custom = { "^\\.git$" } }, -- as rg and :grep skip it
+  help = { sort_by = "desc" }, -- ? lists the keys by what they do
   renderer = {
     root_folder_label = ":t", -- the project's name, not its full path
     group_empty = true, -- single-folder chains on one line (src/main/java)
@@ -55,8 +56,16 @@ require("nvim-tree").setup({
     for _, key in ipairs({ "<CR>", "o", "<2-LeftMouse>" }) do
       vim.keymap.set("n", key, open, { buffer = buf, nowait = true, silent = true, desc = "nvim-tree: Open" })
     end
+    -- ? opens and closes the list of keys, as g? does
+    vim.keymap.set("n", "?", api.tree.toggle_help, { buffer = buf, nowait = true, silent = true, desc = "nvim-tree: Help" })
   end,
 })
+
+-- The tree's status line names its help key; every way of opening the tree
+-- ends in TreeOpen, the startup takeover of the listing's buffer included
+api.events.subscribe(api.events.Event.TreeOpen, function()
+  vim.api.nvim_set_option_value("statusline", " ? keys", { scope = "local", win = api.tree.winid() })
+end)
 
 vim.keymap.set("n", "<leader>ee", function()
   cover()

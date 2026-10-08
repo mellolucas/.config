@@ -76,7 +76,8 @@ Changes since `v0.0.1`.
   `Space e e` shows or hides it, and `Space e r` finds the open file in it.
   Beside the code when the window has room (`Option+z` widens the editor),
   it otherwise takes the window and hands it to the file you open. It follows
-  the edited file and marks Git changes as they happen. `:edit DIR` and
+  the edited file and marks Git changes as they happen; `?` lists its keys
+  by what they do, as its status line says. `:edit DIR` and
   `:Explore` stay Neovim's own, and a Neovim without `vim.pack` keeps netrw
   on the same keys.
 - Interactive non-login shells (common on Linux) now set up Homebrew too.

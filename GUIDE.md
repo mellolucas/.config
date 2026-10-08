@@ -75,7 +75,7 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
 - `Option+←` / `Option+→` jump words everywhere; while typing and on the command line, `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
 - Undo history survives closing and reopening a file.
-- In the tree: Enter opens (in a narrow pane the file takes the pane), `Tab` previews, `Ctrl+V` / `Ctrl+X` split right / below, `a` / `r` / `d` create / rename / delete, `f` filters, `H` / `I` toggle hidden / ignored files, `[c` / `]c` jump between changed files, `g?` lists every key.
+- In the tree: Enter opens (in a narrow pane the file takes the pane), `Tab` previews, `Ctrl+V` / `Ctrl+X` split right / below, `a` / `r` / `d` create / rename / delete, `f` filters, `H` / `I` toggle hidden / ignored files, `[c` / `]c` jump between changed files, `?` lists every key (its status line says so).
 - To explore a repository, `Option+z` widens the editor and `Space e r` opens the tree beside the code, on the current file; `Tab` previews, `Ctrl+]` / `grr` / `gO` follow the code, and `Option+h` returns to the tree. `Option+z` again brings back the shells and agent, and the tree steps aside.
 
 ## Agents: Choose a coding agent
