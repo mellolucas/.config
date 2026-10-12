@@ -25,11 +25,12 @@ local function narrow()
 end
 
 -- A full-window tree covers the file being edited; a file opened from it keeps
--- that one as its alternate, and closing the tree restores the covered file's
--- own alternate, so Space b - returns where it would without the tree
+-- that one as its alternate, and closing the tree gives the covered file's
+-- window its own alternate back, so Space b - returns where it would without
+-- the tree
 local covered, before
 local function cover()
-  if narrow() and vim.bo.filetype ~= "NvimTree" then
+  if narrow() and vim.bo.filetype ~= "NvimTree" and not api.tree.is_visible() then
     covered = vim.api.nvim_get_current_buf()
     local alternate = vim.fn.bufnr("#")
     before = alternate > 0 and alternate or nil
@@ -37,11 +38,11 @@ local function cover()
 end
 
 local function open()
-  local quit = narrow()
+  local quit, from = narrow(), covered
   api.node.open.edit(nil, { quit_on_open = quit })
   local opened = vim.api.nvim_get_current_buf()
-  if quit and covered and covered ~= opened and vim.api.nvim_buf_is_valid(covered) and vim.bo[opened].filetype ~= "NvimTree" then
-    vim.fn.setreg("#", covered)
+  if quit and from and from ~= opened and vim.api.nvim_buf_is_valid(from) and vim.bo[opened].filetype ~= "NvimTree" then
+    vim.fn.setreg("#", from)
   end
 end
 
@@ -112,29 +113,30 @@ require("nvim-tree").setup({
   end,
 })
 
--- Whether the tree returns beside the code when the window widens: it does
--- once it has opened, unless it was hidden when the window last narrowed
-local beside = false
-
 -- The tree's status line names its help key; every way of opening the tree
--- ends in TreeOpen, the startup takeover of the listing's buffer included
+-- ends in TreeOpen, the startup takeover of the listing's buffer included.
+-- Once it has opened, the tree returns beside the code when this tab page
+-- widens, unless it was hidden when the tab page last narrowed.
 api.events.subscribe(api.events.Event.TreeOpen, function()
-  beside = true
+  vim.t.tree_beside = true
   vim.api.nvim_set_option_value("statusline", " ? keys", { scope = "local", win = api.tree.winid() })
 end)
--- TreeClose comes before the window closes; the covered file shows after
+-- TreeClose comes before the tree's window closes, with the window that shows
+-- the covered file current; that window alone gets its alternate back, once
+-- the close is done
 api.events.subscribe(api.events.Event.TreeClose, function()
+  local win, buf, alternate = vim.api.nvim_get_current_win(), covered, before
+  covered, before = nil, nil
+  if not (buf and alternate) then
+    return
+  end
   vim.schedule(function()
-    if covered and before and before ~= covered and vim.api.nvim_buf_is_valid(before) then
-      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-        if vim.api.nvim_win_get_buf(win) == covered then
-          vim.api.nvim_win_call(win, function()
-            vim.fn.setreg("#", before)
-          end)
-        end
-      end
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf and alternate ~= buf
+      and vim.api.nvim_buf_is_valid(alternate) then
+      vim.api.nvim_win_call(win, function()
+        vim.fn.setreg("#", alternate)
+      end)
     end
-    covered, before = nil, nil
   end)
 end)
 
@@ -173,8 +175,8 @@ vim.api.nvim_create_autocmd("VimEnter", {
 
 -- Widening (Option+z zooms the editor) turns a full-window tree into the
 -- sidebar, or brings the sidebar back; narrowing hands the window back to the
--- code, unless only empty windows sit beside the tree
-local was_narrow = narrow()
+-- code, unless only empty windows sit beside the tree. Each tab page keeps its
+-- own width state and catches up on entering, after resizes made elsewhere.
 local function windows()
   return vim.tbl_filter(function(win)
     return vim.api.nvim_win_get_config(win).relative == ""
@@ -185,19 +187,21 @@ local function blank(win)
   return vim.api.nvim_buf_get_name(buf) == "" and vim.bo[buf].buftype == "" and not vim.bo[buf].modified
     and vim.api.nvim_buf_line_count(buf) == 1 and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] == ""
 end
-vim.api.nvim_create_autocmd("VimResized", {
+vim.t.tree_narrow = narrow()
+vim.api.nvim_create_autocmd({ "VimResized", "TabEnter" }, {
   nested = true, -- the tree's own window and buffer events run too
   callback = function()
-    if narrow() == was_narrow then
+    local now, was = narrow(), vim.t.tree_narrow
+    vim.t.tree_narrow = now
+    if was == nil or now == was then
       return
     end
-    was_narrow = narrow()
     local tree = api.tree.is_visible() and api.tree.winid() or nil
     local others = vim.tbl_filter(function(win)
       return win ~= tree
     end, windows())
-    if was_narrow then
-      beside = tree ~= nil
+    if now then
+      vim.t.tree_beside = tree ~= nil
       if tree and #others > 0 then
         if #vim.tbl_filter(blank, others) == #others then
           for _, win in ipairs(others) do
@@ -212,7 +216,7 @@ vim.api.nvim_create_autocmd("VimResized", {
       api.tree.toggle({ focus = true, find_file = true })
     elseif tree then
       api.tree.resize() -- split beside a file in the narrow window: back to 30 columns
-    elseif beside then
+    elseif vim.t.tree_beside then
       api.tree.toggle({ focus = false, find_file = true })
     end
   end,

@@ -674,11 +674,19 @@ do
   vim.pack = { add = function(specs) for _, spec in ipairs(specs) do packs[#packs + 1] = spec.src end end }
   package.loaded["mini.icons"] = { setup = function() end, mock_nvim_web_devicons = record("icons") }
   package.loaded["nvim-tree"] = { setup = function(config) tree_config = config end }
-  local handlers, tree_win, cursor_node = {}, nil, nil
+  local handlers, tree_win, cursor_node, closing = {}, nil, nil, nil
   package.loaded["nvim-tree.api"] = {
     tree = {
       open = record("open"), toggle = record("toggle"), find_file = record("find_file"),
-      close = record("close"), resize = record("resize"), toggle_help = record("help"),
+      resize = record("resize"), toggle_help = record("help"),
+      -- As nvim-tree does, close the tree's window unless it is the last one.
+      close = function()
+        calls[#calls + 1] = { "close" }
+        closing, tree_win = tree_win, nil
+        if closing and api.nvim_win_is_valid(closing) and #api.nvim_tabpage_list_wins(0) > 1 then
+          api.nvim_win_close(closing, true)
+        end
+      end,
       is_visible = function() return tree_win ~= nil end,
       winid = function() return tree_win end,
       get_node_under_cursor = function() return cursor_node end,
@@ -744,7 +752,9 @@ do
       end
       -- Tab opens as Enter does in a narrow window; beside the code, the
       -- cursor stays in the tree.
+      local edits = count("edit")
       fn.maparg("<Tab>", "n", false, true).callback()
+      assert(count("edit") == edits + 1, "Tab at " .. case[1] .. " opened nothing")
       local tab = last("edit")[3]
       assert(case[2] and tab.quit_on_open == true or not case[2] and tab.focus == true,
         "Tab at " .. case[1] .. ": " .. vim.inspect(tab))
@@ -771,6 +781,26 @@ do
     fn.maparg("h", "n", false, true).callback()
     assert(#calls == before_root, "h or l acted on the root line: " .. vim.inspect(calls[#calls]))
   end)
+  -- l on an open folder steps onto its first entry, when the next line is one.
+  local tree_api = package.loaded["nvim-tree.api"].tree
+  local src = { name = "src", absolute_path = "/p/src", type = "directory", nodes = {}, open = true, parent = {} }
+  local rows = { { name = "..", absolute_path = "/p", nodes = {}, open = true }, src,
+    { name = "x.txt", absolute_path = "/p/src/x.txt", type = "file", parent = src },
+    { name = "b.txt", absolute_path = "/p/b.txt", type = "file", parent = {} } }
+  local shown = api.nvim_get_current_buf()
+  api.nvim_buf_set_lines(tree_buf, 0, -1, false, { "p", "src", "x.txt", "b.txt" })
+  api.nvim_win_set_buf(0, tree_buf)
+  tree_api.get_node_under_cursor = function() return rows[api.nvim_win_get_cursor(0)[1]] end
+  api.nvim_win_set_cursor(0, { 2, 0 })
+  fn.maparg("l", "n", false, true).callback()
+  assert(api.nvim_win_get_cursor(0)[1] == 3, "l on an open folder did not step onto its first entry")
+  rows[2] = { name = "empty", absolute_path = "/p/empty", type = "directory", nodes = {}, open = true, parent = {} }
+  rows[3] = rows[4]
+  api.nvim_win_set_cursor(0, { 2, 0 })
+  fn.maparg("l", "n", false, true).callback()
+  assert(api.nvim_win_get_cursor(0)[1] == 2, "l on an open empty folder left it for the next entry")
+  tree_api.get_node_under_cursor = function() return cursor_node end
+  api.nvim_win_set_buf(0, shown)
 
   -- Starting on a directory opens the tree in place of that directory's
   -- listing, sized to the window; a file a +command opened, or a restored
@@ -811,8 +841,20 @@ do
 
   -- Widening (Option+z zooms) turns a full-window tree into the sidebar or
   -- brings the sidebar back; narrowing hands the window to the code, unless
-  -- only empty windows sit beside the tree.
+  -- only empty windows sit beside the tree. The tree's own events run inside
+  -- these autocommands: as in nvim-tree, its window closing dispatches TreeClose.
+  local tree_closed = 0
+  api.nvim_create_autocmd("WinClosed", {
+    callback = function(args)
+      if tonumber(args.match) == closing then
+        tree_closed = tree_closed + 1
+        handlers.TreeClose()
+      end
+    end,
+  })
   vim.cmd("silent! only")
+  tree_win = nil
+  resize(40) -- a known narrow start
   local code = api.nvim_create_buf(true, false)
   api.nvim_buf_set_name(code, fn.tempname() .. "/code.lua")
   local closes, resizes = count("close"), count("resize")
@@ -826,7 +868,7 @@ do
   assert(count("resize") == resizes + 1, "widening left a tree split at its narrow width")
   resize(40)
   assert(count("close") == closes + 1, "narrowing kept the sidebar beside the code")
-  tree_win = nil
+  assert(tree_closed == 1, "the tree's events did not run inside the resize")
   resize(200)
   assert(vim.deep_equal(last("toggle")[2], { focus = false, find_file = true }), "widening: " .. vim.inspect(last("toggle")))
   vim.cmd("silent! only")
@@ -841,27 +883,63 @@ do
   assert(count("close") == closes + 1 and vim.deep_equal(last("toggle")[2], { focus = true, find_file = true }),
     "widening a full-window tree: " .. vim.inspect(last("toggle")))
   -- Hidden when the window narrowed, the tree stays hidden on widening.
-  tree_win = nil
   toggles = count("toggle")
   resize(40)
   resize(200)
   assert(count("toggle") == toggles, "widening reopened a tree hidden at the last narrowing")
-  resize(40)
 
-  -- Closing a full-window tree gives the file it covered its own alternate back.
-  local first, second = api.nvim_create_buf(true, false), api.nvim_create_buf(true, false)
-  api.nvim_buf_set_name(first, fn.tempname() .. "/first.lua")
-  api.nvim_buf_set_name(second, fn.tempname() .. "/second.lua")
+  -- Each tab page keeps its own: one opened while narrow that never showed the
+  -- tree, as :GitDiff's, widens without it, and the first catches up on
+  -- entering after a resize made elsewhere.
+  vim.cmd("silent! only")
+  resize(40)
+  tree_win = api.nvim_get_current_win()
+  handlers.TreeOpen()
+  api.nvim_set_option_value("statusline", "", { scope = "local" })
+  vim.cmd.vsplit()
+  api.nvim_win_set_buf(0, code)
+  local first_tree = tree_win
+  vim.cmd.tabnew()
+  tree_win = nil
+  toggles, resizes = count("toggle"), count("resize")
+  resize(200)
+  assert(count("toggle") == toggles, "a tab page that never showed the tree opened it")
+  tree_win = first_tree
+  vim.cmd.tabclose()
+  assert(count("resize") == resizes + 1, "the first tab page did not catch up on entering")
+  closes = count("close")
+  resize(40)
+  assert(count("close") == closes + 1, "narrowing the first tab page kept the sidebar")
+
+  -- Closing a full-window tree gives back the alternate of the window that
+  -- shows the covered file, and no other window's.
+  resize(40)
+  vim.cmd("silent! only")
+  tree_win = nil
+  local first, second, third = api.nvim_create_buf(true, false), api.nvim_create_buf(true, false),
+    api.nvim_create_buf(true, false)
+  for buf, name in pairs({ [first] = "first", [second] = "second", [third] = "third" }) do
+    api.nvim_buf_set_name(buf, fn.tempname() .. "/" .. name .. ".lua")
+  end
   vim.cmd.buffer(first)
   vim.cmd.buffer(second)
+  local covering = api.nvim_get_current_win()
+  vim.cmd.vsplit()
+  vim.cmd.buffer(third)
+  vim.cmd.buffer(second)
+  local other = api.nvim_get_current_win()
+  api.nvim_set_current_win(covering)
   fn.maparg(" ee", "n", false, true).callback()
   vim.cmd.enew() -- the tree takes the window
   vim.cmd.buffer(second) -- and hands it back on closing
   handlers.TreeClose()
+  handlers.TreeClose() -- a second close before the first's restore finds nothing to restore
   vim.wait(50, function() return fn.bufnr("#") == first end)
   assert(fn.bufnr("#") == first, "alternate after the tree closed: " .. fn.bufname("#"))
+  local kept = api.nvim_win_call(other, function() return fn.bufnr("#") end)
+  assert(kept == third, "the tree's close changed another window's alternate: " .. fn.bufname(kept))
   vim.cmd("silent! only")
-  for _, buf in ipairs({ code, first, second }) do
+  for _, buf in ipairs({ code, first, second, third }) do
     api.nvim_buf_delete(buf, { force = true })
   end
 

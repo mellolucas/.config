@@ -141,6 +141,18 @@ resize(200)
 expect({ "a.txt" }, "a zoom after hiding the tree")
 press(" ee")
 expect({ "tree", "a.txt" }, "Space e e shows the tree again")
+-- Each tab page keeps its own: one opened while narrow that never showed the
+-- tree, as :GitDiff's, widens without it, and the editor's tab catches up on
+-- returning after a resize made elsewhere.
+resize(40)
+expect({ "a.txt" }, "unzoom before opening a tab page")
+vim.cmd.tabnew()
+resize(200)
+expect({ "[empty]" }, "a tab page that never showed the tree")
+vim.cmd.tabclose()
+settle()
+expect({ "tree", "a.txt" }, "the editor's tab page after widening elsewhere")
+assert(current() == "a.txt", "catching up moved the cursor into the tree")
 
 -- Zoomed, Tab shows a file beside the tree and keeps the cursor there; the
 -- file stays through unzooming, and a full-window tree widens into the sidebar.
@@ -217,4 +229,4 @@ end, vim.split(fn.execute("messages"), "\n"))
 assert(#errors == 0, "messages: " .. table.concat(errors, " | "))
 vim.cmd.cd(fn.fnameescape(repo))
 fn.delete(project, "rf")
-print("ok: file tree with the real plugins (narrow, zoom at 110 columns, Tab, h and l, alternate file)")
+print("ok: file tree with the real plugins (narrow, zoom at 110 columns, tab pages, Tab, h and l, alternate file)")
