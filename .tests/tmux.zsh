@@ -107,6 +107,9 @@ local -A version pending replies=(
   $'\e]10;?' $'\e]10;rgb:cdcd/d6d6/f4f4\e\\'
   $'\e]11;?' $'\e]11;rgb:1e1e/1e1e/2e2e\e\\'
   $'\e[?996n' $'\e[?997;1n'
+  $'\e[?2026$p' $'\e[?2026;2$y'
+  $'\e[18t' $'\e[8;40;120t'
+  $'\e[14t' $'\e[4;800;1200t'
 )
 answer() {
   local client chunk out query
