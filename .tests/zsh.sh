@@ -206,7 +206,7 @@ STUB
 )
 
 (
-  topics=(workspace panes editor agents git shell files browse documents maintain)
+  topics=(workspace panes editor explore agents git shell files browse documents maintain)
   typeset -A sections titles topic_outputs
   current=''
   guide_topics=()

@@ -109,7 +109,7 @@ while IFS= read -r line || [[ -n $line ]]; do
   previous=$line
 done < "$repo/GUIDE.md"
 labels+=("${intro_labels[@]}")
-[[ ${(j: :)topics} == 'workspace panes editor agents git shell files browse documents maintain' ]] ||
+[[ ${(j: :)topics} == 'workspace panes editor explore agents git shell files browse documents maintain' ]] ||
   fail 'guide topic contract'
 index=$'# Working here\n\nChoose a task with `keys TOPIC`, or search every line with `keys WORDS`.\n\n'
 all=$intro

@@ -20,7 +20,7 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: editor l
 | `workspace --help` | Every option and its default |
 
 - Focus starts in the larger middle-bottom shell; `Option+h/j/k/l` moves to the editor and the agent.
-- The editor opens on the project's file tree; `Option+z` widens it to explore (`keys editor`).
+- The editor opens on the project's file tree; `Option+z` widens it to explore (`keys explore`).
 - Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux it opens a new window instead.
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
 - Tab completes `workspace`'s flags and directories.
@@ -75,8 +75,30 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
 - `Option+←` / `Option+→` jump words everywhere; while typing and on the command line, `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
 - Undo history survives closing and reopening a file.
-- In the tree: Enter opens (in a narrow pane the file takes the pane), `Tab` previews, `Ctrl+V` / `Ctrl+X` split right / below, `a` / `r` / `d` create / rename / delete, `f` filters, `H` / `I` toggle hidden / ignored files, `[c` / `]c` jump between changed files, `?` lists every key (its status line says so).
-- To explore a repository, `Option+z` widens the editor and `Space e r` opens the tree beside the code, on the current file; `Tab` previews, `Ctrl+]` / `grr` / `gO` follow the code, and `Option+h` returns to the tree. `Option+z` again brings back the shells and agent, and the tree steps aside.
+- The file tree has its own page: `keys explore`.
+
+## Explore: Explore a codebase
+
+Browse a project in the editor's file tree, beside its code when the editor has room.
+
+| Press | Result |
+| --- | --- |
+| `Option+z` (in the editor) | Zoom: the tree joins the code as a sidebar; again for the shells and agent |
+| `Space e e` / `Space e r` | Show or hide the tree / find the current file in it |
+| `l` / `h` | Step into a folder or open a file / step out of a folder, closing it |
+| Enter / `Tab` | Open the file / show it, keeping the cursor in the tree |
+| `Ctrl+V` / `Ctrl+X` | Open beside / below the code, to compare files |
+| `f` / `H` / `I` | Filter by name / toggle hidden / ignored files |
+| `a` / `r` / `d` | Create / rename / delete |
+| `[c` / `]c` | Previous / next changed file |
+| `?` | Every key, by what it does |
+
+- Unzoomed, the tree and the code take turns in the narrow pane: Enter, `Tab`, or `l` on a file gives it the pane, and `Space e e` brings the tree back.
+- Hidden with `Space e e` while zoomed, the tree stays out of later zooms until you show it again.
+- The tree follows the file you're in and marks Git changes as they happen: `✗` modified, `★` new, `✓` staged, `➜` renamed; a folder shows the marks of what it holds.
+- `Option+h` goes from the code to the tree, and `Ctrl+W p` back; in a workspace, `Option+l` heads for the shell pane instead.
+- `Ctrl+V` and `Ctrl+X` split the code window; with only the tree showing, both open beside it. `Ctrl+W c` closes a split, while `Option+q` closes the whole editor pane.
+- Follow the code with `Ctrl+]` / `Ctrl+T`, `grr`, and `gO`, and search it with `Space f f` and `:grep` (`keys editor`).
 
 ## Agents: Choose a coding agent
 

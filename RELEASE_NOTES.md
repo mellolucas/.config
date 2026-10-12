@@ -74,12 +74,14 @@ Changes since `v0.0.1`.
 - Neovim shows a file tree (nvim-tree, with mini.icons coloring its icons
   from the colorscheme): `nvim DIR` and the workspace's editor open on it,
   `Space e e` shows or hides it, and `Space e r` finds the open file in it.
-  Beside the code when the window has room (`Option+z` widens the editor),
-  it otherwise takes the window and hands it to the file you open. It follows
-  the edited file and marks Git changes as they happen; `?` lists its keys
-  by what they do, as its status line says. `:edit DIR` and
-  `:Explore` stay Neovim's own, and a Neovim without `vim.pack` keeps netrw
-  on the same keys.
+  Beside the code when the window has room, it otherwise takes the window and
+  hands it to the file you open; zooming the editor (`Option+z`) brings it
+  beside the code, and unzooming steps it aside. `l` and `h` step into and
+  out of folders, `Tab` shows a file while the cursor stays in the tree, and
+  the tree follows the edited file and marks Git changes as they happen; `?`
+  lists its keys by what they do, as its status line says (`keys explore`).
+  `:edit DIR` and `:Explore` stay Neovim's own, and a Neovim without
+  `vim.pack` keeps netrw on the same keys.
 - Interactive non-login shells (common on Linux) now set up Homebrew too.
 - `workspace` keeps its proportions on Retina displays: the window size it
   measures in pixels is converted to the points Ghostty resizes by.
