@@ -98,21 +98,21 @@ for key command in y 'send-keys -X copy-selection-no-clear' : command-prompt \
 done
 print -r -- "ok: $chords Option chords and the browse keys match ghostty/vim.ghostty"
 
-# Fixture terminals answer tmux's queries as real terminals do (while one goes
-# unanswered, tmux holds a lone Esc for 500 ms) and name themselves through
-# XTVERSION, which tmux keeps as client_termtype.
-local -A version pending replies=(
+# Fixture terminals answer tmux's queries as real terminals do, reporting their
+# own size, and name themselves through XTVERSION, which tmux keeps as
+# client_termtype. While a query goes unanswered, tmux holds a lone Esc for
+# 500 ms: up to 5 seconds after attaching, or for good when a terminal that
+# reports no pixel size leaves CSI 14 t unanswered.
+local -A version size pending replies=(
   $'\e[c' $'\e[?62;22;52c'
   $'\e[>c' $'\e[>1;10;0c'
   $'\e]10;?' $'\e]10;rgb:cdcd/d6d6/f4f4\e\\'
   $'\e]11;?' $'\e]11;rgb:1e1e/1e1e/2e2e\e\\'
   $'\e[?996n' $'\e[?997;1n'
   $'\e[?2026$p' $'\e[?2026;2$y'
-  $'\e[18t' $'\e[8;40;120t'
-  $'\e[14t' $'\e[4;800;1200t'
 )
 answer() {
-  local client chunk out query
+  local client chunk out query reply rows cols
   heard=0
   for client in ${(k)version}; do
     out=$pending[$client]
@@ -120,14 +120,17 @@ answer() {
       out+=$chunk
       heard=1
     done
-    for query in ${(k)replies} $'\e[>q'; do
+    rows=${size[$client]% *} cols=${size[$client]#* }
+    for query in ${(k)replies} $'\e[>q' $'\e[18t' $'\e[14t'; do
       [[ $out == *$query* ]] || continue
       out=${out//$query/}
-      if [[ $query == $'\e[>q' ]]; then
-        zpty -w -n $client $'\eP>|'"$version[$client]"$'\e\\'
-      else
-        zpty -w -n $client $replies[$query]
-      fi
+      case $query in
+        ($'\e[>q') reply=$'\eP>|'"$version[$client]"$'\e\\' ;;
+        ($'\e[18t') reply=$'\e[8;'"$rows;${cols}t" ;;
+        ($'\e[14t') reply=$'\e[4;'"$(( rows * 20 ));$(( cols * 10 ))t" ;;
+        (*) reply=$replies[$query] ;;
+      esac
+      zpty -w -n $client $reply
     done
     # A query split across reads completes on the next one.
     pending[$client]=${out[-8,-1]}
@@ -155,8 +158,8 @@ wait_for() {
 }
 attach() {
   local client=$1
-  version[$client]=$2
-  zpty -b $client "env TERM=xterm-256color tmux attach -t test"
+  version[$client]=$2 size[$client]='40 120'
+  zpty -b $client "stty rows 40 cols 120; env TERM=xterm-256color tmux attach -t test"
   wait_for "$client did not attach" '[[ $(tmux list-clients -F "#{client_termtype}") == *"$version[$client]"* ]]'
   settle
 }
@@ -195,8 +198,8 @@ wait_for 'Option+z did not zoom while browsing' '[[ $(state "#{window_zoomed_fla
 [[ $(state '#{pane_id}') == $right && $(state '#{pane_in_mode}') == 1 ]] || fail 'Option+h moved while browsing'
 press $'\ez'
 wait_for 'Option+z did not unzoom' '[[ $(state "#{window_zoomed_flag}") == 0 ]]'
-# Neovim and zsh vi mode need a prompt Esc: escape-time, not the 500 ms hold;
-# the bound leaves room for a busy machine.
+# Neovim and zsh vi mode need a prompt Esc from an answering terminal:
+# escape-time, not the 500 ms hold; the bound leaves room for a busy machine.
 settle
 local -F start=$EPOCHREALTIME
 zpty -w -n fixture $'\e'
@@ -281,7 +284,7 @@ done
 # From a terminal, the session takes its size before attaching, so the shares
 # hold: columns 20/40/40 and middle rows 30/70, within two cells.
 builtin cd -- "$HOME/sized"
-version[sized]='fixture 1.0'
+version[sized]='fixture 1.0' size[sized]='50 200'
 zpty -b sized 'trap - EXIT; stty rows 50 cols 200; workspace'
 wait_for 'workspace did not attach' '[[ -n $(tmux list-clients -t "=sized" 2>/dev/null) ]]'
 roles sized
