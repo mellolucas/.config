@@ -126,7 +126,9 @@ Changes since `v0.0.1`.
   its background again whenever its pane regains focus.
 - OpenCode 2: interface settings live in `opencode/cli.json`, replacing
   `tui.jsonc`; updates use the `update` key, and the background server's
-  `service.json` stays machine-local.
+  `service.json` stays machine-local. `Ctrl+Space` is its leader, with the
+  palette on `Ctrl+P` or `Ctrl+Space` then `:`; the guide's Agents page lists
+  each agent's scroll, search, and copy keys.
 
 ### Migration
 

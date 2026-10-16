@@ -109,15 +109,24 @@ Run a coding agent beside your editor.
 
 | Run | Result |
 | --- | --- |
-| `workspace` | OpenCode in the right pane (the default) |
+| `workspace` | OpenCode in the agent pane (the default) |
 | `ocode` | OpenCode in the current pane |
-| `Ctrl+Space` then `:` (in OpenCode) | OpenCode's command palette; `Ctrl+Space` is its leader |
-| `PageUp` / `PageDown` or `Ctrl+Option+U` / `Ctrl+Option+D` (in OpenCode) | Scroll the conversation by a page / half a page |
-| `Ctrl+Space` then `y` / `l` (in OpenCode) | Copy a message / list sessions |
-| `Ctrl+O` (in OpenCode) | Reopen a recent session |
+| `Ctrl+P`, or `Ctrl+Space` then `:` (in OpenCode) | OpenCode's command palette; `Ctrl+Space` is its leader |
+| `Ctrl+Space` then `l` / `Ctrl+O` (in OpenCode) | List sessions / reopen a recent one |
 | `workspace --agent claude` | Claude Code |
 | `workspace --agent copilot` | GitHub Copilot CLI (`gh copilot` runs it too) |
 | `workspace --agent codex` | Codex |
+
+Agents run full screen, out of browse mode's reach; each scrolls, searches, and copies with its own keys.
+
+| Agent | Scroll / top and bottom / search / copy |
+| --- | --- |
+| OpenCode | `Ctrl+Option+U` / `Ctrl+Option+D` half a page, `PageUp` / `PageDown` / `Ctrl+G` / `Ctrl+Option+G` / none yet / `Ctrl+Space` then `y` copies a message |
+| Claude Code | `PageUp` / `PageDown` / `Ctrl+O` opens the transcript: `/` `n` `N` `j` `k` `g` `G`, and `v` opens it in Neovim |
+| Copilot CLI | `PageUp` / `PageDown` / `Home` / `End` / `Ctrl+F` / `/copy` copies the last answer |
+| Codex | `PageUp` / `PageDown` / `Ctrl+Home` / `Ctrl+End` / `F3` / select with the mouse |
+
+- `Home` / `End` are `Fn+←` / `Fn+→` on Mac keyboards.
 
 - Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
 - In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C` or `Ctrl+Space` then `q`.
