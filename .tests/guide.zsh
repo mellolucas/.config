@@ -81,6 +81,8 @@ test_root=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-guide.XXXXXX")
 trap 'if [[ $sysparams[pid] == $owner_pid ]]; then zpty -d 2>/dev/null || true; zf_rm -rf -- "$test_root"; fi' EXIT
 trap 'exit 1' HUP INT TERM
 path=()
+# The child's temporary files, which the picker must remove however it ends
+zf_mkdir "$test_root/tmp"
 
 fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 
@@ -212,7 +214,7 @@ check() {
   fi
   expected+="END:$result"$'\n'
 
-  local -a child_command=(/usr/bin/env -i HOME="$test_root" ZDOTDIR="$test_root" \
+  local -a child_command=(/usr/bin/env -i HOME="$test_root" ZDOTDIR="$test_root" TMPDIR="$test_root/tmp" \
     LC_ALL=C TERM=xterm-256color "$zsh_bin" -f -c \
     'source "$1" --child "${@:2}"' guide-child "$script" "$mode" "$width" "$selected" "$repo" "$@")
   # zpty joins its command arguments for evaluation; preserve spaces and empties.
@@ -231,6 +233,8 @@ check() {
   transcript=${transcript//$'\r'/}
   [[ $transcript == "$expected" ]] ||
     fail "$label: expected ${(qqqq)expected}, got ${(qqqq)transcript}"
+  local -a leftovers=("$test_root"/tmp/*(DN))
+  (( ! $#leftovers )) || fail "$label left temporary files: ${(j:, :)leftovers:t}"
   (( ++checks ))
 }
 
