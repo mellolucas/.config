@@ -1,9 +1,10 @@
 #compdef workspace
 
 _arguments -S \
-  '*--agent=[command for the right pane]:command:_cmdstring' \
-  '*--editor=[command for the left pane]:command:_cmdstring' \
-  '*--middle-top=[command for the middle-top pane]:command:_cmdstring' \
-  '*--middle-bottom=[command for the middle-bottom pane]:command:_cmdstring' \
+  '*--layout=[pane layout]:layout:(full lean)' \
+  '*--agent=[command for the agent pane]:command:_cmdstring' \
+  '*--editor=[command for the editor pane]:command:_cmdstring' \
+  '*--status=[command the status shell starts with]:command:_cmdstring' \
+  '*--shell=[command the main shell starts with]:command:_cmdstring' \
   '(- *)'{-h,--help}'[show help]' \
   '1:workspace directory:_directories'

@@ -1,23 +1,30 @@
 -- Ghostty workspace layout.
 --
 -- Usage:
---   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD MIDDLE_TOP_CMD MIDDLE_BOTTOM_CMD CONTENT_WIDTH CONTENT_HEIGHT
+--   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD STATUS_CMD SHELL_CMD CONTENT_WIDTH CONTENT_HEIGHT LAYOUT
 --
 -- Opens as a new tab in the frontmost Ghostty window (new window when none).
 -- CONTENT_WIDTH/CONTENT_HEIGHT are the window text area in pixels (CSI 14 t);
--- when missing or 0 the splits are equalized instead of ratio-sized.
+-- when missing or 0 the full layout's splits are equalized instead of
+-- ratio-sized. LAYOUT is full (the default) or lean.
 --
--- Layout (columns 20% / 40% / 40%, middle column rows 30% / 70%):
+-- full (columns 20% / 40% / 40%, middle column rows 30% / 70%):
 --
 --   ┌────────┬───────────────┬───────────────┐
---   │        │               │               │
---   │        │   shell       │               │
---   │        │               │               │
---   │ editor ├───────────────┤   agent       │
---   │        │               │               │
---   │        │   shell       │               │
+--   │        │ status shell  │               │
+--   │        ├───────────────┤               │
+--   │ editor │               │   agent       │
+--   │        │  main shell   │               │
 --   │        │               │               │
 --   └────────┴───────────────┴───────────────┘
+--
+-- lean (even halves; the shell runs the status command, then the shell one):
+--
+--   ┌──────────────────┬──────────────────┐
+--   │      editor      │                  │
+--   ├──────────────────┤      agent       │
+--   │      shell       │                  │
+--   └──────────────────┴──────────────────┘
 
 use AppleScript version "2.4"
 use framework "AppKit"
@@ -25,22 +32,24 @@ use scripting additions
 
 on run argv
 	if (count of argv) < 3 then
-		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [MIDDLE_TOP_CMD] [MIDDLE_BOTTOM_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT]"
+		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [STATUS_CMD] [SHELL_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT] [LAYOUT]"
 	end if
 	
 	set workspaceDir to item 1 of argv
 	set editorCmd to item 2 of argv
 	set agentCmd to item 3 of argv
 	
-	set middleTopCmd to ""
-	set middleBottomCmd to ""
+	set statusCmd to ""
+	set shellCmd to ""
 	set contentWidth to 0
 	set contentHeight to 0
+	set layoutName to "full"
 	
-	if (count of argv) ≥ 4 then set middleTopCmd to item 4 of argv
-	if (count of argv) ≥ 5 then set middleBottomCmd to item 5 of argv
+	if (count of argv) ≥ 4 then set statusCmd to item 4 of argv
+	if (count of argv) ≥ 5 then set shellCmd to item 5 of argv
 	if (count of argv) ≥ 6 then set contentWidth to (item 6 of argv) as integer
 	if (count of argv) ≥ 7 then set contentHeight to (item 7 of argv) as integer
+	if (count of argv) ≥ 8 then set layoutName to item 8 of argv
 	
 	-- One divider move per axis reaches the target ratios: resize_split moves
 	-- the divider of the pane's nearest ancestor split, and nested splits
@@ -67,16 +76,24 @@ on run argv
 			set workspaceTab to selected tab of (new window with configuration cfg)
 		end if
 		
-		set middleTop to focused terminal of workspaceTab
-		set leftEditor to split middleTop direction left with configuration cfg
-		set rightAgent to split middleTop direction right with configuration cfg
-		set middleBottom to split middleTop direction down with configuration cfg
-		
-		if widthDelta > 0 and heightDelta > 0 then
-			perform action ("resize_split:left," & widthDelta) on leftEditor
-			perform action ("resize_split:up," & heightDelta) on middleBottom
+		if layoutName is "lean" then
+			-- Splits halve the pane they divide, so no resizing
+			set leftEditor to focused terminal of workspaceTab
+			set rightAgent to split leftEditor direction right with configuration cfg
+			set mainShell to split leftEditor direction down with configuration cfg
+			set statusShell to mainShell
 		else
-			perform action "equalize_splits" on middleTop
+			set statusShell to focused terminal of workspaceTab
+			set leftEditor to split statusShell direction left with configuration cfg
+			set rightAgent to split statusShell direction right with configuration cfg
+			set mainShell to split statusShell direction down with configuration cfg
+			
+			if widthDelta > 0 and heightDelta > 0 then
+				perform action ("resize_split:left," & widthDelta) on leftEditor
+				perform action ("resize_split:up," & heightDelta) on mainShell
+			else
+				perform action "equalize_splits" on statusShell
+			end if
 		end if
 
 		input text editorCmd to leftEditor
@@ -85,16 +102,16 @@ on run argv
 		input text agentCmd to rightAgent
 		send key "enter" to rightAgent
 		
-		if middleTopCmd is not "" then
-			input text middleTopCmd to middleTop
-			send key "enter" to middleTop
+		if statusCmd is not "" then
+			input text statusCmd to statusShell
+			send key "enter" to statusShell
 		end if
 		
-		if middleBottomCmd is not "" then
-			input text middleBottomCmd to middleBottom
-			send key "enter" to middleBottom
+		if shellCmd is not "" then
+			input text shellCmd to mainShell
+			send key "enter" to mainShell
 		end if
 		
-		focus middleBottom
+		focus mainShell
 	end tell
 end run

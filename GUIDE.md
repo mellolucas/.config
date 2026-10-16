@@ -8,18 +8,20 @@ Each tool also lists its own keys: `:nmap <Space>` in Neovim, `Cmd+Shift+P` in G
 
 ## Workspace: Start a workspace
 
-Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: editor left, two shells in the middle, agent right.
+Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: editor left, two shells in the middle, agent right; the lean layout gives the editor and the agent half the width each.
 
 | Run | Result |
 | --- | --- |
 | `workspace` | Lay out the current directory |
 | `workspace DIR` | Lay out another directory |
-| `workspace --agent CMD` | Start a different agent in the right pane |
-| `workspace --middle-top gg` | Git card without the code summary |
-| `workspace --middle-top ''` | Leave a pane at its prompt |
+| `workspace --layout lean` | Editor above one shell on the left, agent right, in even halves |
+| `workspace --agent CMD` | Start a different agent in the agent pane |
+| `workspace --status gg` | Git card without the code summary in the status shell |
+| `workspace --status ''` | Leave the status shell at its prompt |
 | `workspace --help` | Every option and its default |
 
-- Focus starts in the larger middle-bottom shell; `Option+h/j/k/l` moves to the editor and the agent.
+- Focus starts in the main shell (the larger middle one, or the lean layout's only one); `Option+h/j/k/l` moves to the editor and the agent.
+- For lasting defaults, set `DOTFILES_WORKSPACE_LAYOUT=lean` (on a laptop, say) or the commands in `zsh/local.zsh`.
 - The editor opens on the project's file tree; `Option+z` widens it to explore (`keys explore`).
 - Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux it opens a new window instead.
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.

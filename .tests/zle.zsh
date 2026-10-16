@@ -332,11 +332,14 @@ for mode in native fzf; do
   zpty -w -n shell $'\x18\x12unfunction _ghostty_zle_keymap_select\r'
   wait_for 'ZLE-READY'
   for helper in workspace dotscode; do
-    for option in agent editor middle-top middle-bottom; do
+    for option in agent editor status shell; do
       complete "$helper $option flag" "$helper --${option[1,-2]}" "$helper --$option="
       complete "$helper $option separate command" "$helper --$option zle-test-co" "$helper --$option zle-test-command"
       complete "$helper $option equals command" "$helper --$option=zle-test-co" "$helper --$option=zle-test-command"
     done
+    complete "$helper layout flag" "$helper --layou" "$helper --layout="
+    complete "$helper layout value" "$helper --layout l" "$helper --layout lean "
+    complete "$helper layout equals value" "$helper --layout=f" "$helper --layout=full "
     complete "$helper help" "$helper --hel" "$helper --help "
     complete "$helper short help" "$helper -h" "$helper -h "
     complete "$helper flags after directory" "$helper dirs/visible --edi" "$helper dirs/visible --editor="

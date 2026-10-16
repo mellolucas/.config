@@ -11,6 +11,9 @@ if [[ ${1:-} == --child ]]; then
   [[ $code == *'local width=0 height=0'*$'\nlocal output'* ]] || exit 1
   code="local width=0 height=0${${code#*'local width=0 height=0'}%%$'\nlocal output'*}"
   functions[query]="$code"$'\nprint -r -- "RESULT:$width:$height"'
+  # Only the full layout sizes its splits from the window
+  layout=full
+  [[ $mode != lean ]] || layout=lean
   export TERM_PROGRAM=ghostty
   [[ $mode != other-terminal ]] || TERM_PROGRAM=other
   # Normalize macOS's transient PENDIN bit before comparing saved settings.
@@ -67,7 +70,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 # argument list; the Ghostty route needs macOS, Ghostty, and no tmux.
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
-    DOTFILES_WORKSPACE_MIDDLE_TOP_CMD DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD TMUX
+    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX
   OSTYPE=darwin23 TERM_PROGRAM=ghostty
   export DOTFILES_WORKSPACE_SCRIPT=$self
   code=$(<"$repo/zsh/functions/workspace")
@@ -76,7 +79,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   code=${code/$executable_check/'[[ 1 == 1 ]]'}
   functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
-  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode ggg '' 0 0)
+  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode ggg '' 0 0 full)
   dispatch() {
     local actual
     actual=$(workspace "$@" 3>&1 < /dev/null) || fail "dispatch: ${(qqq)@}"
@@ -93,15 +96,15 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   dispatch
   dispatch --
   dispatch -- "$PWD"
-  export DOTFILES_WORKSPACE_MIDDLE_TOP_CMD=gg
+  export DOTFILES_WORKSPACE_STATUS_CMD=gg
   expected[5]=gg
   dispatch
-  unset DOTFILES_WORKSPACE_MIDDLE_TOP_CMD
+  unset DOTFILES_WORKSPACE_STATUS_CMD
   expected[5]=ggg
   export DOTFILES_WORKSPACE_EDITOR_CMD='' DOTFILES_WORKSPACE_AGENT_CMD=''
   dispatch
   export DOTFILES_WORKSPACE_EDITOR_CMD='env editor --wait' DOTFILES_WORKSPACE_AGENT_CMD='env agent chat'
-  export DOTFILES_WORKSPACE_MIDDLE_TOP_CMD='' DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD='env bottom'
+  export DOTFILES_WORKSPACE_STATUS_CMD='' DOTFILES_WORKSPACE_SHELL_CMD='env bottom'
   expected[3]='env editor --wait'
   expected[4]='env agent chat'
   expected[5]=''
@@ -112,16 +115,27 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   expected[5]='top command'
   expected[6]='bottom command'
   dispatch --agent "$expected[4]" --editor "$expected[3]" \
-    --middle-top "$expected[5]" --middle-bottom "$expected[6]"
+    --status "$expected[5]" --shell "$expected[6]"
   dispatch --editor="$expected[3]" --agent="$expected[4]" \
-    --middle-top="$expected[5]" --middle-bottom="$expected[6]" -- "$PWD"
+    --status="$expected[5]" --shell="$expected[6]" -- "$PWD"
   expected[5]=''
   expected[6]=''
-  dispatch --editor "$expected[3]" --agent "$expected[4]" --middle-top '' --middle-bottom=
+  dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell=
+  # The layout reaches the script last: lean by flag or environment, and the
+  # flag wins.
+  expected[9]=lean
+  dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= --layout lean
+  dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= --layout=lean
+  DOTFILES_WORKSPACE_LAYOUT=lean dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell=
+  expected[9]=full
+  DOTFILES_WORKSPACE_LAYOUT=lean dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= \
+    --layout full
+  reject --layout tiled
+  DOTFILES_WORKSPACE_LAYOUT=tiled reject
   # Metacharacters must remain literal data, not run in the launcher shell.
   expected[3]='$(exit 91); "quoted" * \\ $HOME'
   expected[4]='--literal=value'
-  dispatch --editor="$expected[3]" --agent="$expected[4]" --middle-top= --middle-bottom ''
+  dispatch --editor="$expected[3]" --agent="$expected[4]" --status= --shell ''
 
   local temporary
   temporary=$(mktemp -d "${TMPDIR:-/tmp}/workspace-test.XXXXXXXX")
@@ -130,12 +144,12 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   (
     builtin cd -- "$temporary"
     expected[2]="${temporary:A}/path with spaces"
-    dispatch 'path with spaces' --editor="$expected[3]" --agent="$expected[4]" --middle-top= --middle-bottom=
+    dispatch 'path with spaces' --editor="$expected[3]" --agent="$expected[4]" --status= --shell=
     expected[2]="${temporary:A}/--directory"
-    dispatch --editor="$expected[3]" --agent="$expected[4]" --middle-top= --middle-bottom= -- --directory
+    dispatch --editor="$expected[3]" --agent="$expected[4]" --status= --shell= -- --directory
   )
 
-  for option in --agent --editor --middle-top --middle-bottom; do
+  for option in --layout --agent --editor --status --shell; do
     reject "$option"
     reject "$option" --editor command
     reject "$option" --
@@ -169,7 +183,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 # (a stub records the calls).
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
-    DOTFILES_WORKSPACE_MIDDLE_TOP_CMD DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD TMUX
+    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX
   # Never the Ghostty route here: it would open a real tab.
   export TERM_PROGRAM=fixture
   fpath=("$repo/zsh/functions" $fpath)
@@ -200,7 +214,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     esac
   }
   output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 OSTYPE=darwin23 TERM_PROGRAM=ghostty \
-    workspace --middle-top '' --agent 'agent $(chat)' "$temporary/work dir" < /dev/null) || fail 'inside tmux'
+    workspace --status '' --agent 'agent $(chat)' "$temporary/work dir" < /dev/null) || fail 'inside tmux'
   [[ -z $output ]] || fail "inside tmux printed: $output"
   expected=(
     "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
@@ -213,10 +227,36 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   )
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "inside tmux calls: $(<"$temporary/calls")"
 
+  # The lean layout: even halves, and the one shell runs the status command,
+  # then the shell command.
+  : > "$temporary/calls"
+  output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 workspace --layout lean --status 'echo status' \
+    --shell 'echo shell' "$temporary/work dir" < /dev/null) || fail 'lean inside tmux'
+  expected=(
+    "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
+    "'split-window' '-h' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-v' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'send-keys' '-t' '%1' '-l' '--' 'nvim .'" "'send-keys' '-t' '%1' 'Enter'"
+    "'send-keys' '-t' '%2' '-l' '--' 'ocode'" "'send-keys' '-t' '%2' 'Enter'"
+    "'send-keys' '-t' '%3' '-l' '--' 'echo status'" "'send-keys' '-t' '%3' 'Enter'"
+    "'send-keys' '-t' '%3' '-l' '--' 'echo shell'" "'send-keys' '-t' '%3' 'Enter'"
+    "'select-pane' '-t' '%3'"
+  )
+  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lean calls: $(<"$temporary/calls")"
+  expected=(
+    "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
+    "'split-window' '-h' '-l' '40%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-h' '-b' '-l' '33%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-v' '-l' '70%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'send-keys' '-t' '%3' '-l' '--' 'nvim .'" "'send-keys' '-t' '%3' 'Enter'"
+    "'send-keys' '-t' '%2' '-l' '--' 'agent \$(chat)'" "'send-keys' '-t' '%2' 'Enter'"
+    "'select-pane' '-t' '%4'"
+  )
+
   # Outside tmux and without a terminal: a session sized like the terminal
   # when there is one, and a hint that names it exactly.
   : > "$temporary/calls"
-  output=$(PATH=$temporary/bin:$PATH workspace --middle-top '' "$temporary/work dir" < /dev/null) ||
+  output=$(PATH=$temporary/bin:$PATH workspace --status '' "$temporary/work dir" < /dev/null) ||
     fail 'outside tmux'
   [[ $output == "workspace: tmux session work dir is ready; attach with: tmux attach -t '=work dir'" ]] ||
     fail "outside tmux printed: $output"
@@ -250,11 +290,11 @@ wait_for() {
 
 for mode in valid noncanonical echo-off queued fragmented leading-zero wrong-code junk zero oversized \
     incomplete multibyte timeout slow length setup-error write-error read-error interrupt HUP TERM \
-    other-terminal non-tty; do
+    other-terminal non-tty lean; do
   transcript=''
   expected=0:0
   zpty -b terminal zsh -f "$self" --child "$mode"
-  if [[ $mode == (setup-error|other-terminal|non-tty) ]]; then
+  if [[ $mode == (setup-error|other-terminal|non-tty|lean) ]]; then
     wait_for READY
   else
     wait_for $'\e[14t'
@@ -294,7 +334,7 @@ for mode in valid noncanonical echo-off queued fragmented leading-zero wrong-cod
   [[ $transcript == *RESULT:$expected* ]] || fail "$mode dimensions: ${(qqq)transcript}"
   [[ $transcript != *'4;884;2552t'* ]] || fail "$mode response echoed: ${(qqq)transcript}"
   [[ $transcript != *STATE_CHANGED* ]] || fail "$mode terminal state: ${(qqq)transcript}"
-  if [[ $mode == (setup-error|other-terminal|non-tty) ]]; then
+  if [[ $mode == (setup-error|other-terminal|non-tty|lean) ]]; then
     [[ $transcript != *$'\e[14t'* ]] || fail "$mode: unexpected query"
   fi
   [[ $mode != queued || $transcript == *'QUEUED:typed input'* ]] || fail 'queued input lost'

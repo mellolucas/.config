@@ -2,11 +2,12 @@
 
 emulate -L zsh
 
+local layout=${DOTFILES_WORKSPACE_LAYOUT:-full}
 local editor=${DOTFILES_WORKSPACE_EDITOR_CMD:-nvim .}
 local agent=${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}
-# Empty middle commands skip their pane's startup command.
-local middle_top=${DOTFILES_WORKSPACE_MIDDLE_TOP_CMD-ggg}
-local middle_bottom=${DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD:-}
+# Empty shell commands skip their pane's startup command.
+local status_cmd=${DOTFILES_WORKSPACE_STATUS_CMD-ggg}
+local shell_cmd=${DOTFILES_WORKSPACE_SHELL_CMD:-}
 local dir=$PWD option value
 local -a directories=()
 
@@ -23,38 +24,43 @@ workspace in DIR reattaches.
 Arguments:
   DIR   Workspace directory. Defaults to the current directory.
 
-Options (override environment; also accept --option=CMD):
-  --agent CMD          Command started in the right pane (nonempty).
-  --editor CMD         Command started in the left pane (nonempty).
-  --middle-top CMD     Middle-top command. Empty skips.
-  --middle-bottom CMD  Middle-bottom command. Empty skips.
-  -h, --help           Show this help without launching a workspace.
-  --                   Treat remaining arguments as the directory.
+Options (override environment; also accept --option=VALUE):
+  --layout NAME  full (the default) or lean, below.
+  --agent CMD    Command started in the agent pane (nonempty).
+  --editor CMD   Command started in the editor pane (nonempty).
+  --status CMD   Command the status shell starts with. Empty skips.
+  --shell CMD    Command the main shell starts with. Empty skips.
+  -h, --help     Show this help without launching a workspace.
+  --             Treat remaining arguments as the directory.
 
-Layout:
-  left           editor  (20% width)
-  middle top     shell   (40% width, 30% height)
-  middle bottom  shell   (40% width, 70% height)
-  right          agent   (40% width)
+Layouts:
+  full   editor left (20% width); in the middle (40% width), the status shell
+         above (30% height) and the main shell below (70%); agent right (40%)
+  lean   editor above one shell on the left (50% width, 50% height each),
+         which runs the status command, then the shell command; agent right
+         (50% width)
 
 Environment (set lasting defaults in zsh/local.zsh):
+  DOTFILES_WORKSPACE_LAYOUT='full'
+      Layout: full or lean.
+
   DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
-      Command started in the left pane.
+      Command started in the editor pane.
 
   DOTFILES_WORKSPACE_AGENT_CMD='ocode'
-      Command started in the right pane.
+      Command started in the agent pane.
 
-  DOTFILES_WORKSPACE_MIDDLE_TOP_CMD='ggg'
-      Command started in the middle-top pane. Empty skips. Defaults to ggg.
+  DOTFILES_WORKSPACE_STATUS_CMD='ggg'
+      Command the status shell starts with. Empty skips. Defaults to ggg.
 
-  DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD=''
-      Command started in the middle-bottom pane. Empty skips.
+  DOTFILES_WORKSPACE_SHELL_CMD=''
+      Command the main shell starts with. Empty skips.
 
   DOTFILES_WORKSPACE_SCRIPT=/path/to/workspace.applescript
       Override the Ghostty AppleScript implementation path.
 EOF
       return 0 ;;
-    --agent|--editor|--middle-top|--middle-bottom|--agent=*|--editor=*|--middle-top=*|--middle-bottom=*)
+    --layout|--agent|--editor|--status|--shell|--layout=*|--agent=*|--editor=*|--status=*|--shell=*)
       option=${1%%=*}
       if [[ $1 == *=* ]]; then
         value=${1#*=}
@@ -71,10 +77,11 @@ EOF
         return 1
       fi
       case $option in
+        --layout) layout=$value ;;
         --agent) agent=$value ;;
         --editor) editor=$value ;;
-        --middle-top) middle_top=$value ;;
-        --middle-bottom) middle_bottom=$value ;;
+        --status) status_cmd=$value ;;
+        --shell) shell_cmd=$value ;;
       esac ;;
     --) shift; directories+=("$@"); break ;;
     -*) print -r -u2 -- "workspace: unknown option: $1"; return 1 ;;
@@ -82,6 +89,11 @@ EOF
   esac
   shift
 done
+
+if [[ $layout != (full|lean) ]]; then
+  print -r -u2 -- "workspace: unknown layout: $layout (full or lean)"
+  return 1
+fi
 
 if (( ${#directories} > 1 )); then
   print -u2 -- 'workspace: expected at most one directory'
@@ -102,7 +114,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
     print -u2 -- 'hint: run: dotfiles bundle'
     return 1
   }
-  local name line top agent_pane editor_pane bottom_pane pane command
+  local name line top agent_pane editor_pane bottom_pane status_pane pane command
   if [[ -z $TMUX ]]; then
     for line in ${(f)"$(tmux list-sessions -F '#{session_name}:#{session_path}' 2>/dev/null)"}; do
       [[ ${line#*:} == "$dir" ]] && name=${line%%:*} && break
@@ -122,13 +134,21 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
       # Sized like this terminal: tmux keeps no shares when attaching resizes it
       top=$(tmux new-session -d -x - -y - -P -F '#{pane_id}' -s "$name" -c "$dir") || return
     fi
-    # Widths 20/40/40 and middle heights 30/70: each split takes a share of
-    # the pane it divides.
-    agent_pane=$(tmux split-window -h -l 40% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
-    editor_pane=$(tmux split-window -h -b -l 33% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
-    bottom_pane=$(tmux split-window -v -l 70% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
+    if [[ $layout == lean ]]; then
+      # Even halves: the agent right, the editor above the one shell
+      agent_pane=$(tmux split-window -h -l 50% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
+      bottom_pane=$(tmux split-window -v -l 50% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
+      editor_pane=$top status_pane=$bottom_pane
+    else
+      # Widths 20/40/40 and middle heights 30/70: each split takes a share of
+      # the pane it divides.
+      agent_pane=$(tmux split-window -h -l 40% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
+      editor_pane=$(tmux split-window -h -b -l 33% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
+      bottom_pane=$(tmux split-window -v -l 70% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
+      status_pane=$top
+    fi
     for pane command in "$editor_pane" "$editor" "$agent_pane" "$agent" \
-      "$top" "$middle_top" "$bottom_pane" "$middle_bottom"; do
+      "$status_pane" "$status_cmd" "$bottom_pane" "$shell_cmd"; do
       [[ -n $command ]] || continue
       tmux send-keys -t "$pane" -l -- "$command" || return
       tmux send-keys -t "$pane" Enter || return
@@ -156,11 +176,11 @@ local script=${DOTFILES_WORKSPACE_SCRIPT:-${XDG_CONFIG_HOME:-$HOME/.config}/ghos
   return 1
 }
 
-# Window text area in pixels (CSI 14 t) for the ratio-based split sizing.
-# Measured from the invoking pane: exact from an unsplit tab, undersized from
-# a split pane; on 0 the AppleScript falls back to equalized splits.
+# Window text area in pixels (CSI 14 t) for the full layout's ratio-based split
+# sizing. Measured from the invoking pane: exact from an unsplit tab, undersized
+# from a split pane; on 0 the AppleScript falls back to equalized splits.
 local width=0 height=0
-if [[ -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
+if [[ $layout == full && -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
   local dimensions
   if dimensions=$(
     local tty saved reply='' char=''
@@ -199,8 +219,8 @@ local output
 local -i rc=0
 output=$(
   /usr/bin/osascript "$script" "$dir" \
-    "$editor" "$agent" "$middle_top" "$middle_bottom" \
-    "$width" "$height" \
+    "$editor" "$agent" "$status_cmd" "$shell_cmd" \
+    "$width" "$height" "$layout" \
     2>&1
 ) || {
   rc=$?

@@ -68,7 +68,9 @@ Changes since `v0.0.1`.
   `HOMEBREW_BUNDLE_FILE_GLOBAL`.
 - ShellCheck joins the Brewfile: bash-language-server uses it for shell
   diagnostics in Neovim, and `.tests/run` lints with it.
-- New helpers: `workspace` flags, `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
+- New helpers: `workspace` flags (`--layout lean` puts the editor above one
+  shell beside the agent, each half the width; `--status` and `--shell` set
+  the shells' commands), `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
   `Space g d`, `Space e r`, and `Space f f`, which makes `:find` a fuzzy file
   picker over the files `rg` lists. `Space b l` waits for a buffer's number
   or name after listing them, and `Space b -` switches to the previous file,

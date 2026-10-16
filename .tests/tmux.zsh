@@ -237,7 +237,7 @@ print -r -- 'ok: chords behave through attached clients'
 fpath=("$repo/zsh/functions" $fpath)
 autoload -Uz workspace
 export DOTFILES_WORKSPACE_EDITOR_CMD="echo ED''ITOR" DOTFILES_WORKSPACE_AGENT_CMD="echo AG''ENT" \
-  DOTFILES_WORKSPACE_MIDDLE_TOP_CMD="echo T''OP" DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD="echo BOT''TOM"
+  DOTFILES_WORKSPACE_STATUS_CMD="echo T''OP" DOTFILES_WORKSPACE_SHELL_CMD="echo BOT''TOM"
 mkdir -p "$HOME/work dir" "$HOME/proj.v1" "$HOME/other/proj.v1" "$HOME/sized"
 builtin cd -- "$HOME/work dir"
 output=$(workspace < /dev/null)
@@ -279,7 +279,7 @@ roles 'work dir'
 for role output in editor EDITOR agent AGENT top TOP bottom BOTTOM; do
   wait_for "the $role pane did not run its command" "ran $pane[$role] $output"
 done
-[[ $(tmux display -p -t '=work dir:' '#{pane_id}') == $pane[bottom] ]] || fail 'focus is not the middle-bottom shell'
+[[ $(tmux display -p -t '=work dir:' '#{pane_id}') == $pane[bottom] ]] || fail 'focus is not the main shell'
 
 # From a terminal, the session takes its size before attaching, so the shares
 # hold: columns 20/40/40 and middle rows 30/70, within two cells.
@@ -294,5 +294,30 @@ integer rows=$(tmux display -p -t '=sized:' '#{window_height}')
 near() { (( $2 * 100 - $3 * $4 >= -200 && $2 * 100 - $3 * $4 <= 200 )) || fail "$1: $2 of $4"; }
 near 'editor width' $width[editor] 20 $columns
 near 'middle width' $width[top] 40 $columns
-near 'middle-top height' $height[top] 30 $rows
+near 'status shell height' $height[top] 30 $rows
+
+# The lean layout: the editor above the one shell, which runs the status and
+# then the shell command, and the agent right, in even halves.
+mkdir -p "$HOME/lean"
+builtin cd -- "$HOME/lean"
+output=$(workspace --layout lean < /dev/null)
+[[ $output == *' lean is ready;'* ]] || fail "lean: $output"
+local -A lean
+local left top id
+for line in ${(f)"$(tmux list-panes -t '=lean' -F '#{pane_left} #{pane_top} #{pane_id}')"}; do
+  read -r left top id <<< "$line"
+  if (( left > 0 )); then lean[agent]=$id
+  elif (( top > 0 )); then lean[shell]=$id
+  else lean[editor]=$id
+  fi
+done
+(( ${#lean} == 3 )) || fail "lean panes: ${(kv)lean}"
+for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM; do
+  wait_for "the lean $role pane did not run $output" "ran $lean[$role] $output"
+done
+[[ $(tmux display -p -t '=lean:' '#{pane_id}') == $lean[shell] ]] || fail 'lean focus is not the shell'
+columns=$(tmux display -p -t '=lean:' '#{window_width}')
+rows=$(tmux display -p -t '=lean:' '#{window_height}')
+near 'lean editor width' $(tmux display -p -t $lean[editor] '#{pane_width}') 50 $columns
+near 'lean editor height' $(tmux display -p -t $lean[editor] '#{pane_height}') 50 $rows
 print -r -- 'ok: workspace sessions, commands, and proportions'
