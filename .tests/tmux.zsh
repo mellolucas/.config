@@ -206,15 +206,15 @@ zpty -w -n fixture $'\e'
 wait_for 'Esc did not leave browse mode' '[[ $(state "#{pane_in_mode}") == 0 ]]'
 (( EPOCHREALTIME - start < 0.4 )) || fail "Esc took $(( (EPOCHREALTIME - start) * 1000 )) ms"
 # Closing asks while a program runs: n keeps the pane, which still gets Ctrl+B.
-press $'\eq'
+press $'\ew'
 press n
 press $'\x02'
-wait_for 'Option+q closed a running program without asking' 'shows $right "^B"'
+wait_for 'Option+w closed a running program without asking' 'shows $right "^B"'
 press $'\es'
 wait_for 'Option+s did not split' '[[ $(state "#{window_panes}") == 3 ]]'
 wait_for 'the new pane does not run zsh' '[[ $(state "#{pane_current_command}") == zsh ]]'
-press $'\eq'
-wait_for 'Option+q did not close a pane at its prompt' '[[ $(state "#{window_panes}") == 2 ]]'
+press $'\ew'
+wait_for 'Option+w did not close a pane at its prompt' '[[ $(state "#{window_panes}") == 2 ]]'
 # Ghostty keeps Option+b for its own browse mode, so from Ghostty ESC b is
 # Option+Left: a word jump for the program. Ghostty names itself so.
 tmux select-pane -t "$left"

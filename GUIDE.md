@@ -36,11 +36,11 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 | `Option+Shift+h/j/k/l` | Resize |
 | `Option+=` | Equalize sizes |
 | `Option+z` | Zoom the current pane (press again to return) |
-| `Option+q` | Close the current pane |
+| `Option+w` | Close the current pane (`Cmd+W` does too in Ghostty, and `Cmd+Z` reopens it) |
 | `Cmd+Option+arrows` / `Cmd+Ctrl+arrows` | Move / resize with arrow keys (Ghostty's defaults) |
 
 - At an edge, `Option+h/j/k/l` reaches Neovim, which moves between its windows (normal mode).
-- `Ctrl+W h/j/k/l` or `Ctrl+W` arrows always mean Neovim windows; `Option+q` closes a terminal pane, not a buffer.
+- `Ctrl+W h/j/k/l` or `Ctrl+W` arrows always mean Neovim windows; `Option+w` closes a terminal pane, not a buffer.
 - `Option+←` / `Option+→` jump words, never panes.
 - In tmux, `Option+Shift+h/j/k/l` moves an edge by one cell, and `Option+=` evens out only the current pane and its neighbors.
 - tmux has no prefix key: `Option+b` then `:` runs its commands, such as `detach`, `new-window`, `next-window`, or `choose-tree`.
@@ -98,7 +98,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 - The tree follows the file you're in and marks Git changes as they happen: `✗` modified, `★` new, `✓` staged, `➜` renamed; a folder shows the marks of what it holds.
 - `Option+h` goes from the code to the tree, and `Ctrl+W p` back; in a workspace, `Option+l` heads for the shell pane instead.
 - `Space b -` switches to your previous file, also from the tree; the tree is never one, and with no previous file it says so.
-- `Ctrl+V` and `Ctrl+X` split the code window; with only the tree showing, both open beside it. `Ctrl+W c` closes a split, while `Option+q` closes the whole editor pane.
+- `Ctrl+V` and `Ctrl+X` split the code window; with only the tree showing, both open beside it. `Ctrl+W c` closes a split, while `Option+w` closes the whole editor pane.
 - Follow the code with `Ctrl+]` / `Ctrl+T`, `grr`, and `gO`, and search it with `Space f f` and `:grep` (`keys editor`).
 
 ## Agents: Choose a coding agent
@@ -217,7 +217,7 @@ Ghostty's browse mode scrolls and copies terminal history without touching the r
 | `:` | Ghostty command palette |
 | `Esc`, `q`, `i`, or `Option+b` | Leave browse mode |
 
-- Browse mode belongs to the pane: resize, equalize, zoom, and close (`Option+Shift+h/j/k/l`, `Option+=`, `Option+z`, `Option+q`) work while browsing; leave it before moving to another pane or splitting.
+- Browse mode belongs to the pane: resize, equalize, zoom, and close (`Option+Shift+h/j/k/l`, `Option+=`, `Option+z`, `Option+w`) work while browsing; leave it before moving to another pane or splitting.
 - Full-screen programs (Neovim, less, OpenCode) keep their own history, out of browse mode's reach: scroll inside them.
 - Without Ghostty, `Option+b` opens tmux's copy mode with the same keys: search shows matches without the extra `Esc`, `:` runs tmux commands, and the mouse wheel scrolls into it. There `y` copies to the clipboard (`Cmd+C` and the prompt jumps are Ghostty's): select with the mouse, or with `Space` (`V` for whole lines) and the movement keys. A mouse selection copies as you let go and leaves copy mode.
 - From Ghostty, as over SSH, `Option+b` stays Ghostty's, so browse a tmux pane with the mouse wheel.

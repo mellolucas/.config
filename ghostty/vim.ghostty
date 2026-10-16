@@ -13,7 +13,7 @@ keybind = alt+shift+k=resize_split:up,10
 keybind = alt+shift+l=resize_split:right,10
 keybind = alt+equal=equalize_splits
 keybind = alt+z=toggle_split_zoom
-keybind = alt+q=close_surface
+keybind = alt+w=close_surface
 
 # Browse mode: scrollback, search, copy.
 keybind = alt+b=activate_key_table:browse
@@ -48,5 +48,5 @@ keybind = browse/alt+shift+k=resize_split:up,10
 keybind = browse/alt+shift+l=resize_split:right,10
 keybind = browse/alt+equal=equalize_splits
 keybind = browse/alt+z=toggle_split_zoom
-keybind = browse/alt+q=close_surface
+keybind = browse/alt+w=close_surface
 keybind = browse/catch_all=ignore
