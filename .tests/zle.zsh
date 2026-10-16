@@ -433,7 +433,7 @@ if [[ -n $fzf_bin ]]; then
   wait_for 'ZLE-READY'
   snapshot ''
   expect_widget 'Option+c changes cwd and restores the unexecuted buffer at the next prompt' \
-    'zle-test-command pending-sentinel' "$fixture/widget files/directory space" '*--walker=dir,*' main
+    'zle-test-command pending-sentinel' "$fixture/widget files/directory space" '*--walker=dir,*--preview*eza --all*' main
   zpty -d shell
   (( failures )) || print -r -- "ok: $((checks - widget_checks)) native fzf prompt checks (deterministic picker)"
 else

@@ -167,7 +167,6 @@ Move around and build commands without retyping.
 
 | Press | Result |
 | --- | --- |
-| `Option+c` | Pick a directory below here and change to it |
 | `Ctrl+T` | Insert file paths into the command line |
 | `↑` / `↓` | While typing, earlier / later commands that start with the text so far |
 | `Ctrl+R` | Search history; Enter inserts without running |
@@ -199,6 +198,7 @@ List what is here, then find a file by name or by content.
 | `v FILE` / `view FILE` | Edit / read-only in your editor |
 | `fzfv` | Search names with a preview; Enter opens the file |
 | `fzfe` | The same picker without a preview |
+| `Option+c` | Pick a directory below here (directories only, each previewed) and change to it |
 | `rg TEXT` | Search contents, including hidden files |
 | `rga TEXT` | Also search files that Git ignores (`rgfa`, `rgca` for files / counts) |
 | `rgf TEXT` / `rgc TEXT` | Matching files only / matching-line counts per file |
@@ -206,6 +206,7 @@ List what is here, then find a file by name or by content.
 
 In `fzfv`: `Ctrl+D` / `Ctrl+U` scroll the preview (first 500 lines), `Option+t` toggles wrapping, Esc cancels.
 
+- Not sure where to look? Narrow down first: `Option+c` to the right directory, then `fzfv` or `Ctrl+T` from there.
 - Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.
 - `rg`, `:grep`, and Neovim's `/` are smart-case: all-lowercase text ignores case.
 - Pipe a list into the pickers: `rgf TEXT | fzfv`.

@@ -150,6 +150,8 @@ if command -v fzf >/dev/null 2>&1; then
     source <(fzf --zsh 2>/dev/null)
     bindkey -M vicmd '^R' redo
   fi
+  # Option+c previews what each directory holds, as l lists it
+  export FZF_ALT_C_OPTS="--preview 'eza --all --group-directories-first --icons=always --color=always -1 {} 2>/dev/null || ls -A {}'"
 fi
 
 # Auto git-glance in the top-level shell when entering a different repo

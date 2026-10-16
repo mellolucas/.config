@@ -119,7 +119,8 @@ Changes since `v0.0.1`.
   every `icon` folder as a macOS `Icon` file.
 - fzf takes its colors from the terminal palette (`fzf/fzfrc`), so it follows
   Catppuccin Mocha and Latte like the rest; the `keys` picker uses the same
-  colors and still ignores personal fzf options.
+  colors and still ignores personal fzf options. `Option+c`, fzf's directory
+  picker, previews what each directory holds.
 - OpenCode's Catppuccin theme follows the terminal's light or dark appearance
   (`"mode": "system"`).
 - A running Neovim follows a light/dark switch too: it asks the terminal for
