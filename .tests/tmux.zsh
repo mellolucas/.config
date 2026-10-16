@@ -297,10 +297,11 @@ near 'middle width' $width[top] 40 $columns
 near 'status shell height' $height[top] 30 $rows
 
 # The lean layout: the editor above the one shell, which runs the status and
-# then the shell command, and the agent right, in even halves.
+# then the shell command as one line, and the agent right, in even halves. The
+# status command reads the terminal, which must not take the shell command.
 mkdir -p "$HOME/lean"
 builtin cd -- "$HOME/lean"
-output=$(workspace --layout lean < /dev/null)
+output=$(workspace --layout lean --status "read -t 1 -r reply; echo T''OP" < /dev/null)
 [[ $output == *' lean is ready;'* ]] || fail "lean: $output"
 local -A lean
 local left top id

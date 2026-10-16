@@ -37,8 +37,8 @@ Layouts:
   full   editor left (20% width); in the middle (40% width), the status shell
          above (30% height) and the main shell below (70%); agent right (40%)
   lean   editor above one shell on the left (50% width, 50% height each),
-         which runs the status command, then the shell command; agent right
-         (50% width)
+         which runs the status command, then the shell command, as one
+         command line; agent right (50% width)
 
 Environment (set lasting defaults in zsh/local.zsh):
   DOTFILES_WORKSPACE_LAYOUT='full'
@@ -93,6 +93,11 @@ done
 if [[ $layout != (full|lean) ]]; then
   print -r -u2 -- "workspace: unknown layout: $layout (full or lean)"
   return 1
+fi
+# The lean layout's one shell takes both commands as one line, so a status
+# command that reads the terminal cannot swallow the shell command as input
+if [[ $layout == lean && -n $status_cmd && -n $shell_cmd ]]; then
+  status_cmd="$status_cmd; $shell_cmd" shell_cmd=''
 fi
 
 if (( ${#directories} > 1 )); then

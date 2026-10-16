@@ -130,6 +130,13 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   expected[9]=full
   DOTFILES_WORKSPACE_LAYOUT=lean dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= \
     --layout full
+  # Lean's one shell takes both commands as one line; either alone passes as is.
+  expected[5]='top command; bottom command' expected[9]=lean
+  dispatch --editor "$expected[3]" --agent "$expected[4]" --status 'top command' --shell 'bottom command' \
+    --layout lean
+  expected[5]='' expected[6]='bottom command'
+  dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell 'bottom command' --layout lean
+  expected[6]='' expected[9]=full
   reject --layout tiled
   DOTFILES_WORKSPACE_LAYOUT=tiled reject
   # Metacharacters must remain literal data, not run in the launcher shell.
@@ -228,7 +235,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "inside tmux calls: $(<"$temporary/calls")"
 
   # The lean layout: even halves, and the one shell runs the status command,
-  # then the shell command.
+  # then the shell command, as one line.
   : > "$temporary/calls"
   output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 workspace --layout lean --status 'echo status' \
     --shell 'echo shell' "$temporary/work dir" < /dev/null) || fail 'lean inside tmux'
@@ -238,8 +245,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     "'split-window' '-v' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
     "'send-keys' '-t' '%1' '-l' '--' 'nvim .'" "'send-keys' '-t' '%1' 'Enter'"
     "'send-keys' '-t' '%2' '-l' '--' 'ocode'" "'send-keys' '-t' '%2' 'Enter'"
-    "'send-keys' '-t' '%3' '-l' '--' 'echo status'" "'send-keys' '-t' '%3' 'Enter'"
-    "'send-keys' '-t' '%3' '-l' '--' 'echo shell'" "'send-keys' '-t' '%3' 'Enter'"
+    "'send-keys' '-t' '%3' '-l' '--' 'echo status; echo shell'" "'send-keys' '-t' '%3' 'Enter'"
     "'select-pane' '-t' '%3'"
   )
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lean calls: $(<"$temporary/calls")"
