@@ -20,6 +20,18 @@ if [[ ${1:-} == --child ]]; then
     print -r -u2 -- "FZF:ARGS:${(j:|:)@}"
     print -r -u2 -- "FZF:ENV:$FZF_DEFAULT_OPTS:$FZF_DEFAULT_OPTS_FILE"
     print -rn -u2 -- "FZF:INPUT"$'\n'"$input"$'FZF:END\n'
+    # The picker's two views and the selection's preview, run as fzf runs them
+    local arg reload='' preview=''
+    for arg in "$@"; do
+      case $arg in
+        (--bind=change:reload:*) reload=${arg#--bind=change:reload:} ;;
+        (--preview=*) preview=${arg#--preview=} ;;
+      esac
+    done
+    local -a run=(/usr/bin/env PATH=/usr/bin:/bin KEYS_SHELF=$KEYS_SHELF KEYS_STYLE=$KEYS_STYLE
+      FZF_PREVIEW_COLUMNS=40 /bin/zsh -fc)
+    print -r -u2 -- "FZF:VIEWS:${#${(f)"$($run "${reload//\{q\}/''}")"}}:${#${(f)"$($run "${reload//\{q\}/'x'}")"}}"
+    print -r -u2 -- "FZF:PREVIEW:${${(f)"$($run 'glow() { cat -- "${@[-1]}"; }; '"${preview//\{1\}/$selection_topic}")"}[1]}"
     case $mode in
       cancel) return 130 ;;
       no-match) return 1 ;;
@@ -119,20 +131,38 @@ for topic in "${topics[@]}"; do
 done
 index+=$'\n`keys all` reads everything. `keys --plain` needs no viewer.\n'
 navigation=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task'
-# Entries show their topic, padded past the longest name.
-typeset -a entries
+# Entries show their topic, padded past the longest name; before a search the
+# picker lists one line per page.
+typeset -a entries menu
 with_topics() {
   local line topic
   local -i pad=0
   for topic in "${topics[@]}"; do (( pad = ${#topic} > pad ? ${#topic} : pad )); done
-  entries=()
+  entries=() menu=()
   for line in "${labels[@]}"; do
     entries+=("${line%%$'\t'*}"$'\t'"${(r:pad+2:)${line%%$'\t'*}}${line#*$'\t'}")
   done
+  for topic in "${topics[@]}"; do
+    menu+=("$topic"$'\t'"${(r:pad+2:)topic}$titles[$topic]")
+  done
 }
 with_topics
-picker=$'FZF:ARGS:--layout=reverse|--no-multi|--wrap|--delimiter=\t|--with-nth=2..|--prompt=Find a task > |--header=Working here\nEnter reads a page. Esc returns to the shell.\nFZF:ENV::'"$repo"$'/fzf/fzfrc\nFZF:INPUT\n'
-picker+="${(F)entries}"$'\nFZF:END\n'
+# The picker's arguments and first view (the pages, or every entry once a search
+# words it), then what its two views and the selection's preview hold.
+picker() {
+  local query=$1 selected=$2 view
+  local preview='glow --style "$KEYS_STYLE" --width "$FZF_PREVIEW_COLUMNS" "$KEYS_SHELF"/{1}.md'
+  [[ $mode != no-glow ]] || preview='cat "$KEYS_SHELF"/{1}.md'
+  local -a args=(--layout=reverse --no-multi --wrap $'--delimiter=\t' --with-nth=2..)
+  [[ -z $query ]] || args+=("--query=$query")
+  args+=('--bind=change:reload:[ -z {q} ] && cat "$KEYS_SHELF/pages" || cat "$KEYS_SHELF/entries"'
+    '--bind=ctrl-/:toggle-wrap,alt-/:toggle-wrap' "--preview=$preview"
+    '--preview-window=right,55%,wrap,<100(down,50%,wrap)' '--prompt=Find a task > '
+    $'--header=Working here: pick a page, or type to search every line\nEnter reads the page. Esc returns to the shell. Ctrl+/ wraps lines.')
+  if [[ -n $query ]]; then view=${(F)entries}; else view=${(F)menu}; fi
+  print -rn -- "FZF:ARGS:${(j:|:)args}"$'\n'"FZF:ENV::$repo/fzf/fzfrc"$'\nFZF:INPUT\n'"$view"$'\nFZF:END\n'
+  print -rn -- "FZF:VIEWS:$#menu:$#entries"$'\n'"FZF:PREVIEW:# $titles[$selected]"$'\n'
+}
 
 checks=0
 check() {
@@ -155,9 +185,8 @@ check() {
   if [[ -z $topic && $mode != (no-fzf|bare|non-tty|stdin-null) ]] && (( ! plain )); then
     uses_picker=1
     # Search words reach the picker as its starting query.
-    if [[ -n $query ]]; then expected+=${picker/--with-nth=2..|/--with-nth=2..|--query=$query|}
-    else expected+=$picker
-    fi
+    expected+=$(picker "$query" "$selected"; print -n .)
+    expected=${expected%.}
     topic=$selected
   fi
   [[ $mode != (no-glow|no-less|bare|non-tty) ]] && (( ! plain )) || uses_glow=0
@@ -252,7 +281,6 @@ done
 # Introduction lines come last, under all, without Markdown markers.
 labels+=("all"$'\t'"  Fixture introduction with code")
 with_topics
-picker=${picker%%FZF:ENV*}"FZF:ENV::$repo/fzf/fzfrc"$'\nFZF:INPUT\n'"${(F)entries}"$'\nFZF:END\n'
 for topic in "${topics[@]}"; do
   check picker 80 "$topic"
 done

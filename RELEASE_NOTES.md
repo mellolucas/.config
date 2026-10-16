@@ -11,10 +11,11 @@ Changes since `v0.0.1`.
   deploys configuration without touching packages; `check-updates` fetches
   and checks without applying updates.
 - `keys` opens a task-oriented field guide; `GUIDE.md` holds the same pages.
-  `keys WORDS` searches every line of it, tips included, and each result
-  names its page. `help --help` explains `help`, a bare `help` points to
-  `keys`, and `help` and `delta` complete as themselves (zsh's SCCS
-  completion had claimed both).
+  Its picker lists the pages, previewing each, until you type, then searches
+  every line, tips included, naming each result's page; `Ctrl+/` toggles
+  wrapping. `keys WORDS` searches from the prompt. `help --help` explains
+  `help`, a bare `help` points to `keys`, and `help` and `delta` complete as
+  themselves (zsh's SCCS completion had claimed both).
 - Ghostty owns Option-key pane navigation, browse mode, and splits; Neovim
   keeps native window controls and handles the chords at pane edges.
 - Where Ghostty is absent (GitHub Codespaces, WSL, SSH, other terminals),

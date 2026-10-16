@@ -1,6 +1,6 @@
 # Working here
 
-A field guide to the shortcuts this setup adds. Run `keys` to pick a task, `keys TOPIC` to read one page, or `keys WORDS` to search every line; `help COMMAND` explains any command.
+A field guide to the shortcuts this setup adds. Run `keys` to browse its pages with a preview of each, typing to search every line; `keys TOPIC` reads one page and `keys WORDS` searches; `help COMMAND` explains any command.
 
 **Notation:** `Option+b` is a chord: hold left Option and press b (Alt on Linux and WSL). Right Option still types accents, except where a Ghostty shortcut takes the chord. `Space t m` is a sequence typed in Neovim normal mode. Case matters (`n` and `N` differ), except in Ctrl chords: `Ctrl+T` is Ctrl and t.
 

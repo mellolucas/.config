@@ -86,13 +86,38 @@ for line in "${labels[@]}"; do
 done
 
 if [[ -z $topic && -t 0 && -t 1 ]] && (( ! plain )) && command -v fzf >/dev/null 2>&1; then
-  local selection result=0
-  local -a query_option=()
-  [[ -z $query ]] || query_option=("--query=$query")
-  # Only the repository's fzf options (colors); personal ones could reshape the picker
-  selection=$(print -rl -- "${entries[@]}" | FZF_DEFAULT_OPTS= FZF_DEFAULT_OPTS_FILE=$repo/fzf/fzfrc \
-    fzf --layout=reverse --no-multi --wrap --delimiter=$'\t' --with-nth=2.. $query_option \
-      --prompt='Find a task > ' --header=$'Working here\nEnter reads a page. Esc returns to the shell.') || result=$?
+  local selection result=0 initial=pages preview
+  local -a query_option=() menu
+  [[ -z $query ]] || query_option=("--query=$query") initial=entries
+  # The picker reads its two views and each page's preview from a shelf of
+  # files: the pages until a search starts, then every entry
+  zmodload -F zsh/files b:zf_mkdir b:zf_rm
+  local shelf=${TMPDIR:-/tmp}/keys.$$.$RANDOM
+  zf_mkdir -m 700 "$shelf" || return
+  {
+    for current in "${topics[@]}"; do
+      print -r -- "$pages[$current]" > "$shelf/$current.md"
+      menu+=("$current"$'\t'"${(r:pad+2:)current}$titles[$current]")
+    done
+    print -r -- "$intro" > "$shelf/all.md"
+    print -rl -- "${menu[@]}" > "$shelf/pages"
+    print -rl -- "${entries[@]}" > "$shelf/entries"
+    preview='cat "$KEYS_SHELF"/{1}.md'
+    command -v glow >/dev/null 2>&1 &&
+      preview='glow --style "$KEYS_STYLE" --width "$FZF_PREVIEW_COLUMNS" "$KEYS_SHELF"/{1}.md'
+    # Only the repository's fzf options (colors); personal ones could reshape the picker
+    selection=$(KEYS_SHELF=$shelf KEYS_STYLE=$repo/glow/guide.json \
+      FZF_DEFAULT_OPTS= FZF_DEFAULT_OPTS_FILE=$repo/fzf/fzfrc \
+      fzf --layout=reverse --no-multi --wrap --delimiter=$'\t' --with-nth=2.. $query_option \
+        --bind='change:reload:[ -z {q} ] && cat "$KEYS_SHELF/pages" || cat "$KEYS_SHELF/entries"' \
+        --bind='ctrl-/:toggle-wrap,alt-/:toggle-wrap' \
+        --preview=$preview --preview-window='right,55%,wrap,<100(down,50%,wrap)' \
+        --prompt='Find a task > ' \
+        --header=$'Working here: pick a page, or type to search every line\nEnter reads the page. Esc returns to the shell. Ctrl+/ wraps lines.' \
+        < "$shelf/$initial") || result=$?
+  } always {
+    zf_rm -rf -- "$shelf"
+  }
   case $result in
     0) topic=${selection%%$'\t'*} ;;
     1|130) return 0 ;;
