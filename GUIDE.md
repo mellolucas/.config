@@ -54,7 +54,7 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 | --- | --- |
 | `Space e e` / `Space e r` | Show or hide the file tree / find this file in it |
 | `Space f f` | Find a file by fuzzy name: type part of it, `Tab` completes, `Enter` opens |
-| `Space b l` / `Space b -` | List buffers and pick one (number or name, `Tab` completes) / switch to the previous one |
+| `Space b l` / `Space b -` | List buffers and pick one (number or name, `Tab` completes) / switch to the previous file |
 | `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
 | `Space b w w` / `Space b w q` | Save / save and quit |
 | `Space q q` / `Space q !` | Quit / quit without saving |
@@ -97,6 +97,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 - Hidden with `Space e e` while zoomed, the tree stays out of later zooms until you show it again.
 - The tree follows the file you're in and marks Git changes as they happen: `✗` modified, `★` new, `✓` staged, `➜` renamed; a folder shows the marks of what it holds.
 - `Option+h` goes from the code to the tree, and `Ctrl+W p` back; in a workspace, `Option+l` heads for the shell pane instead.
+- `Space b -` switches to your previous file, also from the tree; the tree is never one, and with no previous file it says so.
 - `Ctrl+V` and `Ctrl+X` split the code window; with only the tree showing, both open beside it. `Ctrl+W c` closes a split, while `Option+q` closes the whole editor pane.
 - Follow the code with `Ctrl+]` / `Ctrl+T`, `grr`, and `gO`, and search it with `Space f f` and `:grep` (`keys editor`).
 

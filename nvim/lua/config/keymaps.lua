@@ -156,7 +156,16 @@ end, { desc = "Toggle markdown preview" })
 
 -- Buffers: <leader>b*
 map("n", "<leader>bl", ":ls<CR>:b ", { desc = "List buffers and pick one" })
-map("n", "<leader>b-", "<C-^>", { desc = "Switch to the previous buffer" })
+-- The previous file is the alternate, when it is a listed buffer other than
+-- this one: never the file tree or an empty placeholder, which are unlisted
+map("n", "<leader>b-", function()
+  local alternate = vim.fn.bufnr("#")
+  if alternate ~= vim.api.nvim_get_current_buf() and vim.fn.buflisted(alternate) == 1 then
+    vim.cmd.buffer(alternate)
+  else
+    vim.notify("No previous file")
+  end
+end, { desc = "Switch to the previous file" })
 map("n", "<leader>bww", "<cmd>w<CR>", { desc = "Save buffer" })
 map("n", "<leader>bwq", "<cmd>wq<CR>", { desc = "Save and quit" })
 
