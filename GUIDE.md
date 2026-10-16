@@ -40,12 +40,13 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 | `Option+z` | Zoom the current pane (press again to return) |
 | `Option+w` | Close the current pane (`Cmd+W` does too in Ghostty, and `Cmd+Z` reopens it) |
 | `Cmd+Option+arrows` / `Cmd+Ctrl+arrows` | Move / resize with arrow keys (Ghostty's defaults) |
+| `Cmd+D` / `Cmd+Shift+D`, `Cmd+[` / `Cmd+]`, `Cmd+Shift+Enter` | Ghostty's own keys: split right / below, previous / next pane, zoom |
 
 - At an edge, `Option+h/j/k/l` reaches Neovim, which moves between its windows (normal mode).
 - `Ctrl+W h/j/k/l` or `Ctrl+W` arrows always mean Neovim windows; `Option+w` closes a terminal pane, not a buffer.
 - `Option+←` / `Option+→` jump words, never panes.
 - In tmux, `Option+Shift+h/j/k/l` moves an edge by one cell, and `Option+=` evens out only the current pane and its neighbors.
-- tmux has no prefix key: `Option+b` then `:` runs its commands, such as `detach`, `new-window`, `next-window`, or `choose-tree`.
+- tmux has no prefix key: `Option+b` then `:` runs its commands, such as `detach`, `new-window`, `next-window`, or `choose-tree`. From Ghostty, where `Option+b` stays Ghostty's (as over SSH), run them at the prompt instead: `tmux detach`.
 - In tmux, click a pane to focus it and drag a border to resize it.
 
 ## Editor: Edit in Neovim
@@ -180,6 +181,7 @@ Move around and build commands without retyping.
 
 - Typing a directory name alone changes into it; `zsh/local.zsh.example` shows how to reach any project by its name (`cdpath`).
 - The prompt uses vi keys: Esc enters command mode, `i` returns to typing. Where the terminal supports cursor shapes, the cursor shows which: a block in command mode, a bar while typing.
+- `Option+b` opens browse mode instead of jumping back a word as in other shells; `Option+←` / `Option+→` jump words here.
 - A red `❯` means the last command failed; an unfinished rebase or merge shows beside the branch (`main|rebase-i`).
 - Start a command with a space to keep it out of history.
 - `Ctrl+D` does not close the shell; type `exit`.

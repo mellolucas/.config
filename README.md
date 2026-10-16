@@ -26,7 +26,7 @@ Open Ghostty, then:
 1. Copy `~/.config/git/config.d/personal.example` (or `work.example`) to `personal` (or `work`) beside it and fill in your identity and signing key (the template's comments show how to create one); Git refuses to commit until an identity exists.
 2. Run `gh auth login`; Git uses it for GitHub credentials.
 3. Log in to each agent you use (`opencode`, `claude`, `copilot`, `codex`) through its own flow.
-4. On macOS, turn off Obsidian's automatic updates in its settings. With more than one input source, also turn off "Select the previous input source" (Ctrl+Space) in System Settings › Keyboard › Keyboard Shortcuts › Input Sources, so OpenCode's leader key reaches it.
+4. On macOS, turn off Obsidian's automatic updates in its settings. With more than one input source, also turn off "Select the previous input source" (Ctrl+Space) in System Settings › Keyboard › Keyboard Shortcuts › Input Sources, so OpenCode's leader key reaches it. On a keyboard without a right Option key, as on some compact ones, map one in the keyboard's own app (Keychron Launcher, for example): left Option drives this setup's chords, and right Option types accents.
 5. If you use Time Machine, run `tmutil addexclusion ~/.cache` once: it skips `~/Library/Caches` but not `~/.cache`.
 6. Run `dotfiles doctor`: it checks the links, tools, login shell, Git identity, GitHub login, and home folder, names a fix for each problem, and ends with "no problems found" once everything is in place.
 7. In a project, run `workspace`; run `keys` to see everything else this setup adds.
