@@ -138,8 +138,8 @@ trap 'exit 1' HUP INT TERM
 mkdir -p "$test_root/home/fixtures" "$test_root/home/cache/zsh" "$test_root/home/bin"
 export HOME="$test_root/home" ZDOTDIR="$test_root/home"
 ln -s "${commands[mv]}" "$HOME/bin/mv"
-# A stand-in glow, so the glow block and mdv load; completion never runs it
-print -r -- "#!/bin/sh" > "$HOME/bin/glow"
+# A stand-in glow, so the glow block and mdv load; completion must never run it
+print -rl -- '#!/bin/sh' 'echo "glow $*" >> "$HOME/helper-calls"' > "$HOME/bin/glow"
 chmod +x "$HOME/bin/glow"
 mkdir -p "$HOME/completions"
 for completion in _workspace _keys _dotfiles _help; do
@@ -364,8 +364,13 @@ for mode in native fzf; do
     complete "$helper terminator disables options" "$helper -- --age" "$helper -- --age"
     complete "$helper only one directory" "$helper dirs/visible dirs/sec" "$helper dirs/visible dirs/sec"
   done
-  # mdv offers Markdown files, never the other files beside them
+  # mdv offers Markdown files from the first Tab, never the other files beside them
   complete 'mdv Markdown file' 'mdv md/' 'mdv md/only.md '
+  zpty -w -n shell $'\x18\x12builtin cd md\r'
+  wait_for 'ZLE-READY'
+  complete 'mdv first Tab' 'mdv ' 'mdv only.md '
+  zpty -w -n shell $'\x18\x12builtin cd ..\r'
+  wait_for 'ZLE-READY'
   for helper in dotfiles dots; do
     for subcommand in install link bundle update check-updates status doctor uninstall help; do
       complete "$helper $subcommand" "$helper ${subcommand[1,-2]}" "$helper $subcommand "
