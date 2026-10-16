@@ -38,7 +38,7 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 | `Option+Shift+h/j/k/l` | Resize |
 | `Option+=` | Equalize sizes |
 | `Option+z` | Zoom the current pane (press again to return) |
-| `Option+w` | Close the current pane (`Cmd+W` does too in Ghostty, and `Cmd+Z` reopens it) |
+| `Option+w` | Close the current pane (`Cmd+W` does too in Ghostty, and `Cmd+Z` reopens it within 5 seconds) |
 | `Cmd+Option+arrows` / `Cmd+Ctrl+arrows` | Move / resize with arrow keys (Ghostty's defaults) |
 | `Cmd+D` / `Cmd+Shift+D`, `Cmd+[` / `Cmd+]`, `Cmd+Shift+Enter` | Ghostty's own keys: split right / below, previous / next pane, zoom |
 
