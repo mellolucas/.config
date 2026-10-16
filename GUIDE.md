@@ -240,7 +240,7 @@ Render Markdown and read long text comfortably.
 
 | Run or press | Result |
 | --- | --- |
-| `mdv FILE` | Render Markdown in the pager |
+| `mdv FILE` | Render Markdown in the pager (`Tab` offers Markdown files) |
 | `mdv -w 120 FILE` | Wrap at 120 columns instead |
 | `glow` | Browse every Markdown file below here, hidden and ignored ones too |
 | `Space` / `b` (in less) | Page down / up |

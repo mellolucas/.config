@@ -206,7 +206,11 @@ alias view='"${(@Q)${(z)EDITOR}}" -R -M'
 if command -v glow >/dev/null 2>&1; then
   # The theme path expands once, here, so the alias stays literal for `help`
   alias glow="glow --style ${(q)XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json"
-  alias mdv='glow -p -w 0'
+  # A function, so Tab offers Markdown files where glow's own completion lists
+  # its subcommands; zsh reads this whole block before the alias above exists,
+  # hence the style spelled out
+  mdv() { \glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" -p -w 0 "$@" }
+  (( ! $+functions[compdef] )) || compdef '_files -g "*.(md|markdown|mdown|mkd|mdx)(-.)"' mdv
 fi
 
 if command -v bat >/dev/null 2>&1; then

@@ -70,12 +70,12 @@ Changes since `v0.0.1`.
   diagnostics in Neovim, and `.tests/run` lints with it.
 - New helpers: `workspace` flags (`--layout lean` puts the editor above one
   shell beside the agent, each half the width; `--status` and `--shell` set
-  the shells' commands), `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`,
-  `Space g d`, `Space e r`, and `Space f f`, which makes `:find` a fuzzy file
-  picker over the files `rg` lists. `Space b l` waits for a buffer's number
-  or name after listing them, and `Space b -` switches to the previous file,
-  never to the file tree or an empty window, also from the tree, saying so
-  when there is none.
+  the shells' commands), `ggg`, `lll`, `llt`, `lld`, `lc`, `awake`, `mdv`
+  completing Markdown files, `Space g d`, `Space e r`, and `Space f f`, which
+  makes `:find` a fuzzy file picker over the files `rg` lists. `Space b l`
+  waits for a buffer's number or name after listing them, and `Space b -`
+  switches to the previous file, never to the file tree or an empty window,
+  also from the tree, saying so when there is none.
 - Neovim shows a file tree (nvim-tree, with mini.icons coloring its icons
   from the colorscheme): `nvim DIR` and the workspace's editor open on it,
   `Space e e` shows or hides it, and `Space e r` finds the open file in it.

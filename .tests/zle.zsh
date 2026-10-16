@@ -38,6 +38,11 @@ if [[ $1 == --child ]]; then
       { print -u2 'FAIL: eza alias block boundaries'; exit 1; }
     config=${config#*$'\nif command -v eza '}
     eval "if command -v eza ${config%%$'\nfi'*}"$'\nfi'
+    config=$(<"$repo/zsh/.zshrc")
+    [[ $config == *$'\nif command -v glow '*$'\nfi\n'* ]] ||
+      { print -u2 'FAIL: glow alias block boundaries'; exit 1; }
+    config=${config#*$'\nif command -v glow '}
+    eval "if command -v glow ${config%%$'\nfi'*}"$'\nfi'
   fi
   if [[ $4 == --widgets ]]; then
     # Keep the installed native widgets; replace only their interactive picker.
@@ -133,6 +138,9 @@ trap 'exit 1' HUP INT TERM
 mkdir -p "$test_root/home/fixtures" "$test_root/home/cache/zsh" "$test_root/home/bin"
 export HOME="$test_root/home" ZDOTDIR="$test_root/home"
 ln -s "${commands[mv]}" "$HOME/bin/mv"
+# A stand-in glow, so the glow block and mdv load; completion never runs it
+print -r -- "#!/bin/sh" > "$HOME/bin/glow"
+chmod +x "$HOME/bin/glow"
 mkdir -p "$HOME/completions"
 for completion in _workspace _keys _dotfiles _help; do
   ln -s "$repo/zsh/functions/$completion" "$HOME/completions/$completion"
@@ -146,13 +154,14 @@ else
   print -r -- "SKIP: eza alias completion (eza: ${eza_bin:-not installed}; _eza: ${eza_completion:-not found in original fpath})"
 fi
 fixture="$HOME/fixtures"
-mkdir -p "$fixture"/{prefix,case,partial,substring,hidden,dirs,all,glob}
+mkdir -p "$fixture"/{prefix,case,partial,substring,hidden,dirs,all,glob,md}
 touch "$fixture/prefix/alpha" "$fixture/prefix/xalpha" \
   "$fixture/prefix/.alpha" "$fixture/prefix/Alpha" \
   "$fixture/case/Alpha" "$fixture/case/xalpha" "$fixture/case/.alpha" \
   "$fixture/partial/foo-bar" "$fixture/substring/xxneedlexx" \
   "$fixture/hidden/.xxsecretxx" "$fixture/all/.hidden" \
-  "$fixture/all/visible" "$fixture/glob/.hidden" "$fixture/glob/visible"
+  "$fixture/all/visible" "$fixture/glob/.hidden" "$fixture/glob/visible" \
+  "$fixture/md/only.md" "$fixture/md/notes.txt"
 mkdir -p "$fixture/dirs/.xxsecretxx" "$fixture/dirs/visible"
 mkdir -p "$fixture/workspace-dirs/space project" "$fixture/--project"
 mkdir -p "$fixture/widget files/directory space"
@@ -355,6 +364,8 @@ for mode in native fzf; do
     complete "$helper terminator disables options" "$helper -- --age" "$helper -- --age"
     complete "$helper only one directory" "$helper dirs/visible dirs/sec" "$helper dirs/visible dirs/sec"
   done
+  # mdv offers Markdown files, never the other files beside them
+  complete 'mdv Markdown file' 'mdv md/' 'mdv md/only.md '
   for helper in dotfiles dots; do
     for subcommand in install link bundle update check-updates status doctor uninstall help; do
       complete "$helper $subcommand" "$helper ${subcommand[1,-2]}" "$helper $subcommand "

@@ -456,7 +456,7 @@ for os in darwin23 linux-gnu; do
               expect "$expected"$'\n-w\n0\ndocument name.md' "$(recorded)" "$label unrestricted width override"
             done
           else
-            (( ! ${+aliases[mdv]} )) || fail "$label mdv dependency guard"
+            (( ! ${+aliases[mdv]} && ! ${+functions[mdv]} )) || fail "$label mdv dependency guard"
           fi
         )
       done
