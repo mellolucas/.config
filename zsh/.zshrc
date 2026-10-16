@@ -42,6 +42,9 @@ unset _brew_site_functions
 
 autoload -Uz compinit
 compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
+# Completion caches (Homebrew's _brew turns them on) go beside the dump, not to
+# zsh's default, ZDOTDIR, which is this repository's zsh folder
+zstyle ':completion:*' cache-path "$XDG_CACHE_HOME/zsh/zcompcache"
 # zsh's SCCS completion claims delta ahead of git-delta's, demoted above
 (( $+commands[delta] )) && compdef _delta delta
 # Include dotfiles in completion without changing ordinary wildcard expansion.

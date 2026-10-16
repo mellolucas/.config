@@ -17,6 +17,10 @@ if [[ $1 == --child ]]; then
   eval "$config"
   # help completes commands and their arguments, not zsh's SCCS subcommands
   [[ ${_comps[help]-} == _help ]] || { print -u2 "FAIL: help completes with ${_comps[help]-nothing}"; exit 1; }
+  # Completion caches stay in the cache home, out of ZDOTDIR (the repository)
+  zstyle -s ':completion:*' cache-path cache_path ||:
+  [[ ${cache_path-} == "$XDG_CACHE_HOME/zsh/zcompcache" ]] ||
+    { print -u2 "FAIL: completion cache in ${cache_path:-ZDOTDIR}"; exit 1; }
   # Ctrl+X Ctrl+E opens the command line in the editor from either vi mode
   for keymap in viins vicmd; do
     [[ $(bindkey -M $keymap '^X^E') == *' edit-command-line' ]] || { print -u2 "FAIL: $keymap Ctrl+X Ctrl+E"; exit 1; }
