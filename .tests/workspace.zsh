@@ -170,15 +170,24 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     dispatch --editor="$expected[3]" --agent="$expected[4]" --status= --shell= -- --directory
   )
   # Laid out around this shell (the script answers "same tab"), the shell
-  # moves to the workspace; with a new tab it stays where it was.
+  # moves to the workspace and runs its own commands there: the shell command,
+  # and in the lean layout the status command first. With a new tab, the
+  # script types them into the new panes, and the shell stays where it was.
   workspace_osascript() { print -r -- 'same tab'; }
   (
-    workspace "$temporary/path with spaces" < /dev/null > /dev/null || fail 'same tab'
+    output=$(workspace --shell 'print -r -- OWN:$PWD' "$temporary/path with spaces" < /dev/null) ||
+      fail 'same tab'
+    [[ $output == "OWN:${temporary:A}/path with spaces" ]] || fail "same tab printed: $output"
+    workspace --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'same tab'
     [[ $PWD == "${temporary:A}/path with spaces" ]] || fail "same tab left the shell in $PWD"
+    output=$(workspace --layout lean --status 'print -r -- STATUS' --shell 'print -r -- SHELL' . < /dev/null)
+    [[ $output == $'STATUS\nSHELL' ]] || fail "lean same tab printed: $output"
   )
   workspace_osascript() { print -r -- 'new tab'; }
   (
     builtin cd -- "$temporary"
+    output=$(workspace --shell 'print -r -- OWN' "$temporary/path with spaces" < /dev/null) || fail 'new tab'
+    [[ -z $output ]] || fail "a new tab ran the shell's commands here: $output"
     workspace "$temporary/path with spaces" < /dev/null > /dev/null || fail 'new tab'
     [[ ${PWD:A} == ${temporary:A} ]] || fail "a new tab moved the shell to $PWD"
   )
@@ -280,13 +289,14 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lean calls: $(<"$temporary/calls")"
 
   # A window holding only this shell becomes the workspace around it: the
-  # shell is the main one, takes its commands, and moves to the workspace.
+  # shell is the main one, moves to the workspace, and runs its own commands
+  # there; nothing is typed into its pane.
   local window_panes=1 pane_tty=/dev/ttysfixture
   : > "$temporary/calls"
   output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 TMUX_PANE=%7 TTY=/dev/ttysfixture \
-    workspace --shell 'echo shell' "$temporary/work dir" < /dev/null; print -r -- "PWD:$PWD") ||
+    workspace --shell 'print -r -- SHELL:$PWD' "$temporary/work dir" < /dev/null; print -r -- "PWD:$PWD") ||
     fail 'lone pane'
-  [[ $output == "PWD:$temporary/work dir" ]] || fail "lone pane printed: $output"
+  [[ $output == "SHELL:$temporary/work dir"$'\n'"PWD:$temporary/work dir" ]] || fail "lone pane printed: $output"
   expected=(
     "'display' '-p' '-t' '%7' '#{window_panes} #{pane_tty}'"
     "'rename-window' '-t' '%7' '--' 'work dir'"
@@ -296,7 +306,6 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     "'send-keys' '-t' '%1' '-l' '--' 'nvim .'" "'send-keys' '-t' '%1' 'Enter'"
     "'send-keys' '-t' '%2' '-l' '--' 'ocode'" "'send-keys' '-t' '%2' 'Enter'"
     "'send-keys' '-t' '%3' '-l' '--' 'ggg'" "'send-keys' '-t' '%3' 'Enter'"
-    "'send-keys' '-t' '%7' '-l' '--' 'echo shell'" "'send-keys' '-t' '%7' 'Enter'"
     "'select-pane' '-t' '%7'"
   )
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lone pane calls: $(<"$temporary/calls")"
@@ -304,14 +313,13 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 TMUX_PANE=%7 TTY=/dev/ttysfixture \
     workspace --layout lean --status 'echo status' --shell 'echo shell' "$temporary/work dir" < /dev/null;
     print -r -- "PWD:$PWD") || fail 'lean lone pane'
-  [[ $output == "PWD:$temporary/work dir" ]] || fail "lean lone pane printed: $output"
+  [[ $output == $'status\nshell\n'"PWD:$temporary/work dir" ]] || fail "lean lone pane printed: $output"
   expected=(
     ${expected[1,2]}
     "'split-window' '-h' '-l' '50%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
     "'split-window' '-v' '-b' '-l' '50%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
     "'send-keys' '-t' '%2' '-l' '--' 'nvim .'" "'send-keys' '-t' '%2' 'Enter'"
     "'send-keys' '-t' '%1' '-l' '--' 'ocode'" "'send-keys' '-t' '%1' 'Enter'"
-    "'send-keys' '-t' '%7' '-l' '--' 'echo status; echo shell'" "'send-keys' '-t' '%7' 'Enter'"
     "'select-pane' '-t' '%7'"
   )
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lean lone pane calls: $(<"$temporary/calls")"

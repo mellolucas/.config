@@ -324,15 +324,17 @@ near 'lean editor height' $(tmux display -p -t $lean[editor] '#{pane_height}') 5
 print -r -- 'ok: workspace sessions, commands, and proportions'
 
 # Run from a shell alone in its window, workspace lays out that window around
-# it: the shell becomes the main one, moves to the workspace, and runs its
-# commands there. Run again beside other panes, it opens a new window.
+# it: the shell becomes the main one, moves to the workspace, and runs its own
+# commands there, typing none into its pane, where a program run after
+# workspace (read, below) would get them. Run again beside other panes, it
+# opens a new window.
 mkdir -p "$HOME/solo" "$HOME/elsewhere"
 tmux new-session -d -s solo -x 120 -y 40 -c "$HOME/elsewhere" 'zsh -f'
 solo=$(tmux display -p -t '=solo:' '#{pane_id}')
 type_line() { tmux send-keys -t "$1" -l -- "$2"; tmux send-keys -t "$1" Enter; }
 type_line $solo "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace --layout lean \
 --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status 'echo T''OP' --shell 'echo BOT''TOM' ${(q)HOME}/solo; \
-[[ \$PWD == ${(q)HOME}/solo ]] && echo MO''VED"
+read -t 1 -r reply; echo READ:\$reply:; [[ \$PWD == ${(q)HOME}/solo ]] && echo MO''VED"
 wait_for 'the lone pane did not become a lean workspace' '(( $(tmux list-panes -t "=solo:" | wc -l) == 3 ))'
 local -A here
 for line in ${(f)"$(tmux list-panes -t '=solo:' -F '#{pane_left} #{pane_top} #{pane_id}')"}; do
@@ -343,7 +345,7 @@ for line in ${(f)"$(tmux list-panes -t '=solo:' -F '#{pane_left} #{pane_top} #{p
   fi
 done
 [[ $here[shell] == $solo ]] || fail "the lone pane is not the main shell: ${(kv)here}"
-for role output in editor EDITOR agent AGENT shell MOVED shell TOP shell BOTTOM; do
+for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM shell READ:: shell MOVED; do
   wait_for "the reused $role pane did not show $output" "ran $here[$role] $output"
 done
 [[ $(tmux list-windows -t '=solo' | wc -l) -eq 1 ]] || fail 'a lone pane got a new window'

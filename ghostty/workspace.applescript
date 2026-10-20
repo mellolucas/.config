@@ -122,18 +122,23 @@ on run argv
 			end if
 		end if
 
+		-- A reused pane's shell runs its own commands once this script returns:
+		-- typed into it, they could reach a program run after workspace
+		set mainTakesInput to (placement is "new tab")
+
 		input text editorCmd to leftEditor
 		send key "enter" to leftEditor
 
 		input text agentCmd to rightAgent
 		send key "enter" to rightAgent
 
-		if statusCmd is not "" then
+		-- The lean layout's status shell is the main one
+		if statusCmd is not "" and (mainTakesInput or layoutName is not "lean") then
 			input text statusCmd to statusShell
 			send key "enter" to statusShell
 		end if
 
-		if shellCmd is not "" then
+		if shellCmd is not "" and mainTakesInput then
 			input text shellCmd to mainShell
 			send key "enter" to mainShell
 		end if

@@ -160,16 +160,23 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
       agent_pane=$(tmux split-window -h -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
       status_pane=$(tmux split-window -v -b -l 30% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
     fi
+    # A reused shell runs its own commands below: typed into it, they could
+    # reach a program run after workspace
+    local -a own=()
     for pane command in "$editor_pane" "$editor" "$agent_pane" "$agent" \
       "$status_pane" "$status_cmd" "$main" "$shell_cmd"; do
       [[ -n $command ]] || continue
+      if [[ -n $here && $pane == $main ]]; then own+=("$command"); continue; fi
       tmux send-keys -t "$pane" -l -- "$command" || return
       tmux send-keys -t "$pane" Enter || return
     done
     tmux select-pane -t "$main" || return
-    # As the main shell, this one moves to the workspace quietly, as the other
-    # panes start there; the commands typed into it run once workspace returns
-    [[ -z $here || ${PWD:A} == $dir ]] || builtin cd -q -- "$dir"
+    if [[ -n $here ]]; then
+      # As the main shell, this one moves to the workspace quietly, as the
+      # other panes start there
+      [[ ${PWD:A} == $dir ]] || builtin cd -q -- "$dir" || return
+      for command in $own; do eval "$command"; done
+    fi
   fi
   [[ -z $TMUX ]] || return 0
   if [[ -t 0 && -t 1 ]]; then
@@ -252,6 +259,16 @@ output=$(
   print -r -u2 -- "workspace: $output"
   return $rc
 }
-# Laid out around this shell, which moves to the workspace quietly, as the
-# other panes start there; the commands typed into it run once workspace returns
-[[ ${output##*$'\n'} != 'same tab' || ${PWD:A} == $dir ]] || builtin cd -q -- "$dir"
+# Laid out around this shell, the main one: it moves to the workspace quietly,
+# as the other panes start there, and runs its own commands, titled as the
+# shell integration titles a command (the script types none into it)
+if [[ ${output##*$'\n'} == 'same tab' ]]; then
+  local command
+  local -a own=("$shell_cmd")
+  [[ $layout == full ]] || own=("$status_cmd" "$shell_cmd")
+  [[ ${PWD:A} == $dir ]] || builtin cd -q -- "$dir" || return
+  for command in $own; do
+    [[ -z $mark ]] || print -rn -- $'\e]2;'"$command"$'\a' 2>/dev/null > /dev/tty
+    eval "$command"
+  done
+fi
