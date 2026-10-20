@@ -18,6 +18,53 @@ if [[ ${1:-} == --mark-child ]]; then
   print -r -- FINISHED
   exit
 fi
+if [[ ${1:-} == --glance-child ]]; then
+  # git-glance's hook from zsh/.zshrc in a top-level terminal shell, with Git
+  # and the card stubbed (a repository is a directory holding .repo), while a
+  # reused shell moves from a to b by each route
+  glance=$2
+  path=("$glance/bin" $path)
+  git() {
+    [[ $1 == rev-parse && $2 == --show-toplevel ]] || return 1
+    local directory=$PWD
+    until [[ -e $directory/.repo ]]; do
+      [[ $directory != / ]] || return 128
+      directory=${directory:h}
+    done
+    print -r -- "$directory"
+  }
+  git-glance() { print -r -- "CARD:${PWD:t}"; }
+  tmux() {
+    case $1 in
+      display) print -r -- '1 /dev/ttysfixture' ;;
+      split-window) print -r -- %9 ;;
+    esac
+  }
+  autoload -Uz add-zsh-hook
+  config=$(<"$repo/zsh/.zshrc")
+  [[ $config == *$'\nif command -v git-glance '*$'\nfi\n'* ]] || exit 1
+  config=${config#*$'\nif command -v git-glance '}
+  builtin cd -- "$glance/a"
+  eval "if command -v git-glance ${config%%$'\nfi\n'*}"$'\nfi'
+  unset DOTFILES_WORKSPACE_LAYOUT DOTFILES_WORKSPACE_SHELL_CMD TMUX TMUX_PANE
+  OSTYPE=darwin23 TERM_PROGRAM=ghostty DOTFILES_WORKSPACE_SCRIPT=$self TTY=/dev/ttysfixture
+  code=$(<"$repo/zsh/functions/workspace")
+  executable_check='[[ -x /usr/bin/osascript ]]'
+  code=${code/$executable_check/'[[ 1 == 1 ]]'}
+  functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
+  workspace_osascript() { print -r -- 'same tab'; }
+  for route in ghostty tmux; do
+    [[ $route == ghostty ]] || export TMUX=/tmp/fixture,1,0 TMUX_PANE=%7
+    workspace "$glance/b" < /dev/null
+    print -r -- "STEP:$route"
+    builtin cd -- sub
+    print -r -- STEP:sub
+    builtin cd -- "$glance/a"
+    print -r -- STEP:back
+  done
+  print -r -- FINISHED
+  exit
+fi
 if [[ ${1:-} == --child ]]; then
   mode=$2
   code=$(<"$repo/zsh/functions/workspace")
@@ -442,3 +489,22 @@ mark=${${transcript#*$'\e]2;'}%%$'\a'*}
 [[ $transcript == *"ARGUMENT:$mark:END"* ]] || fail "mark argument: ${(qqq)transcript}"
 zpty -d terminal
 print -r -- 'ok: pane mark'
+
+# git-glance's hook remembers the repository a reused shell moves to, as for a
+# shell started there: no card within it, and a card back in the first one.
+(
+  glance=$(mktemp -d "${TMPDIR:-/tmp}/workspace-glance.XXXXXXXX")
+  glance=${glance:A}
+  trap 'zpty -d terminal 2>/dev/null; command rm -rf -- "$glance"' EXIT
+  mkdir -p "$glance"/{a,b/sub,bin}
+  touch "$glance/a/.repo" "$glance/b/.repo"
+  print -r -- '#!/bin/sh' > "$glance/bin/tmux"
+  chmod +x "$glance/bin/tmux"
+  transcript=''
+  zpty -b terminal zsh -f "$self" --glance-child "$glance"
+  wait_for FINISHED
+  steps=(${(M)${(f)transcript//$'\r'/}:#(CARD|STEP):*})
+  [[ ${(j: :)steps} == 'STEP:ghostty STEP:sub CARD:a STEP:back STEP:tmux STEP:sub CARD:a STEP:back' ]] ||
+    fail "git-glance after a reused shell moves: ${(j: :)steps}"
+  print -r -- 'ok: git-glance after a reused shell moves'
+)
