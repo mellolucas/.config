@@ -18,9 +18,10 @@ while (( $# )); do
 usage: workspace [OPTIONS] [--] [DIR]
 
 Lay out a coding workspace. In Ghostty on macOS: in this tab when this shell
-is its only pane (the shell becomes the main one and moves to DIR), else in a
-new tab. Inside tmux, the same with windows. Elsewhere, a tmux session named
-after DIR, which rerunning workspace in DIR reattaches.
+is its only pane and Ghostty can tell which pane that is (the shell becomes
+the main one, moves to DIR, and runs its commands), else in a new tab. Inside
+tmux, the same with windows. Elsewhere, a tmux session named after DIR, which
+rerunning workspace in DIR reattaches.
 
 Arguments:
   DIR   Workspace directory. Defaults to the current directory.
