@@ -10,6 +10,7 @@ setopt errexit pipefail
 self=${0:A}
 repo=${self:h:h}
 ruby_bin=${commands[ruby]-}
+rg_bin=${commands[rg]-}
 zsh_bin=${commands[zsh]}
 git_bin=${commands[git]}
 if [[ ${1:-} == --glance-child ]]; then
@@ -107,7 +108,7 @@ if [[ ${1:-} == --glance-render-child ]]; then
   print END
   exit 0
 fi
-for file in "$repo"/zsh/{homebrew.sh,.zprofile,.zshrc,functions/{fzfe,fzfv,git-glance,github-open,github-view,help,keys}} "$self"; do
+for file in "$repo"/zsh/{homebrew.sh,.zprofile,.zshrc,functions/{fzfe,fzfv,git-glance,github-open,github-view,help,keys,rgv}} "$self"; do
   zsh -n "$file"
 done
 
@@ -126,7 +127,7 @@ print -r -- 'local README' > "$root/README.md"
 autoload -Uz run-help
 autoload +X run-help
 fpath=("$repo/zsh/functions")
-autoload -Uz fzfe fzfv github-open github-view help keys
+autoload -Uz fzfe fzfv github-open github-view help keys rgv
 # Individual checks opt into isolated executables as needed.
 path=()
 
@@ -866,6 +867,131 @@ for has_glow in 0 1; do
     done
   )
 done
+
+# rgv runs the real ripgrep over a fixture, then a stand-in picker that runs
+# each file's preview as fzf would and picks one; stand-in editors record what
+# Enter opens.
+if [[ -n $rg_bin ]]; then
+  (
+    setopt extendedglob
+    fixture=$test_root/rgv
+    export TMPDIR=$test_root/rgv-tmp
+    /bin/mkdir -p "$fixture/src" "$fixture/.hidden" "$fixture/.git" "$TMPDIR"
+    builtin cd "$fixture"
+    print -rl -- one 'needle here' three four five six seven 'needle far below' > src/a.txt
+    print -rl -- x y z w 'needle again' 'needle twice' > src/b.txt
+    print -r -- nothing > src/c.txt
+    print -r -- 'a needle' > 'src/space name.txt'
+    print -r -- 'needle hidden' > .hidden/d.txt
+    print -r -- 'needle in git' > .git/e.txt
+    # A binary file rg names only when asked, with a notice and no lines
+    print -rn -- $'needle\0binary\n' > data.bin
+    # rg reports a broken link and exits 2, after printing its matches
+    /bin/ln -s missing src/broken
+    rg() { print -rl -- "$@" > "$test_root/rgv-rg"; "$rg_bin" "$@"; }
+    fzf() {
+      local menu='' line arg preview='' chosen=''
+      print -rl -- "$@" > "$test_root/rgv-fzf"
+      [[ -d $RGV_SHELF ]] || fail 'rgv removed its files before the picker closed'
+      IFS= read -r -d '' menu || [[ -n $menu ]]
+      menu=${menu%$'\n'}
+      print -r -- "$menu" > "$test_root/rgv-menu"
+      for arg in "$@"; do [[ $arg != --preview=* ]] || preview=${arg#--preview=}; done
+      : > "$test_root/rgv-previews"
+      for line in "${(@f)menu}"; do
+        /usr/bin/env PATH=/usr/bin:/bin RGV_SHELF=$RGV_SHELF /bin/sh -c \
+          "${preview//\{1\}/${(qq)${line%%$'\t'*}}}" >> "$test_root/rgv-previews"
+        print -r -- '==' >> "$test_root/rgv-previews"
+      done
+      [[ $pick != cancel ]] || return 130
+      for line in "${(@f)menu}"; do [[ $line != *$'\t'"$pick ("<->')' ]] || chosen=$line; done
+      print -r -- "$chosen"
+    }
+    nvim() {
+      print -rl -- nvim "$@" > "$test_root/rgv-editor"
+      [[ $1 != -q ]] || print -r -- "$(<$2)" > "$test_root/rgv-quickfix"
+    }
+    editor() { print -rl -- editor "$@" > "$test_root/rgv-editor"; }
+    leftovers() { local -a files=("$TMPDIR"/*(DN)); (( ! $#files )) || fail "rgv $1 left files: ${files:t}"; }
+    # The rg alias's options, as the shell reads them
+    defaults=${(M)${(f)"$(<$repo/zsh/.zshrc)"}:#alias rg=*}
+    defaults=(${(Q)${(z)${(Q)defaults#alias rg=}}})
+    [[ $defaults[1] == rg && $#defaults -gt 1 ]] || fail "rg alias: $defaults"
+
+    output=$(rgv --help) || fail 'rgv --help status'
+    [[ $output == 'usage: rgv '* && ! -e $test_root/rgv-rg ]] || fail "rgv --help: $output"
+
+    # Every file with a match, in path order with its count; each preview is
+    # that file's matches and context, in rg's colors. Enter opens Neovim on
+    # the quickfix list of every match, at the chosen file's first.
+    export EDITOR=nvim
+    pick=src/b.txt
+    rgv needle 2> "$test_root/rgv-stderr" || fail 'rgv status'
+    expect "${(F)defaults[2,-1]}"$'\n--sort=path\n--heading\n--with-filename\n--line-number\n--context=2\n--color=always\nneedle' \
+      "$(recorded rgv-rg)" 'rgv: the rg alias options, its own, then the arguments'
+    [[ $(<$test_root/rgv-stderr) == *src/broken* ]] || fail "rgv: rg's report on stderr: $(<$test_root/rgv-stderr)"
+    picker=$'--layout=reverse\n--no-multi\n--delimiter=\t\n--with-nth=3..\n--prompt=Matches > \n--header='
+    picker_rest=$'\n--preview=sed -n {1}p "$RGV_SHELF/matches"\n--preview-window=right,60%,wrap,<66(down,60%,wrap)\n--bind=alt-t:toggle-preview-wrap,ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down'
+    expect "$picker"$'Enter opens its first match in Neovim;\n]q next match, ] then Ctrl+Q next file'"$picker_rest" \
+      "$(recorded rgv-fzf)" 'rgv picker options'
+    menu_lines=("${(@f)$(recorded rgv-menu)}")
+    shown=(${menu_lines#*$'\t'*$'\t'})
+    expect $'.hidden/d.txt (1)\nsrc/a.txt (2)\nsrc/b.txt (2)\nsrc/space name.txt (1)' "${(F)shown}" \
+      'rgv lists each file with a match, in path order'
+    previews=$(recorded rgv-previews)
+    [[ $previews == *$'\e['* ]] || fail 'rgv previews without colors'
+    expect $'.hidden/d.txt\n1:needle hidden\n==\nsrc/a.txt\n1-one\n2:needle here\n3-three\n4-four\n--\n6-six\n7-seven\n8:needle far below\n==\nsrc/b.txt\n3-z\n4-w\n5:needle again\n6:needle twice\n==\nsrc/space name.txt\n1:a needle\n==' \
+      "${previews//$'\e'\[[0-9;]#m}" "rgv previews each file's matches"
+    editor_call=("${(@f)$(recorded rgv-editor)}")
+    [[ $#editor_call == 4 && $editor_call[1,2] == 'nvim -q' && $editor_call[3] == $TMPDIR/rgv.<->.<->/quickfix &&
+      $editor_call[4] == '+cc 4' ]] || fail "rgv opened: ${(qqq)editor_call}"
+    expect $'.hidden/d.txt:1:needle hidden\nsrc/a.txt:2:needle here\nsrc/a.txt:8:needle far below\nsrc/b.txt:5:needle again\nsrc/b.txt:6:needle twice\nsrc/space name.txt:1:a needle' \
+      "$(<$test_root/rgv-quickfix)" "rgv quickfix list"
+    leftovers 'after Enter'
+
+    # A search of one file still names it; another editor opens the chosen
+    # file at its first match.
+    EDITOR='editor --flag' pick='src/space name.txt'
+    rgv -w needle 'src/space name.txt' || fail 'rgv status with another editor'
+    expect "$picker"'Enter opens the file at its first match'"$picker_rest" "$(recorded rgv-fzf)" \
+      'rgv picker header for another editor'
+    expect $'editor\n--flag\n+1\n--\nsrc/space name.txt' "$(recorded rgv-editor)" 'rgv with another editor'
+    leftovers 'with another editor'
+
+    # A file with a notice but no matching lines stays off the list.
+    EDITOR=nvim pick=src/a.txt
+    rgv needle data.bin src/a.txt || fail 'rgv status beside a binary file'
+    menu_lines=("${(@f)$(recorded rgv-menu)}")
+    expect 'src/a.txt (2)' "${menu_lines#*$'\t'*$'\t'}" 'rgv leaves out a file without matching lines'
+    leftovers 'beside a binary file'
+
+    # Cancelling opens nothing; without matches or with a bad pattern there
+    # is no picker; each ends with rg's status or rgv's own message.
+    /bin/rm -f "$test_root"/rgv-{editor,fzf}
+    pick=cancel
+    rgv needle 2> /dev/null || fail 'rgv cancel status'
+    [[ ! -e $test_root/rgv-editor ]] || fail 'rgv cancel opened an editor'
+    leftovers 'after cancel'
+    /bin/rm -f "$test_root/rgv-fzf"
+    for pattern expected_rc expected_message in zzz-nothing 1 'rgv: no matches' '(' 2 'regex parse error'; do
+      rc=0
+      output=$(rgv "$pattern" src/a.txt 2>&1) || rc=$?
+      [[ $rc == $expected_rc && $output == *$expected_message* ]] || fail "rgv $pattern: $rc: $output"
+      [[ ! -e $test_root/rgv-fzf ]] || fail "rgv $pattern opened the picker"
+      leftovers "for $pattern"
+    done
+    for tool in rg fzf; do
+      rc=0
+      output=$(unfunction $tool; rgv needle 2>&1) || rc=$?
+      [[ $rc == 1 && $output == "rgv: $tool not found" ]] || fail "rgv without $tool: $rc: $output"
+    done
+    rc=0
+    output=$(EDITOR='' rgv needle 2>&1) || rc=$?
+    [[ $rc == 1 && $output == 'rgv: EDITOR must name a command' ]] || fail "rgv without EDITOR: $rc: $output"
+  )
+else
+  print -r -- 'SKIP: rgv (rg missing)'
+fi
 
 git_state=branch
 branch=$'feature/#&%\xc3\xa9'

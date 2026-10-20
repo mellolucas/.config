@@ -1,0 +1,98 @@
+# vim: ft=zsh
+
+emulate -L zsh
+setopt extendedglob
+
+if [[ $1 == (-h|--help) ]]; then
+  print -r -- "usage: rgv [RG OPTIONS] PATTERN [PATH...]
+
+Search with ripgrep, then browse the matching files: one line per file with
+its number of matches, and its matches in the preview, with two lines of
+context. Typing filters the files by path; Ctrl+D / Ctrl+U scroll the
+preview and Option+t toggles its wrapping. Enter opens the file at its first
+match; in Neovim, with every match in the quickfix list: ]q / [q go to the
+next / previous match, ] then Ctrl+Q / [ then Ctrl+Q to the next / previous
+file.
+
+Options and paths are rg's (rg --help), after the rg alias's defaults: hidden
+files, symlinks followed, smart case, .git skipped. Options that change how
+rg prints, such as -l, -N or --json, don't fit."
+  return 0
+fi
+
+local tool
+for tool in rg fzf; do
+  command -v $tool >/dev/null 2>&1 || { print -u2 -- "rgv: $tool not found"; return 1 }
+done
+local -a editor=("${(@Q)${(z)EDITOR}}")
+[[ -n $editor[1] ]] || { print -u2 'rgv: EDITOR must name a command'; return 1 }
+
+zmodload -F zsh/files b:zf_mkdir b:zf_rm
+local shelf=${TMPDIR:-/tmp}/rgv.$$.$RANDOM
+zf_mkdir -m 700 "$shelf" || return
+{
+  local -i result=0
+  # The rg alias's defaults (zsh/.zshrc), then the caller's arguments. Sorted
+  # by path, and grouped by file with context: each file's preview is a range
+  # of these lines.
+  rg --hidden --follow --smart-case --glob='!.git' --max-columns=120 --max-columns-preview \
+    --sort=path --heading --with-filename --line-number --context=2 --color=always "$@" > "$shelf/matches" ||
+    result=$?
+  # rg exits 2 after matches too when some path failed, which it reports
+  if [[ ! -s $shelf/matches ]]; then
+    (( result != 1 )) || print -u2 -- 'rgv: no matches'
+    return $result
+  fi
+
+  # Each file prints as its name, its match (N:) and context (N-) lines, and
+  # a blank line before the next file.
+  local line plain file=''
+  local -i number=0 i
+  local -a paths starts ends counts firsts lines quickfix menu
+  while IFS= read -r line; do
+    (( ++number ))
+    plain=${line//$'\e'\[[0-9;]#m}
+    if [[ -z $file ]]; then
+      file=$plain
+      paths+=("$file") starts+=($number) counts+=(0) firsts+=(0) lines+=(0)
+    elif [[ -z $plain ]]; then
+      ends+=($(( number - 1 )))
+      file=''
+    elif [[ $plain == (#b)(<->):(*) ]]; then
+      quickfix+=("$file:$match[1]:$match[2]")
+      (( counts[-1]++ )) || firsts[-1]=$#quickfix lines[-1]=$match[1]
+    fi
+  done < "$shelf/matches"
+  [[ -z $file ]] || ends+=($number)
+  for (( i = 1; i <= $#paths; i++ )); do
+    (( counts[i] )) && menu+=("$starts[i],$ends[i]"$'\t'"$i"$'\t'"$paths[i] ($counts[i])")
+  done
+  (( $#menu )) || { print -u2 -- 'rgv: no matches'; return 1 }
+  print -rl -- $quickfix > "$shelf/quickfix"
+
+  local selection
+  local -a header=('Enter opens the file at its first match')
+  [[ ${editor[1]:t} != nvim ]] || header=('Enter opens its first match in Neovim;' ']q next match, ] then Ctrl+Q next file')
+  # The preview sits beside the list from 110 columns (its threshold measures
+  # the preview)
+  result=0
+  selection=$(print -rl -- $menu | RGV_SHELF=$shelf fzf --layout=reverse --no-multi \
+      --delimiter=$'\t' --with-nth=3.. --prompt='Matches > ' --header=${(F)header} \
+      --preview='sed -n {1}p "$RGV_SHELF/matches"' --preview-window='right,60%,wrap,<66(down,60%,wrap)' \
+      --bind='alt-t:toggle-preview-wrap,ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down') ||
+    result=$?
+  case $result in
+    0) ;;
+    1|130) return 0 ;;
+    *) return $result ;;
+  esac
+
+  i=${${selection#*$'\t'}%%$'\t'*}
+  if [[ ${editor[1]:t} == nvim ]]; then
+    "${editor[@]}" -q "$shelf/quickfix" "+cc $firsts[i]"
+  else
+    "${editor[@]}" "+$lines[i]" -- "$paths[i]"
+  fi
+} always {
+  zf_rm -rf -- "$shelf"
+}

@@ -67,6 +67,7 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 | `Space d q` | Diagnostics into the quickfix list |
 | `:grep TEXT` | Search the project with rg into the quickfix list |
 | `]q` / `[q` / `:copen` / `:cclose` | Next / previous quickfix entry / show / hide the list |
+| `]` then `Ctrl+Q` / `[` then `Ctrl+Q` | First quickfix entry in the next / previous file |
 | `K` / `grn` / `gra` | Hover / rename / code actions |
 | `grr` / `gri` / `grt` | References / implementations / type definition |
 | `Ctrl+]` / `Ctrl+T` | Jump to the definition / back |
@@ -206,12 +207,14 @@ List what is here, then find a file by name or by content.
 | `rga TEXT` | Also search files that Git ignores (`rgfa`, `rgca` for files / counts) |
 | `rgf TEXT` / `rgc TEXT` | Matching files only / matching-line counts per file |
 | `rgw TEXT` | Whole words only (combine: `rgwa`, `rgwc`, `rgwca`) |
+| `rgv TEXT` | Browse the matches file by file: each file's matches in the preview; Enter opens Neovim at the first, with every match in the quickfix list |
 
-In `fzfv`: `Ctrl+D` / `Ctrl+U` scroll the preview (first 500 lines), `Option+t` toggles wrapping, Esc cancels.
+In `fzfv` and `rgv`: `Ctrl+D` / `Ctrl+U` scroll the preview (`fzfv` shows a file's first 500 lines), `Option+t` toggles wrapping, Esc cancels.
 
 - Not sure where to look? Narrow down first: `Option+c` to the right directory, then `fzfv` or `Ctrl+T` from there.
 - Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.
-- `rg`, `:grep`, and Neovim's `/` are smart-case: all-lowercase text ignores case.
+- `rg`, `rgv`, `:grep`, and Neovim's `/` are smart-case: all-lowercase text ignores case.
+- `rgv` takes `rg`'s options and paths: `rgv -w TEXT`, `rgv --no-ignore TEXT src/`, `rgv -C 5 TEXT` for more context.
 - Pipe a list into the pickers: `rgf TEXT | fzfv`.
 
 ## Browse: Read terminal output

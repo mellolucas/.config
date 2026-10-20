@@ -113,10 +113,13 @@ zsh_bin=${commands[zsh]}
 fzf_bin=${commands[fzf]-}
 eza_bin=${commands[eza]-}
 eza_completion=''
+rg_completion=''
 for directory in $fpath; do
-  if [[ -r $directory/_eza ]]; then
+  if [[ -z $eza_completion && -r $directory/_eza ]]; then
     eza_completion=$directory/_eza
-    break
+  fi
+  if [[ -z $rg_completion && -r $directory/_rg ]]; then
+    rg_completion=$directory/_rg
   fi
 done
 # Only the native distribution functions, never site-functions or private completions.
@@ -152,6 +155,12 @@ if [[ -n $eza_bin && -n $eza_completion ]]; then
   ln -s "$eza_bin" "$HOME/bin/eza"
 else
   print -r -- "SKIP: eza alias completion (eza: ${eza_bin:-not installed}; _eza: ${eza_completion:-not found in original fpath})"
+fi
+if [[ -n $rg_completion ]]; then
+  # rgv borrows ripgrep's packaged completion, which needs no rg to complete options
+  ln -s "$rg_completion" "$HOME/completions/_rg"
+else
+  print -r -- 'SKIP: rgv completion (_rg not found in original fpath)'
 fi
 fixture="$HOME/fixtures"
 mkdir -p "$fixture"/{prefix,case,partial,substring,hidden,dirs,all,glob,md}
@@ -371,6 +380,8 @@ for mode in native fzf; do
   complete 'mdv first Tab' 'mdv ' 'mdv only.md '
   zpty -w -n shell $'\x18\x12builtin cd ..\r'
   wait_for 'ZLE-READY'
+  # rgv completes as rg does
+  [[ -z $rg_completion ]] || complete 'rgv rg option' 'rgv --word-reg' 'rgv --word-regexp '
   for helper in dotfiles dots; do
     for subcommand in install link bundle update check-updates status doctor uninstall help; do
       complete "$helper $subcommand" "$helper ${subcommand[1,-2]}" "$helper $subcommand "

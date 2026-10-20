@@ -77,6 +77,12 @@ Changes since `v0.0.1`.
   waits for a buffer's number or name after listing them, and `Space b -`
   switches to the previous file, never to the file tree or an empty window,
   also from the tree, saying so when there is none.
+- `rgv TEXT` browses ripgrep's matches file by file: one line per file with
+  its number of matches, and that file's matches with context in the
+  preview. Enter opens Neovim at the file's first match, with every match in
+  the quickfix list, where `]q` and `]` then `Ctrl+Q` step to the next match
+  and file. It takes `rg`'s options and paths, after the `rg` alias's
+  defaults.
 - Neovim shows a file tree (nvim-tree, with mini.icons coloring its icons
   from the colorscheme): `nvim DIR` and the workspace's editor open on it,
   `Space e e` shows or hides it, and `Space e r` finds the open file in it.

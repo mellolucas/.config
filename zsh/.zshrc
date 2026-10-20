@@ -47,6 +47,8 @@ compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
 zstyle ':completion:*' cache-path "$XDG_CACHE_HOME/zsh/zcompcache"
 # zsh's SCCS completion claims delta ahead of git-delta's, demoted above
 (( $+commands[delta] )) && compdef _delta delta
+# rgv takes rg's options and paths
+(( $+_comps[rg] )) && compdef rgv=rg
 # Include dotfiles in completion without changing ordinary wildcard expansion.
 _comp_options+=(globdots)
 
