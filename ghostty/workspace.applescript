@@ -1,9 +1,12 @@
 -- Ghostty workspace layout.
 --
 -- Usage:
---   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD STATUS_CMD SHELL_CMD CONTENT_WIDTH CONTENT_HEIGHT LAYOUT
+--   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD STATUS_CMD SHELL_CMD CONTENT_WIDTH CONTENT_HEIGHT LAYOUT MARK
 --
--- Opens as a new tab in the frontmost Ghostty window (new window when none).
+-- When the focused pane's title is MARK (the invoking shell titles its own
+-- pane) and it is its tab's only pane, lays out that tab, the pane becoming
+-- the main shell; otherwise opens a new tab in the frontmost Ghostty window
+-- (new window when none). Prints "same tab" or "new tab".
 -- CONTENT_WIDTH/CONTENT_HEIGHT are the window text area in pixels (CSI 14 t);
 -- when missing or 0 the full layout's splits are equalized instead of
 -- ratio-sized. LAYOUT is full (the default) or lean.
@@ -32,7 +35,7 @@ use scripting additions
 
 on run argv
 	if (count of argv) < 3 then
-		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [STATUS_CMD] [SHELL_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT] [LAYOUT]"
+		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [STATUS_CMD] [SHELL_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT] [LAYOUT] [MARK]"
 	end if
 
 	set workspaceDir to item 1 of argv
@@ -44,12 +47,14 @@ on run argv
 	set contentWidth to 0
 	set contentHeight to 0
 	set layoutName to "full"
+	set markTitle to ""
 
 	if (count of argv) ≥ 4 then set statusCmd to item 4 of argv
 	if (count of argv) ≥ 5 then set shellCmd to item 5 of argv
 	if (count of argv) ≥ 6 then set contentWidth to (item 6 of argv) as integer
 	if (count of argv) ≥ 7 then set contentHeight to (item 7 of argv) as integer
 	if (count of argv) ≥ 8 then set layoutName to item 8 of argv
+	if (count of argv) ≥ 9 then set markTitle to item 9 of argv
 
 	-- One divider move per axis reaches the target ratios: resize_split moves
 	-- the divider of the pane's nearest ancestor split, and nested splits
@@ -70,12 +75,33 @@ on run argv
 		set cfg to new surface configuration
 		set initial working directory of cfg to workspaceDir
 
-		if (count of windows) > 0 then
-			set workspaceTab to new tab in front window with configuration cfg
-		else
-			set workspaceTab to selected tab of (new window with configuration cfg)
+		-- Ghostty applies a new title within about 75 ms
+		set mainShell to missing value
+		if markTitle is not "" and (count of windows) > 0 then
+			try
+				repeat 10 times
+					set sourceTab to selected tab of front window
+					set sourceTerminal to focused terminal of sourceTab
+					if name of sourceTerminal is markTitle then
+						if (count of terminals of sourceTab) is 1 then set mainShell to sourceTerminal
+						exit repeat
+					end if
+					delay 0.05
+				end repeat
+			end try
 		end if
-		set mainShell to focused terminal of workspaceTab
+
+		if mainShell is not missing value then
+			set placement to "same tab"
+		else
+			set placement to "new tab"
+			if (count of windows) > 0 then
+				set workspaceTab to new tab in front window with configuration cfg
+			else
+				set workspaceTab to selected tab of (new window with configuration cfg)
+			end if
+			set mainShell to focused terminal of workspaceTab
+		end if
 
 		-- The other panes split from the main shell
 		if layoutName is "lean" then
@@ -114,4 +140,5 @@ on run argv
 
 		focus mainShell
 	end tell
+	return placement
 end run

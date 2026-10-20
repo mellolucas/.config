@@ -323,6 +323,39 @@ near 'lean editor width' $(tmux display -p -t $lean[editor] '#{pane_width}') 50 
 near 'lean editor height' $(tmux display -p -t $lean[editor] '#{pane_height}') 50 $rows
 print -r -- 'ok: workspace sessions, commands, and proportions'
 
+# Run from a shell alone in its window, workspace lays out that window around
+# it: the shell becomes the main one, moves to the workspace, and runs its
+# commands there. Run again beside other panes, it opens a new window.
+mkdir -p "$HOME/solo" "$HOME/elsewhere"
+tmux new-session -d -s solo -x 120 -y 40 -c "$HOME/elsewhere" 'zsh -f'
+solo=$(tmux display -p -t '=solo:' '#{pane_id}')
+type_line() { tmux send-keys -t "$1" -l -- "$2"; tmux send-keys -t "$1" Enter; }
+type_line $solo "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace --layout lean \
+--editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status 'echo T''OP' --shell 'echo BOT''TOM' ${(q)HOME}/solo; \
+[[ \$PWD == ${(q)HOME}/solo ]] && echo MO''VED"
+wait_for 'the lone pane did not become a lean workspace' '(( $(tmux list-panes -t "=solo:" | wc -l) == 3 ))'
+local -A here
+for line in ${(f)"$(tmux list-panes -t '=solo:' -F '#{pane_left} #{pane_top} #{pane_id}')"}; do
+  read -r left top id <<< "$line"
+  if (( left > 0 )); then here[agent]=$id
+  elif (( top > 0 )); then here[shell]=$id
+  else here[editor]=$id
+  fi
+done
+[[ $here[shell] == $solo ]] || fail "the lone pane is not the main shell: ${(kv)here}"
+for role output in editor EDITOR agent AGENT shell MOVED shell TOP shell BOTTOM; do
+  wait_for "the reused $role pane did not show $output" "ran $here[$role] $output"
+done
+[[ $(tmux list-windows -t '=solo' | wc -l) -eq 1 ]] || fail 'a lone pane got a new window'
+[[ $(tmux display -p -t '=solo:' '#{pane_id} #{window_name}') == "$solo solo" ]] ||
+  fail "reused window: $(tmux display -p -t '=solo:' '#{pane_id} #{window_name}')"
+type_line $solo "workspace --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status '' ${(q)HOME}/elsewhere; \
+[[ \$PWD == ${(q)HOME}/solo ]] && echo STA''YED"
+wait_for 'beside other panes, workspace did not open a new window' \
+  '[[ $(tmux list-windows -t "=solo" -F "#{window_name} #{window_panes}") == $'"'"'solo 3\nelsewhere 4'"'"' ]]'
+wait_for 'a new window moved the shell' "ran $solo STAYED"
+print -r -- 'ok: workspace builds around a shell alone in its window, else opens one'
+
 # keys through the real fzf, with tmux as the screen: at 120 columns every page
 # sits beside the preview; once results are listed, and only then, the wrap
 # key shows by the count and Ctrl+/ toggles them, one press each way.

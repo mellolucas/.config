@@ -17,9 +17,10 @@ while (( $# )); do
       cat <<'EOF'
 usage: workspace [OPTIONS] [--] [DIR]
 
-Lay out a coding workspace: a new tab in Ghostty on macOS; elsewhere a tmux
-window (inside tmux) or a tmux session named after DIR, which rerunning
-workspace in DIR reattaches.
+Lay out a coding workspace. In Ghostty on macOS: in this tab when this shell
+is its only pane (the shell becomes the main one and moves to DIR), else in a
+new tab. Inside tmux, the same with windows. Elsewhere, a tmux session named
+after DIR, which rerunning workspace in DIR reattaches.
 
 Arguments:
   DIR   Workspace directory. Defaults to the current directory.
@@ -119,7 +120,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
     print -u2 -- 'hint: run: dotfiles bundle'
     return 1
   }
-  local name line main agent_pane editor_pane status_pane pane command
+  local name line main here='' agent_pane editor_pane status_pane pane command
   if [[ -z $TMUX ]]; then
     for line in ${(f)"$(tmux list-sessions -F '#{session_name}:#{session_path}' 2>/dev/null)"}; do
       [[ ${line#*:} == "$dir" ]] && name=${line%%:*} && break
@@ -127,7 +128,15 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
   fi
   if [[ -z $name ]]; then
     if [[ -n $TMUX ]]; then
-      main=$(tmux new-window -P -F '#{pane_id}' -n "${dir:t}" -c "$dir") || return
+      # A window holding only this shell becomes the workspace around it; the
+      # pane's terminal tells this shell from one nested in another program
+      if [[ -n $TMUX_PANE && -n $TTY &&
+          $(tmux display -p -t "$TMUX_PANE" '#{window_panes} #{pane_tty}' 2>/dev/null) == "1 $TTY" ]]; then
+        main=$TMUX_PANE here=1
+        tmux rename-window -t "$main" -- "${dir:t}" || return
+      else
+        main=$(tmux new-window -P -F '#{pane_id}' -n "${dir:t}" -c "$dir") || return
+      fi
     else
       # Session names cannot hold . or :, and stay unique per directory
       name=${${${dir:t}:-root}//[.:]/_}
@@ -158,6 +167,9 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
       tmux send-keys -t "$pane" Enter || return
     done
     tmux select-pane -t "$main" || return
+    # As the main shell, this one moves to the workspace quietly, as the other
+    # panes start there; the commands typed into it run once workspace returns
+    [[ -z $here || ${PWD:A} == $dir ]] || builtin cd -q -- "$dir"
   fi
   [[ -z $TMUX ]] || return 0
   if [[ -t 0 && -t 1 ]]; then
@@ -219,12 +231,19 @@ if [[ $layout == full && -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
   fi
 fi
 
-local output
+local output mark=''
 local -i rc=0
+# Ghostty can't tell a shell which pane it runs in, so this shell titles its
+# own pane with a unique mark for the script to find; the next prompt's title
+# replaces it
+if [[ -t 0 ]]; then
+  mark="workspace $$.$RANDOM"
+  print -rn -- $'\e]2;'"$mark"$'\a' 2>/dev/null > /dev/tty || mark=''
+fi
 output=$(
   /usr/bin/osascript "$script" "$dir" \
     "$editor" "$agent" "$status_cmd" "$shell_cmd" \
-    "$width" "$height" "$layout" \
+    "$width" "$height" "$layout" "$mark" \
     2>&1
 ) || {
   rc=$?
@@ -233,3 +252,6 @@ output=$(
   print -r -u2 -- "workspace: $output"
   return $rc
 }
+# Laid out around this shell, which moves to the workspace quietly, as the
+# other panes start there; the commands typed into it run once workspace returns
+[[ ${output##*$'\n'} != 'same tab' || ${PWD:A} == $dir ]] || builtin cd -q -- "$dir"

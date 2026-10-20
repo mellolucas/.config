@@ -5,6 +5,19 @@ setopt errexit pipefail
 
 self=${0:A}
 repo=${self:h:h}
+if [[ ${1:-} == --mark-child ]]; then
+  # The Ghostty route from a terminal, with the script runner stubbed
+  unset DOTFILES_WORKSPACE_LAYOUT TMUX TMUX_PANE
+  OSTYPE=darwin23 TERM_PROGRAM=ghostty DOTFILES_WORKSPACE_SCRIPT=$self
+  code=$(<"$repo/zsh/functions/workspace")
+  executable_check='[[ -x /usr/bin/osascript ]]'
+  code=${code/$executable_check/'[[ 1 == 1 ]]'}
+  functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
+  workspace_osascript() { print -r -- "ARGUMENT:${@[-1]}:END" >&3; }
+  workspace --layout lean 3>&1
+  print -r -- FINISHED
+  exit
+fi
 if [[ ${1:-} == --child ]]; then
   mode=$2
   code=$(<"$repo/zsh/functions/workspace")
@@ -70,7 +83,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 # argument list; the Ghostty route needs macOS, Ghostty, and no tmux.
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
-    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX
+    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX TMUX_PANE
   OSTYPE=darwin23 TERM_PROGRAM=ghostty
   export DOTFILES_WORKSPACE_SCRIPT=$self
   code=$(<"$repo/zsh/functions/workspace")
@@ -79,7 +92,8 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   code=${code/$executable_check/'[[ 1 == 1 ]]'}
   functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
-  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode ggg '' 0 0 full)
+  # Without a terminal the shell marks no pane, so the script opens a new tab.
+  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode ggg '' 0 0 full '')
   dispatch() {
     local actual
     actual=$(workspace "$@" 3>&1 < /dev/null) || fail "dispatch: ${(qqq)@}"
@@ -155,6 +169,20 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     expected[2]="${temporary:A}/--directory"
     dispatch --editor="$expected[3]" --agent="$expected[4]" --status= --shell= -- --directory
   )
+  # Laid out around this shell (the script answers "same tab"), the shell
+  # moves to the workspace; with a new tab it stays where it was.
+  workspace_osascript() { print -r -- 'same tab'; }
+  (
+    workspace "$temporary/path with spaces" < /dev/null > /dev/null || fail 'same tab'
+    [[ $PWD == "${temporary:A}/path with spaces" ]] || fail "same tab left the shell in $PWD"
+  )
+  workspace_osascript() { print -r -- 'new tab'; }
+  (
+    builtin cd -- "$temporary"
+    workspace "$temporary/path with spaces" < /dev/null > /dev/null || fail 'new tab'
+    [[ ${PWD:A} == ${temporary:A} ]] || fail "a new tab moved the shell to $PWD"
+  )
+  workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
 
   for option in --layout --agent --editor --status --shell; do
     reject "$option"
@@ -190,7 +218,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 # (a stub records the calls).
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
-    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX
+    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX TMUX_PANE
   # Never the Ghostty route here: it would open a real tab.
   export TERM_PROGRAM=fixture
   fpath=("$repo/zsh/functions" $fpath)
@@ -215,6 +243,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     # Pane ids from the log: the function captures output in subshells
     case $1 in
       has-session) return 1 ;;
+      display) print -r -- "$window_panes $pane_tty" ;;
       new-session|new-window|split-window)
         local -a made=(${(M)${(f)"$(<"$temporary/calls")"}:#\'(new-session|new-window|split-window)\'*})
         print -r -- "%$#made" ;;
@@ -249,6 +278,53 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     "'select-pane' '-t' '%1'"
   )
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lean calls: $(<"$temporary/calls")"
+
+  # A window holding only this shell becomes the workspace around it: the
+  # shell is the main one, takes its commands, and moves to the workspace.
+  local window_panes=1 pane_tty=/dev/ttysfixture
+  : > "$temporary/calls"
+  output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 TMUX_PANE=%7 TTY=/dev/ttysfixture \
+    workspace --shell 'echo shell' "$temporary/work dir" < /dev/null; print -r -- "PWD:$PWD") ||
+    fail 'lone pane'
+  [[ $output == "PWD:$temporary/work dir" ]] || fail "lone pane printed: $output"
+  expected=(
+    "'display' '-p' '-t' '%7' '#{window_panes} #{pane_tty}'"
+    "'rename-window' '-t' '%7' '--' 'work dir'"
+    "'split-window' '-h' '-b' '-l' '20%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-h' '-l' '50%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-v' '-b' '-l' '30%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'send-keys' '-t' '%1' '-l' '--' 'nvim .'" "'send-keys' '-t' '%1' 'Enter'"
+    "'send-keys' '-t' '%2' '-l' '--' 'ocode'" "'send-keys' '-t' '%2' 'Enter'"
+    "'send-keys' '-t' '%3' '-l' '--' 'ggg'" "'send-keys' '-t' '%3' 'Enter'"
+    "'send-keys' '-t' '%7' '-l' '--' 'echo shell'" "'send-keys' '-t' '%7' 'Enter'"
+    "'select-pane' '-t' '%7'"
+  )
+  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lone pane calls: $(<"$temporary/calls")"
+  : > "$temporary/calls"
+  output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 TMUX_PANE=%7 TTY=/dev/ttysfixture \
+    workspace --layout lean --status 'echo status' --shell 'echo shell' "$temporary/work dir" < /dev/null;
+    print -r -- "PWD:$PWD") || fail 'lean lone pane'
+  [[ $output == "PWD:$temporary/work dir" ]] || fail "lean lone pane printed: $output"
+  expected=(
+    ${expected[1,2]}
+    "'split-window' '-h' '-l' '50%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-v' '-b' '-l' '50%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'send-keys' '-t' '%2' '-l' '--' 'nvim .'" "'send-keys' '-t' '%2' 'Enter'"
+    "'send-keys' '-t' '%1' '-l' '--' 'ocode'" "'send-keys' '-t' '%1' 'Enter'"
+    "'send-keys' '-t' '%7' '-l' '--' 'echo status; echo shell'" "'send-keys' '-t' '%7' 'Enter'"
+    "'select-pane' '-t' '%7'"
+  )
+  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lean lone pane calls: $(<"$temporary/calls")"
+  # Beside other panes, or nested in another program's terminal (the pane's
+  # terminal is not this shell's), a new window, and the shell stays put.
+  for window_panes pane_tty in 2 /dev/ttysfixture 1 /dev/ttysother; do
+    : > "$temporary/calls"
+    output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 TMUX_PANE=%7 TTY=/dev/ttysfixture \
+      workspace "$temporary/work dir" < /dev/null; print -r -- "PWD:$PWD") || fail "not alone: $window_panes"
+    [[ $output == "PWD:$PWD" ]] || fail "not alone ($window_panes $pane_tty) printed: $output"
+    [[ ${${(f)"$(<"$temporary/calls")"}[2]} == "'new-window' "* ]] ||
+      fail "not alone ($window_panes $pane_tty) calls: $(<"$temporary/calls")"
+  done
   expected=(
     "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
     "'split-window' '-h' '-b' '-l' '20%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
@@ -347,3 +423,14 @@ for mode in valid noncanonical echo-off queued fragmented leading-zero wrong-cod
   zpty -d terminal
   print -r -- "ok: $mode"
 done
+
+# From a terminal, the shell titles its own pane with a unique mark and passes
+# the same mark, for the script to find the pane.
+transcript=''
+zpty -b terminal zsh -f "$self" --mark-child
+wait_for FINISHED
+mark=${${transcript#*$'\e]2;'}%%$'\a'*}
+[[ $transcript == *$'\e]2;'* && $mark == 'workspace '<->.<-> ]] || fail "pane mark: ${(qqq)transcript}"
+[[ $transcript == *"ARGUMENT:$mark:END"* ]] || fail "mark argument: ${(qqq)transcript}"
+zpty -d terminal
+print -r -- 'ok: pane mark'

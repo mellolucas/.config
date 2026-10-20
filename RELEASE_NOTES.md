@@ -91,6 +91,10 @@ Changes since `v0.0.1`.
 - Interactive non-login shells (common on Linux) now set up Homebrew too.
 - `workspace` keeps its proportions on Retina displays: the window size it
   measures in pixels is converted to the points Ghostty resizes by.
+- Run from a shell alone in its Ghostty tab (or tmux window), `workspace`
+  lays out that tab around it: the shell becomes the main one and moves to
+  the workspace's directory. Beside other panes it opens a new tab (or
+  window).
 - Option+Left and Option+Right jump words at the prompt and in Neovim instead
   of dropping into vi command mode or Neovim's normal mode. At the prompt,
   Option+Backspace deletes a word, Ctrl+W and Ctrl+U reach past where typing

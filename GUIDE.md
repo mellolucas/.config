@@ -20,10 +20,11 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: editor l
 | `workspace --status ''` | Leave the status shell at its prompt |
 | `workspace --help` | Every option and its default |
 
+- Run from a tab where your shell is the only pane, `workspace` lays out that tab around it: your shell becomes the main shell and moves to the directory. From a tab with other panes it opens a new tab.
 - Focus starts in the main shell (the larger middle one, or the lean layout's only one); `Option+h/j/k/l` moves to the editor and the agent.
 - For lasting defaults, set `DOTFILES_WORKSPACE_LAYOUT=lean` (on a laptop, say) or the commands in `zsh/local.zsh`.
 - The editor opens on the project's file tree; `Option+z` widens it to explore (`keys explore`).
-- Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux it opens a new window instead.
+- Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux, windows take the place of tabs.
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
 - Tab completes `workspace`'s flags and directories.
 
