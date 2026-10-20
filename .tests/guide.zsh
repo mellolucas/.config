@@ -20,18 +20,21 @@ if [[ ${1:-} == --child ]]; then
     print -r -u2 -- "FZF:ARGS:${(j:|:)@}"
     print -r -u2 -- "FZF:ENV:$FZF_DEFAULT_OPTS:$FZF_DEFAULT_OPTS_FILE"
     print -rn -u2 -- "FZF:INPUT"$'\n'"$input"$'FZF:END\n'
-    # The picker's two views and the selection's preview, run as fzf runs them
-    local arg reload='' preview=''
+    # The picker's two views, the selection's preview, and the info line without
+    # and with a query, run as fzf runs them
+    local arg reload='' preview='' info=''
     for arg in "$@"; do
       case $arg in
         (--bind=change:reload:*) reload=${arg#--bind=change:reload:} ;;
         (--preview=*) preview=${arg#--preview=} ;;
+        (--info-command=*) info=${arg#--info-command=} ;;
       esac
     done
     local -a run=(/usr/bin/env PATH=/usr/bin:/bin KEYS_SHELF=$KEYS_SHELF KEYS_STYLE=$KEYS_STYLE
       FZF_PREVIEW_COLUMNS=40 /bin/zsh -fc)
     print -r -u2 -- "FZF:VIEWS:${#${(f)"$($run "${reload//\{q\}/''}")"}}:${#${(f)"$($run "${reload//\{q\}/'x'}")"}}"
     print -r -u2 -- "FZF:PREVIEW:${${(f)"$($run 'glow() { cat -- "${@[-1]}"; }; '"${preview//\{1\}/$selection_topic}")"}[1]}"
+    print -r -u2 -- "FZF:INFO:$(/usr/bin/env FZF_INFO=3/9 FZF_QUERY= /bin/zsh -fc $info):$(/usr/bin/env FZF_INFO=3/9 FZF_QUERY=x /bin/zsh -fc $info)"
     case $mode in
       cancel) return 130 ;;
       no-match) return 1 ;;
@@ -158,12 +161,14 @@ picker() {
   local -a args=(--layout=reverse --no-multi --wrap $'--delimiter=\t' --with-nth=2..)
   [[ -z $query ]] || args+=("--query=$query")
   args+=('--bind=change:reload:[ -z {q} ] && cat "$KEYS_SHELF/pages" || cat "$KEYS_SHELF/entries"'
-    '--bind=ctrl-/:toggle-wrap,alt-/:toggle-wrap' "--preview=$preview"
-    '--preview-window=right,55%,wrap,<100(down,50%,wrap)' '--prompt=Find a task > '
-    $'--header=Working here: pick a page, or type to search every line\nEnter reads the page. Esc returns to the shell. Ctrl+/ wraps lines.')
+    '--bind=ctrl-/:toggle-wrap,alt-/:toggle-wrap'
+    '--info-command=echo "$FZF_INFO${FZF_QUERY:+ · Ctrl+/ toggles wrapping}"' "--preview=$preview"
+    '--preview-window=right,50%,wrap,<55(down,50%,wrap)' '--prompt=Find a task > '
+    $'--header=Pick a page, or type to search every line\nEnter reads the page. Esc returns to the shell.')
   if [[ -n $query ]]; then view=${(F)entries}; else view=${(F)menu}; fi
   print -rn -- "FZF:ARGS:${(j:|:)args}"$'\n'"FZF:ENV::$repo/fzf/fzfrc"$'\nFZF:INPUT\n'"$view"$'\nFZF:END\n'
   print -rn -- "FZF:VIEWS:$#menu:$#entries"$'\n'"FZF:PREVIEW:# $titles[$selected]"$'\n'
+  print -rn -- 'FZF:INFO:3/9:3/9 · Ctrl+/ toggles wrapping'$'\n'
 }
 
 checks=0

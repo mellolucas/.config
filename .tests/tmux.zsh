@@ -322,3 +322,42 @@ rows=$(tmux display -p -t '=lean:' '#{window_height}')
 near 'lean editor width' $(tmux display -p -t $lean[editor] '#{pane_width}') 50 $columns
 near 'lean editor height' $(tmux display -p -t $lean[editor] '#{pane_height}') 50 $rows
 print -r -- 'ok: workspace sessions, commands, and proportions'
+
+# keys through the real fzf, with tmux as the screen: at 120 columns every page
+# sits beside the preview; once results are listed, and only then, the wrap
+# key shows by the count and Ctrl+/ toggles them, one press each way.
+if (( $+commands[fzf] )); then
+  local -a page_rows leftovers
+  for line in ${(f)"$(<"$repo/GUIDE.md")"}; do
+    [[ $line != '## '*': '* ]] || page_rows+=("${(L)${${line#'## '}%%:*}}"$'\t'"${line#*: }")
+  done
+  screen() { tmux capture-pane -p -t '=keys:'; }
+  settled() { local first=$(screen); sleep 0.2; REPLY=$(screen); [[ $REPLY == "$first" ]]; }
+  listed() {
+    local text=$(screen) row
+    for row in "${page_rows[@]}"; do
+      (( ${#${(M)${(f)text}:#*" ${row%%$'\t'*} "*"${row#*$'\t'}"*}} )) || return 1
+    done
+  }
+  mkdir -p "$HOME/tmp"
+  tmux new-session -d -s keys -x 120 -y 24 -c "$repo" \
+    "TMPDIR=${(q)HOME}/tmp zsh -fc 'fpath=(zsh/functions \$fpath); autoload -Uz keys; keys'"
+  tmux resize-window -t '=keys:' -x 120 -y 24
+  wait_for "keys at 120 columns did not list all ${#page_rows} pages" listed
+  [[ $(screen) != *'Ctrl+/'* ]] || fail 'keys shows the wrap key before any results'
+  tmux send-keys -t '=keys:' -l split
+  wait_for 'keys did not show the wrap key with its results' '[[ $(screen) == *"Ctrl+/ toggles wrapping"* ]]'
+  wait_for 'keys did not settle on its results' settled
+  wrapped=$REPLY
+  tmux send-keys -t '=keys:' -H 1f
+  wait_for 'Ctrl+/ did not unwrap the results' 'settled && [[ $REPLY != "$wrapped" ]]'
+  tmux send-keys -t '=keys:' -H 1f
+  wait_for 'a second Ctrl+/ did not wrap the results again' 'settled && [[ $REPLY == "$wrapped" ]]'
+  tmux send-keys -t '=keys:' Escape
+  wait_for 'Esc did not close keys' '! tmux has-session -t "=keys" 2>/dev/null'
+  leftovers=("$HOME"/tmp/*(DN))
+  (( ! $#leftovers )) || fail "keys left temporary files: ${leftovers:t}"
+  print -r -- 'ok: keys lists every page beside its preview and toggles wrapping in results'
+else
+  print -r -- 'SKIP: keys picker through real fzf (fzf missing)'
+fi

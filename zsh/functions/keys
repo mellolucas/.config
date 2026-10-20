@@ -105,15 +105,18 @@ if [[ -z $topic && -t 0 && -t 1 ]] && (( ! plain )) && command -v fzf >/dev/null
     preview='cat "$KEYS_SHELF"/{1}.md'
     command -v glow >/dev/null 2>&1 &&
       preview='glow --style "$KEYS_STYLE" --width "$FZF_PREVIEW_COLUMNS" "$KEYS_SHELF"/{1}.md'
-    # Only the repository's fzf options (colors); personal ones could reshape the picker
+    # Only the repository's fzf options (colors); personal ones could reshape the picker.
+    # The preview sits beside the list from 110 columns (its threshold measures
+    # the preview), and the wrap key shows beside the count once results do.
     selection=$(KEYS_SHELF=$shelf KEYS_STYLE=$repo/glow/guide.json \
       FZF_DEFAULT_OPTS= FZF_DEFAULT_OPTS_FILE=$repo/fzf/fzfrc \
       fzf --layout=reverse --no-multi --wrap --delimiter=$'\t' --with-nth=2.. $query_option \
         --bind='change:reload:[ -z {q} ] && cat "$KEYS_SHELF/pages" || cat "$KEYS_SHELF/entries"' \
         --bind='ctrl-/:toggle-wrap,alt-/:toggle-wrap' \
-        --preview=$preview --preview-window='right,55%,wrap,<100(down,50%,wrap)' \
+        --info-command='echo "$FZF_INFO${FZF_QUERY:+ · Ctrl+/ toggles wrapping}"' \
+        --preview=$preview --preview-window='right,50%,wrap,<55(down,50%,wrap)' \
         --prompt='Find a task > ' \
-        --header=$'Working here: pick a page, or type to search every line\nEnter reads the page. Esc returns to the shell. Ctrl+/ wraps lines.' \
+        --header=$'Pick a page, or type to search every line\nEnter reads the page. Esc returns to the shell.' \
         < "$shelf/$initial") || result=$?
   } always {
     zf_rm -rf -- "$shelf"
