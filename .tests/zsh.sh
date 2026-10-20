@@ -11,6 +11,7 @@ self=${0:A}
 repo=${self:h:h}
 ruby_bin=${commands[ruby]-}
 rg_bin=${commands[rg]-}
+nvim_bin=${commands[nvim]-}
 zsh_bin=${commands[zsh]}
 git_bin=${commands[git]}
 if [[ ${1:-} == --glance-child ]]; then
@@ -874,6 +875,8 @@ done
 if [[ -n $rg_bin ]]; then
   (
     setopt extendedglob
+    # Only this fixture's options, never the host's ripgrep configuration
+    unset RIPGREP_CONFIG_PATH
     fixture=$test_root/rgv
     export TMPDIR=$test_root/rgv-tmp
     /bin/mkdir -p "$fixture/src" "$fixture/.hidden" "$fixture/.git" "$TMPDIR"
@@ -882,8 +885,13 @@ if [[ -n $rg_bin ]]; then
     print -rl -- x y z w 'needle again' 'needle twice' > src/b.txt
     print -r -- nothing > src/c.txt
     print -r -- 'a needle' > 'src/space name.txt'
+    # Neovim's default 'errorformat' would read this line as other.c, line 9
+    print -r -- 'see "other.c", line 9: needle' > 'src/time 12:30.txt'
     print -r -- 'needle hidden' > .hidden/d.txt
     print -r -- 'needle in git' > .git/e.txt
+    # Names with a tab or a newline stay off the list
+    print -r -- 'needle tab' > $'src/tab\tname.txt'
+    print -r -- 'needle newline' > $'src/new\nline.txt'
     # A binary file rg names only when asked, with a notice and no lines
     print -rn -- $'needle\0binary\n' > data.bin
     # rg reports a broken link and exits 2, after printing its matches
@@ -909,7 +917,8 @@ if [[ -n $rg_bin ]]; then
     }
     nvim() {
       print -rl -- nvim "$@" > "$test_root/rgv-editor"
-      [[ $1 != -q ]] || print -r -- "$(<$2)" > "$test_root/rgv-quickfix"
+      local list=${${2#*readfile\(\'}%%\'\)*}
+      print -r -- "$(<$list)" > "$test_root/rgv-quickfix"
     }
     editor() { print -rl -- editor "$@" > "$test_root/rgv-editor"; }
     leftovers() { local -a files=("$TMPDIR"/*(DN)); (( ! $#files )) || fail "rgv $1 left files: ${files:t}"; }
@@ -921,9 +930,10 @@ if [[ -n $rg_bin ]]; then
     output=$(rgv --help) || fail 'rgv --help status'
     [[ $output == 'usage: rgv '* && ! -e $test_root/rgv-rg ]] || fail "rgv --help: $output"
 
-    # Every file with a match, in path order with its count; each preview is
-    # that file's matches and context, in rg's colors. Enter opens Neovim on
-    # the quickfix list of every match, at the chosen file's first.
+    # Every file with a matching line, in path order with their count; each
+    # preview is that file's lines and context, in rg's colors. Enter opens
+    # Neovim on the quickfix list of every matching line, at the chosen file's
+    # first.
     export EDITOR=nvim
     pick=src/b.txt
     rgv needle 2> "$test_root/rgv-stderr" || fail 'rgv status'
@@ -932,22 +942,43 @@ if [[ -n $rg_bin ]]; then
     [[ $(<$test_root/rgv-stderr) == *src/broken* ]] || fail "rgv: rg's report on stderr: $(<$test_root/rgv-stderr)"
     picker=$'--layout=reverse\n--no-multi\n--delimiter=\t\n--with-nth=3..\n--prompt=Matches > \n--header='
     picker_rest=$'\n--preview=sed -n {1}p "$RGV_SHELF/matches"\n--preview-window=right,60%,wrap,<66(down,60%,wrap)\n--bind=alt-t:toggle-preview-wrap,ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down'
-    expect "$picker"$'Enter opens its first match in Neovim;\n]q next match, ] then Ctrl+Q next file'"$picker_rest" \
+    expect "$picker"$'Enter opens its first match in Neovim:\n]q goes to the next matching line,\n] then Ctrl+Q to the next file'"$picker_rest" \
       "$(recorded rgv-fzf)" 'rgv picker options'
     menu_lines=("${(@f)$(recorded rgv-menu)}")
     shown=(${menu_lines#*$'\t'*$'\t'})
-    expect $'.hidden/d.txt (1)\nsrc/a.txt (2)\nsrc/b.txt (2)\nsrc/space name.txt (1)' "${(F)shown}" \
-      'rgv lists each file with a match, in path order'
+    expect $'.hidden/d.txt (1)\nsrc/a.txt (2)\nsrc/b.txt (2)\nsrc/space name.txt (1)\nsrc/time 12:30.txt (1)' "${(F)shown}" \
+      'rgv lists each file with a matching line, in path order'
     previews=$(recorded rgv-previews)
     [[ $previews == *$'\e['* ]] || fail 'rgv previews without colors'
-    expect $'.hidden/d.txt\n1:needle hidden\n==\nsrc/a.txt\n1-one\n2:needle here\n3-three\n4-four\n--\n6-six\n7-seven\n8:needle far below\n==\nsrc/b.txt\n3-z\n4-w\n5:needle again\n6:needle twice\n==\nsrc/space name.txt\n1:a needle\n==' \
-      "${previews//$'\e'\[[0-9;]#m}" "rgv previews each file's matches"
+    expect $'.hidden/d.txt\n1:needle hidden\n==\nsrc/a.txt\n1-one\n2:needle here\n3-three\n4-four\n--\n6-six\n7-seven\n8:needle far below\n==\nsrc/b.txt\n3-z\n4-w\n5:needle again\n6:needle twice\n==\nsrc/space name.txt\n1:a needle\n==\nsrc/time 12:30.txt\n1:see "other.c", line 9: needle\n==' \
+      "${previews//$'\e'\[[0-9;]#m}" "rgv previews each file's matching lines"
     editor_call=("${(@f)$(recorded rgv-editor)}")
-    [[ $#editor_call == 4 && $editor_call[1,2] == 'nvim -q' && $editor_call[3] == $TMPDIR/rgv.<->.<->/quickfix &&
-      $editor_call[4] == '+cc 4' ]] || fail "rgv opened: ${(qqq)editor_call}"
-    expect $'.hidden/d.txt:1:needle hidden\nsrc/a.txt:2:needle here\nsrc/a.txt:8:needle far below\nsrc/b.txt:5:needle again\nsrc/b.txt:6:needle twice\nsrc/space name.txt:1:a needle' \
-      "$(<$test_root/rgv-quickfix)" "rgv quickfix list"
+    [[ $#editor_call == 3 && $editor_call[1,2] == 'nvim -c' &&
+      $editor_call[3] == "call setqflist([], ' ', {'title': 'rgv', 'efm': \"%f\\t%l\\t%m\", 'lines': readfile('$TMPDIR/rgv."<->"."<->"/quickfix')}) | cc 4" ]] ||
+      fail "rgv opened: ${(qqq)editor_call}"
+    expect $'.hidden/d.txt\t1\tneedle hidden\nsrc/a.txt\t2\tneedle here\nsrc/a.txt\t8\tneedle far below\nsrc/b.txt\t5\tneedle again\nsrc/b.txt\t6\tneedle twice\nsrc/space name.txt\t1\ta needle\nsrc/time 12:30.txt\t1\tsee "other.c", line 9: needle' \
+      "$(<$test_root/rgv-quickfix)" "rgv quickfix records"
     leftovers 'after Enter'
+
+    # Neovim itself reads the list: each record's file and line, never what
+    # the matching text resembles, landing on the chosen file's first.
+    if [[ -n $nvim_bin ]]; then
+      (
+        /bin/mkdir -p "$test_root/rgv-nvim"
+        nvim() {
+          RGV_REPORT=$test_root/rgv-report TMPDIR=$test_root/rgv-nvim "$nvim_bin" --clean --headless -i NONE "$@" \
+            -c 'lua local q = vim.fn.getqflist({ idx = 0, items = 0, title = 0 }); local out = { vim.fn.bufname() .. ":" .. vim.fn.line(".") .. " " .. q.idx .. " " .. q.title }; for _, item in ipairs(q.items) do out[#out + 1] = vim.fn.bufname(item.bufnr) .. ":" .. item.lnum end; vim.fn.writefile(out, vim.env.RGV_REPORT)' \
+            -c 'qa!' > /dev/null 2>&1
+        }
+        pick='src/time 12:30.txt'
+        rgv needle 2> /dev/null || fail 'rgv status with Neovim'
+        expect $'src/time 12:30.txt:1 7 rgv\n.hidden/d.txt:1\nsrc/a.txt:2\nsrc/a.txt:8\nsrc/b.txt:5\nsrc/b.txt:6\nsrc/space name.txt:1\nsrc/time 12:30.txt:1' \
+          "$(<$test_root/rgv-report)" 'rgv quickfix list as Neovim reads it'
+        leftovers 'after Neovim'
+      )
+    else
+      print -r -- 'SKIP: rgv quickfix list in Neovim (nvim missing)'
+    fi
 
     # A search of one file still names it; another editor opens the chosen
     # file at its first match.

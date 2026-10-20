@@ -7,16 +7,17 @@ if [[ $1 == (-h|--help) ]]; then
   print -r -- "usage: rgv [RG OPTIONS] PATTERN [PATH...]
 
 Search with ripgrep, then browse the matching files: one line per file with
-its number of matches, and its matches in the preview, with two lines of
-context. Typing filters the files by path; Ctrl+D / Ctrl+U scroll the
+its number of matching lines, and those lines in the preview, with two lines
+of context. Typing filters the files by path; Ctrl+D / Ctrl+U scroll the
 preview and Option+t toggles its wrapping. Enter opens the file at its first
-match; in Neovim, with every match in the quickfix list: ]q / [q go to the
-next / previous match, ] then Ctrl+Q / [ then Ctrl+Q to the next / previous
-file.
+match; in Neovim, with every matching line in the quickfix list: ]q / [q go
+to the next / previous one, ] then Ctrl+Q / [ then Ctrl+Q to the next /
+previous file.
 
 Options and paths are rg's (rg --help), after the rg alias's defaults: hidden
 files, symlinks followed, smart case, .git skipped. Options that change how
-rg prints, such as -l, -N or --json, don't fit."
+rg prints, such as -l, -N or --json, don't fit. Files whose names hold a tab
+or a newline are left out."
   return 0
 fi
 
@@ -45,21 +46,24 @@ zf_mkdir -m 700 "$shelf" || return
   fi
 
   # Each file prints as its name, its match (N:) and context (N-) lines, and
-  # a blank line before the next file.
+  # a blank line before the next file. A name with a newline prints over
+  # several lines, and one with a tab can't be told apart in the quickfix
+  # records below: such files stay off the list.
   local line plain file=''
-  local -i number=0 i
+  local -i number=0 i skip=0
   local -a paths starts ends counts firsts lines quickfix menu
   while IFS= read -r line; do
     (( ++number ))
     plain=${line//$'\e'\[[0-9;]#m}
     if [[ -z $file ]]; then
-      file=$plain
+      file=$plain skip=0
+      [[ -e $file && $file != *$'\t'* ]] || skip=1
       paths+=("$file") starts+=($number) counts+=(0) firsts+=(0) lines+=(0)
     elif [[ -z $plain ]]; then
       ends+=($(( number - 1 )))
       file=''
-    elif [[ $plain == (#b)(<->):(*) ]]; then
-      quickfix+=("$file:$match[1]:$match[2]")
+    elif (( ! skip )) && [[ $plain == (#b)(<->):(*) ]]; then
+      quickfix+=("$file"$'\t'"$match[1]"$'\t'"$match[2]")
       (( counts[-1]++ )) || firsts[-1]=$#quickfix lines[-1]=$match[1]
     fi
   done < "$shelf/matches"
@@ -72,7 +76,8 @@ zf_mkdir -m 700 "$shelf" || return
 
   local selection
   local -a header=('Enter opens the file at its first match')
-  [[ ${editor[1]:t} != nvim ]] || header=('Enter opens its first match in Neovim;' ']q next match, ] then Ctrl+Q next file')
+  [[ ${editor[1]:t} != nvim ]] ||
+    header=('Enter opens its first match in Neovim:' ']q goes to the next matching line,' '] then Ctrl+Q to the next file')
   # The preview sits beside the list from 110 columns (its threshold measures
   # the preview)
   result=0
@@ -89,7 +94,10 @@ zf_mkdir -m 700 "$shelf" || return
 
   i=${${selection#*$'\t'}%%$'\t'*}
   if [[ ${editor[1]:t} == nvim ]]; then
-    "${editor[@]}" -q "$shelf/quickfix" "+cc $firsts[i]"
+    # Neovim reads the records with their own format: matching text parsed
+    # by 'errorformat' could name another file
+    local list=${${:-$shelf/quickfix}//\'/\'\'}
+    "${editor[@]}" -c "call setqflist([], ' ', {'title': 'rgv', 'efm': \"%f\t%l\t%m\", 'lines': readfile('$list')}) | cc $firsts[i]"
   else
     "${editor[@]}" "+$lines[i]" -- "$paths[i]"
   fi

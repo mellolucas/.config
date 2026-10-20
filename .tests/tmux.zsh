@@ -400,15 +400,19 @@ else
 fi
 
 # rgv through the real ripgrep and fzf: one line per file, beside a preview of
-# the selected file's matches at 120 columns; Down previews the next file, and
-# Enter opens the editor on every match, at that file's first.
+# the selected file's matching lines at 120 columns; Down previews the next
+# file, and Enter opens the editor on every matching line, at that file's first.
 if (( $+commands[fzf] && $+commands[rg] )); then
   mkdir -p "$HOME/rgv/src" "$HOME/rgv-bin" "$HOME/tmp"
   print -rl -- one 'needle here' three > "$HOME/rgv/src/a.txt"
   print -rl -- x y 'needle again' > "$HOME/rgv/src/b.txt"
   # A stand-in Neovim records what it was asked to open
-  print -rl -- '#!/bin/sh' 'printf "%s\n" "$@" > "$HOME/rgv-args"' \
-    '[ "$1" = -q ] && cp "$2" "$HOME/rgv-quickfix"' > "$HOME/rgv-bin/nvim"
+  cat > "$HOME/rgv-bin/nvim" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$@" > "$HOME/rgv-args"
+list=${2#*"readfile('"}
+cp "${list%%"')"*}" "$HOME/rgv-quickfix"
+EOF
   chmod +x "$HOME/rgv-bin/nvim"
   rgv_screen() { tmux capture-pane -p -t '=rgv:'; }
   rgv_beside() {
@@ -428,13 +432,13 @@ zsh -fc 'fpath=(\"\$FUNCTIONS\"); autoload -Uz rgv; rgv needle'"
   tmux send-keys -t '=rgv:' Enter
   wait_for 'rgv did not return after Enter' '! tmux has-session -t "=rgv" 2>/dev/null'
   rgv_args=("${(@f)$(<$HOME/rgv-args)}")
-  [[ $#rgv_args == 3 && $rgv_args[1] == -q && $rgv_args[2] == $HOME/tmp/rgv.<->.<->/quickfix &&
-    $rgv_args[3] == '+cc 2' ]] || fail "rgv opened: ${(qqq)rgv_args}"
-  [[ $(<$HOME/rgv-quickfix) == $'src/a.txt:2:needle here\nsrc/b.txt:3:needle again' ]] ||
-    fail "rgv quickfix list: $(<$HOME/rgv-quickfix)"
+  [[ $#rgv_args == 2 && $rgv_args[1] == -c && $rgv_args[2] == *"readfile('$HOME/tmp/rgv."<->"."<->"/quickfix')}) | cc 2" ]] ||
+    fail "rgv opened: ${(qqq)rgv_args}"
+  [[ $(<$HOME/rgv-quickfix) == $'src/a.txt\t2\tneedle here\nsrc/b.txt\t3\tneedle again' ]] ||
+    fail "rgv quickfix records: $(<$HOME/rgv-quickfix)"
   leftovers=("$HOME"/tmp/*(DN))
   (( ! $#leftovers )) || fail "rgv left temporary files: ${leftovers:t}"
-  print -r -- 'ok: rgv lists each file beside its matches, previews the next on Down, and opens every match'
+  print -r -- 'ok: rgv lists each file beside its matching lines, previews the next on Down, and opens them all'
 else
   print -r -- 'SKIP: rgv through real ripgrep and fzf (fzf or rg missing)'
 fi
