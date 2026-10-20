@@ -304,7 +304,6 @@ builtin cd -- "$HOME/lean"
 output=$(workspace --layout lean --status "read -t 1 -r reply; echo T''OP" < /dev/null)
 [[ $output == *' lean is ready;'* ]] || fail "lean: $output"
 local -A lean
-local left top id
 for line in ${(f)"$(tmux list-panes -t '=lean' -F '#{pane_left} #{pane_top} #{pane_id}')"}; do
   read -r left top id <<< "$line"
   if (( left > 0 )); then lean[agent]=$id
@@ -368,10 +367,13 @@ if (( $+commands[fzf] )); then
   done
   screen() { tmux capture-pane -p -t '=keys:'; }
   settled() { local first=$(screen); sleep 0.2; REPLY=$(screen); [[ $REPLY == "$first" ]]; }
+  # Each page's topic and title on one row of the screen
   listed() {
-    local text=$(screen) row
+    local -a rows=("${(@f)$(screen)}") found
+    local row
     for row in "${page_rows[@]}"; do
-      (( ${#${(M)${(f)text}:#*" ${row%%$'\t'*} "*"${row#*$'\t'}"*}} )) || return 1
+      found=(${(M)rows:#*" ${row%%$'\t'*} "*"${row#*$'\t'}"*})
+      (( $#found )) || return 1
     done
   }
   mkdir -p "$HOME/tmp"
