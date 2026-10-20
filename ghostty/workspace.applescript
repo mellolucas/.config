@@ -75,24 +75,24 @@ on run argv
 		else
 			set workspaceTab to selected tab of (new window with configuration cfg)
 		end if
+		set mainShell to focused terminal of workspaceTab
 
+		-- The other panes split from the main shell
 		if layoutName is "lean" then
 			-- Splits halve the pane they divide, so no resizing
-			set leftEditor to focused terminal of workspaceTab
-			set rightAgent to split leftEditor direction right with configuration cfg
-			set mainShell to split leftEditor direction down with configuration cfg
+			set rightAgent to split mainShell direction right with configuration cfg
+			set leftEditor to split mainShell direction up with configuration cfg
 			set statusShell to mainShell
 		else
-			set statusShell to focused terminal of workspaceTab
-			set leftEditor to split statusShell direction left with configuration cfg
-			set rightAgent to split statusShell direction right with configuration cfg
-			set mainShell to split statusShell direction down with configuration cfg
+			set leftEditor to split mainShell direction left with configuration cfg
+			set rightAgent to split mainShell direction right with configuration cfg
+			set statusShell to split mainShell direction up with configuration cfg
 
 			if widthDelta > 0 and heightDelta > 0 then
 				perform action ("resize_split:left," & widthDelta) on leftEditor
 				perform action ("resize_split:up," & heightDelta) on mainShell
 			else
-				perform action "equalize_splits" on statusShell
+				perform action "equalize_splits" on mainShell
 			end if
 		end if
 

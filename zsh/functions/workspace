@@ -119,7 +119,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
     print -u2 -- 'hint: run: dotfiles bundle'
     return 1
   }
-  local name line top agent_pane editor_pane bottom_pane status_pane pane command
+  local name line main agent_pane editor_pane status_pane pane command
   if [[ -z $TMUX ]]; then
     for line in ${(f)"$(tmux list-sessions -F '#{session_name}:#{session_path}' 2>/dev/null)"}; do
       [[ ${line#*:} == "$dir" ]] && name=${line%%:*} && break
@@ -127,7 +127,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
   fi
   if [[ -z $name ]]; then
     if [[ -n $TMUX ]]; then
-      top=$(tmux new-window -P -F '#{pane_id}' -n "${dir:t}" -c "$dir") || return
+      main=$(tmux new-window -P -F '#{pane_id}' -n "${dir:t}" -c "$dir") || return
     else
       # Session names cannot hold . or :, and stay unique per directory
       name=${${${dir:t}:-root}//[.:]/_}
@@ -137,28 +137,27 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
         name=$base-$(( ++n ))
       done
       # Sized like this terminal: tmux keeps no shares when attaching resizes it
-      top=$(tmux new-session -d -x - -y - -P -F '#{pane_id}' -s "$name" -c "$dir") || return
+      main=$(tmux new-session -d -x - -y - -P -F '#{pane_id}' -s "$name" -c "$dir") || return
     fi
+    # The other panes split from the main shell, each taking a share of it.
     if [[ $layout == lean ]]; then
       # Even halves: the agent right, the editor above the one shell
-      agent_pane=$(tmux split-window -h -l 50% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
-      bottom_pane=$(tmux split-window -v -l 50% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
-      editor_pane=$top status_pane=$bottom_pane
+      agent_pane=$(tmux split-window -h -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      editor_pane=$(tmux split-window -v -b -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      status_pane=$main
     else
-      # Widths 20/40/40 and middle heights 30/70: each split takes a share of
-      # the pane it divides.
-      agent_pane=$(tmux split-window -h -l 40% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
-      editor_pane=$(tmux split-window -h -b -l 33% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
-      bottom_pane=$(tmux split-window -v -l 70% -t "$top" -P -F '#{pane_id}' -c "$dir") || return
-      status_pane=$top
+      # Widths 20/40/40, and the middle column's heights 30/70
+      editor_pane=$(tmux split-window -h -b -l 20% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      agent_pane=$(tmux split-window -h -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      status_pane=$(tmux split-window -v -b -l 30% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
     fi
     for pane command in "$editor_pane" "$editor" "$agent_pane" "$agent" \
-      "$status_pane" "$status_cmd" "$bottom_pane" "$shell_cmd"; do
+      "$status_pane" "$status_cmd" "$main" "$shell_cmd"; do
       [[ -n $command ]] || continue
       tmux send-keys -t "$pane" -l -- "$command" || return
       tmux send-keys -t "$pane" Enter || return
     done
-    tmux select-pane -t "$bottom_pane" || return
+    tmux select-pane -t "$main" || return
   fi
   [[ -z $TMUX ]] || return 0
   if [[ -t 0 && -t 1 ]]; then

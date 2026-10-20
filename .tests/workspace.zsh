@@ -225,12 +225,12 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   [[ -z $output ]] || fail "inside tmux printed: $output"
   expected=(
     "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-l' '40%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-b' '-l' '33%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-v' '-l' '70%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'send-keys' '-t' '%3' '-l' '--' 'nvim .'" "'send-keys' '-t' '%3' 'Enter'"
-    "'send-keys' '-t' '%2' '-l' '--' 'agent \$(chat)'" "'send-keys' '-t' '%2' 'Enter'"
-    "'select-pane' '-t' '%4'"
+    "'split-window' '-h' '-b' '-l' '20%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-h' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-v' '-b' '-l' '30%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'send-keys' '-t' '%2' '-l' '--' 'nvim .'" "'send-keys' '-t' '%2' 'Enter'"
+    "'send-keys' '-t' '%3' '-l' '--' 'agent \$(chat)'" "'send-keys' '-t' '%3' 'Enter'"
+    "'select-pane' '-t' '%1'"
   )
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "inside tmux calls: $(<"$temporary/calls")"
 
@@ -242,21 +242,18 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   expected=(
     "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
     "'split-window' '-h' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-v' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'send-keys' '-t' '%1' '-l' '--' 'nvim .'" "'send-keys' '-t' '%1' 'Enter'"
+    "'split-window' '-v' '-b' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'send-keys' '-t' '%3' '-l' '--' 'nvim .'" "'send-keys' '-t' '%3' 'Enter'"
     "'send-keys' '-t' '%2' '-l' '--' 'ocode'" "'send-keys' '-t' '%2' 'Enter'"
-    "'send-keys' '-t' '%3' '-l' '--' 'echo status; echo shell'" "'send-keys' '-t' '%3' 'Enter'"
-    "'select-pane' '-t' '%3'"
+    "'send-keys' '-t' '%1' '-l' '--' 'echo status; echo shell'" "'send-keys' '-t' '%1' 'Enter'"
+    "'select-pane' '-t' '%1'"
   )
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lean calls: $(<"$temporary/calls")"
   expected=(
     "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-l' '40%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-b' '-l' '33%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-v' '-l' '70%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'send-keys' '-t' '%3' '-l' '--' 'nvim .'" "'send-keys' '-t' '%3' 'Enter'"
-    "'send-keys' '-t' '%2' '-l' '--' 'agent \$(chat)'" "'send-keys' '-t' '%2' 'Enter'"
-    "'select-pane' '-t' '%4'"
+    "'split-window' '-h' '-b' '-l' '20%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-h' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
+    "'split-window' '-v' '-b' '-l' '30%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
   )
 
   # Outside tmux and without a terminal: a session sized like the terminal
@@ -271,9 +268,9 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     "'has-session' '-t' '=work dir'"
     "'new-session' '-d' '-x' '-' '-y' '-' '-P' '-F' '#{pane_id}' '-s' 'work dir' '-c' '$temporary/work dir'"
     ${expected[2,4]}
-    "'send-keys' '-t' '%3' '-l' '--' 'nvim .'" "'send-keys' '-t' '%3' 'Enter'"
-    "'send-keys' '-t' '%2' '-l' '--' 'ocode'" "'send-keys' '-t' '%2' 'Enter'"
-    "'select-pane' '-t' '%4'"
+    "'send-keys' '-t' '%2' '-l' '--' 'nvim .'" "'send-keys' '-t' '%2' 'Enter'"
+    "'send-keys' '-t' '%3' '-l' '--' 'ocode'" "'send-keys' '-t' '%3' 'Enter'"
+    "'select-pane' '-t' '%1'"
   )
   [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "outside tmux calls: $(<"$temporary/calls")"
   unfunction tmux
