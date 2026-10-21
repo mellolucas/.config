@@ -23,7 +23,6 @@ end, {
 })
 
 -- Toggle: <leader>t*
-map("n", "<leader>th", "<cmd>set hlsearch!<CR>", { desc = "Toggle search highlighting" })
 map("n", "<leader>tw", "<cmd>set wrap!<CR>", { desc = "Toggle line wrap" })
 map("n", "<leader>td", function()
   local config = vim.diagnostic.config()
@@ -192,10 +191,6 @@ map("n", "<leader>ff", ":find ", { desc = "Find a file by fuzzy name" })
 
 -- Git: <leader>g*
 map("n", "<leader>gd", "<cmd>GitDiff<CR>", { desc = "Diff saved file against index" })
-
--- Quit: <leader>q*
-map("n", "<leader>qq", "<cmd>q<CR>", { desc = "Quit" })
-map("n", "<leader>q!", "<cmd>q!<CR>", { desc = "Quit without saving" })
 
 -- Windows: <A-hjkl>
 -- Inside Ghostty these are the pass-through layer of the performable alt+hjkl split navigation; standalone, plain window nav.

@@ -52,7 +52,7 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 
 ## Editor: Edit in Neovim
 
-`Space` is the leader key, pressed in normal mode: the next key picks an area (`f` find, `b` buffers, `t` toggles, `g` Git), and a doubled key runs an area's main action (`Space f f`, `Space q q`).
+`Space` is the leader key, pressed in normal mode: the next key picks an area (`f` find, `b` buffers, `t` toggles, `g` Git), and a doubled key runs an area's main action (`Space f f`).
 
 | Press | Result |
 | --- | --- |
@@ -61,8 +61,9 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 | `Space b l` / `Ctrl+^` (`Ctrl+6`) | List buffers and pick one (number or name, `Tab` completes) / switch to the previous file |
 | `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
 | `Space b w w` / `Space b w q` | Save / save and quit |
-| `Space q q` / `Space q !` | Quit / quit without saving |
-| `Space t w` / `Space t d` / `Space t h` | Toggle wrap / inline diagnostics / search highlight |
+| `:q` / `ZQ` | Quit / quit without saving |
+| `Space t w` / `Space t d` | Toggle wrap / inline diagnostics |
+| `Ctrl+L` | Clear search highlighting until the next search |
 | `Space c f` | Format with the language server |
 | `Space d q` | Diagnostics into the quickfix list |
 | `:grep TEXT` | Search the project with rg into the quickfix list |
