@@ -78,7 +78,7 @@ Command keys do what they do in every Mac app. They reach Neovim through Ghostty
 | `Ctrl+\` then `Ctrl+N` | Leave terminal mode |
 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
-- `Option+←` / `Option+→` jump words and `Cmd+←` / `Cmd+→` reach the line's start / end everywhere; while typing and on the command line, `Option+Backspace` deletes a word. `Cmd+←` / `Cmd+→` arrive as Vim's `Ctrl+A` / `Ctrl+E`: to add 1 to a number, select it and press `g` then `Ctrl+A`.
+- `Option+←` / `Option+→` jump words and `Cmd+←` / `Cmd+→` reach the line's start / end, in the text and on the command line; while typing and on the command line, `Option+Backspace` deletes a word. `Cmd+←` / `Cmd+→` arrive as Vim's `Ctrl+A` / `Ctrl+E`: to add 1 to a number, select it and press `g` then `Ctrl+A`. The file tree keeps its own keys (`?`).
 - Undo history survives closing and reopening a file.
 - The file tree has its own page: `keys explore`.
 
