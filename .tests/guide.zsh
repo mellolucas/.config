@@ -135,7 +135,7 @@ for topic in "${topics[@]}"; do
   all+=$'\n'"$pages[$topic]"
 done
 index+=$'\n`keys all` reads everything. `keys --plain` needs no viewer.\n'
-navigation=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task'
+navigation=$'\n---\n`Cmd+D` is a chord (hold Command, press d); `Space t m` is typed in Neovim normal mode. `keys` picks another task'
 # Entries show their topic, padded past the longest name; before a search the
 # picker lists one line per page.
 typeset -a entries menu

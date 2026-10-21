@@ -146,7 +146,7 @@ case $topic in
     [[ -n ${pages[$topic]-} ]] || { print -ru2 -- "keys: unknown topic '$topic'; run keys --help"; return 1 }
     content=$pages[$topic] ;;
 esac
-content+=$'\n---\n`Option+b` is a left-Option chord; `Space t m` is typed in Neovim normal mode. `keys` picks another task'
+content+=$'\n---\n`Cmd+D` is a chord (hold Command, press d); `Space t m` is typed in Neovim normal mode. `keys` picks another task'
 
 local reader=0
 if (( ! plain )) && [[ -t 1 ]] && command -v glow >/dev/null 2>&1 && command -v less >/dev/null 2>&1; then
