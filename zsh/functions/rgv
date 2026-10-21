@@ -9,10 +9,9 @@ if [[ $1 == (-h|--help) ]]; then
 Search with ripgrep, then browse the matching files: one line per file with
 its number of matching lines, and those lines in the preview, with two lines
 of context. Typing filters the files by path; Option+Up / Option+Down scroll
-the preview and Option+t toggles its wrapping. Enter opens the file at its
-first match; in Neovim, with every matching line in the quickfix list: ]q /
-[q go to the next / previous one, ] then Ctrl+Q / [ then Ctrl+Q to the next
-/ previous file.
+the preview. Enter opens the file at its first match; in Neovim, with every
+matching line in the quickfix list: ]q / [q go to the next / previous one,
+] then Ctrl+Q / [ then Ctrl+Q to the next / previous file.
 
 Options and paths are rg's (rg --help), after the rg alias's defaults: hidden
 files, symlinks followed, smart case, .git skipped. Options that change how
