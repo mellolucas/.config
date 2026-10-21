@@ -925,11 +925,16 @@ do
     api.nvim_set_current_win(in_tree)
     fn.maparg("<C-^>", "n", false, true).callback()
     assert(api.nvim_get_current_win() == in_tree and said == "No previous file", "Ctrl+^ from the tree, no previous file")
-    -- With a count, the code beside the tree opens buffer N, previous file or not.
+    -- With a count, the code beside the tree opens buffer N, previous file or
+    -- not, ahead of any keys queued after it (as in a macro).
+    api.nvim_buf_set_lines(one, 0, -1, false, { "one" })
+    api.nvim_buf_set_lines(two, 0, -1, false, { "two" })
     said = nil
-    api.nvim_feedkeys(vim.keycode(one .. "<C-^>"), "mx", false)
+    api.nvim_feedkeys(vim.keycode(one .. "<C-^>x"), "mx", false)
     assert(api.nvim_get_current_win() == code_win and api.nvim_get_current_buf() == one and said == nil,
       "a count with Ctrl+^ from the tree beside the code: " .. tostring(said))
+    assert(api.nvim_buf_get_lines(one, 0, 1, false)[1] == "ne" and api.nvim_buf_get_lines(two, 0, 1, false)[1] == "two",
+      "the key after a counted Ctrl+^ edited the wrong file")
     vim.cmd("normal! \27") -- a command without a count, so the direct calls below see none
     vim.cmd("silent! only")
     vim.o.columns = 40

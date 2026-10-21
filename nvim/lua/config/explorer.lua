@@ -243,7 +243,7 @@ require("nvim-tree").setup({
         close()
       end
       if count > 0 then
-        vim.api.nvim_feedkeys(count .. vim.keycode("<C-^>"), "n", false)
+        vim.api.nvim_feedkeys(count .. vim.keycode("<C-^>"), "ni", false)
       else
         vim.cmd.buffer(file)
       end
