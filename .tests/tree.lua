@@ -157,6 +157,34 @@ expect({ "b.txt" }, "Ctrl+^ from a full-window tree")
 assert(alternate() == "a.txt", "alternate after Ctrl+^ from the tree: " .. alternate())
 press("<C-^>")
 expect({ "a.txt" }, "Ctrl+^ back")
+-- Each tab page's full-window tree is its own: in a second tab page, leaving it
+-- (Esc, q), opening a file from it, and widening keep that tab page, and the
+-- first tab page's tree keeps its way back.
+press("-")
+vim.cmd("tabnew " .. fn.fnameescape(project .. "/b.txt"))
+press("-")
+expect({ "tree" }, "a tree covering b.txt in a second tab page")
+press("<Esc>")
+expect({ "b.txt" }, "Esc in a second tab page")
+press("-")
+press("q")
+expect({ "b.txt" }, "q in a second tab page")
+press("-")
+select("c.txt")
+press("<CR>")
+expect({ "c.txt" }, "opening a file in a second tab page")
+press("-")
+resize(200)
+expect({ "tree", "c.txt" }, "widening a second tab page")
+resize(40)
+assert(#api.nvim_list_tabpages() == 2, "the second tab page closed")
+vim.cmd.tabclose()
+settle()
+expect({ "tree" }, "the first tab page's tree")
+said = nil
+press("<Esc>")
+expect({ "a.txt" }, "Esc in the first tab page after the second's: " .. tostring(said))
+assert(alternate() == "b.txt", "alternate after Esc in the first tab page: " .. alternate())
 
 -- 110 columns bring the tree beside the code, leaving the cursor in it;
 -- 109 hand the window back to the code, and widening again brings it back.

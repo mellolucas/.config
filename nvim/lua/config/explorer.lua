@@ -60,25 +60,47 @@ local function code_window()
   return vim.tbl_contains(others, last) and last or others[1]
 end
 
--- A full-window tree covers the file being edited; a file opened from it keeps
--- that one as its alternate, and closing the tree gives the covered file's
--- window its own alternate back, so Ctrl+^ returns where it would without
--- the tree
-local covered, before
+-- A full-window tree covers the file being edited, each tab page's its own; a
+-- file opened from it keeps that one as its alternate, and closing the tree
+-- gives the covered file's window its own alternate back, so Ctrl+^ returns
+-- where it would without the tree
 local function cover()
   if narrow() and vim.bo.filetype ~= "NvimTree" and not api.tree.is_visible() then
-    covered = vim.api.nvim_get_current_buf()
-    local alternate = vim.fn.bufnr("#")
-    before = alternate ~= covered and vim.fn.buflisted(alternate) == 1 and alternate or nil
+    local covered, alternate = vim.api.nvim_get_current_buf(), vim.fn.bufnr("#")
+    vim.t.tree_covered = covered
+    vim.t.tree_before = alternate ~= covered and vim.fn.buflisted(alternate) == 1 and alternate or nil
   end
 end
+-- nvim-tree closes the tree's window, which closes a tab page the tree alone
+-- fills when other tab pages exist; the covered file (or an empty window) shown
+-- above it first keeps the tab page, as nvim-tree does for the last window of all
+local function close()
+  if #windows() == 1 and #vim.api.nvim_list_tabpages() > 1 then
+    local covered = vim.t.tree_covered
+    if covered and vim.api.nvim_buf_is_valid(covered) then
+      vim.cmd.sbuffer(covered)
+    else
+      vim.cmd.new()
+    end
+  end
+  api.tree.close()
+end
 
+-- A file opened from a tree that fills its tab page takes the tree's own
+-- window, which keeps the tab page
 local function open()
-  local quit, from = narrow(), covered
-  api.node.open.edit(nil, { quit_on_open = quit })
+  local quit, from = narrow(), vim.t.tree_covered
+  if quit and #windows() == 1 then
+    api.node.open.replace_tree_buffer()
+  else
+    api.node.open.edit(nil, { quit_on_open = quit })
+  end
   local opened = vim.api.nvim_get_current_buf()
-  if quit and from and from ~= opened and vim.api.nvim_buf_is_valid(from) and vim.bo[opened].filetype ~= "NvimTree" then
-    vim.fn.setreg("#", from)
+  if quit and vim.bo[opened].filetype ~= "NvimTree" then
+    vim.t.tree_covered, vim.t.tree_before = nil, nil
+    if from and from ~= opened and vim.api.nvim_buf_is_valid(from) then
+      vim.fn.setreg("#", from)
+    end
   end
 end
 
@@ -186,12 +208,14 @@ require("nvim-tree").setup({
       local code = code_window()
       if code then
         vim.api.nvim_set_current_win(code)
-      elseif covered then
-        api.tree.close()
+      elseif vim.t.tree_covered then
+        close()
       else
         vim.notify("No file to return to")
       end
     end, "Back to the code")
+    -- q hides the tree, as nvim-tree's own q does, keeping its tab page
+    map("q", close, "Close")
     -- ? opens and closes the list of keys, as g? does
     map("?", api.tree.toggle_help, "Help")
     -- Ctrl+^ switches the code to its previous file, never to the tree:
@@ -201,8 +225,8 @@ require("nvim-tree").setup({
       local file
       if code then
         file = previous(code)
-      elseif covered and before and vim.fn.buflisted(before) == 1 then
-        file = before
+      elseif vim.t.tree_covered and vim.t.tree_before and vim.fn.buflisted(vim.t.tree_before) == 1 then
+        file = vim.t.tree_before
       end
       if not file then
         return vim.notify("No previous file")
@@ -210,7 +234,7 @@ require("nvim-tree").setup({
       if code then
         vim.api.nvim_set_current_win(code)
       else
-        api.tree.close()
+        close()
       end
       vim.cmd.buffer(file)
     end, "Previous file")
@@ -229,8 +253,8 @@ end)
 -- the covered file current; that window alone gets its alternate back, once
 -- the close is done
 api.events.subscribe(api.events.Event.TreeClose, function()
-  local win, buf, alternate = vim.api.nvim_get_current_win(), covered, before
-  covered, before = nil, nil
+  local win, buf, alternate = vim.api.nvim_get_current_win(), vim.t.tree_covered, vim.t.tree_before
+  vim.t.tree_covered, vim.t.tree_before = nil, nil
   if not (buf and alternate) then
     return
   end
@@ -305,7 +329,7 @@ vim.api.nvim_create_autocmd({ "VimResized", "TabEnter" }, {
         end
       end
     elseif tree and #others == 0 then
-      api.tree.close()
+      close()
       -- nvim-tree leaves an empty window when the tree covered no file
       if blank(vim.api.nvim_get_current_win()) then
         placeholder()

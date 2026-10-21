@@ -740,7 +740,8 @@ do
       winid = function() return tree_win end,
       get_node_under_cursor = function() return cursor_node end,
     },
-    node = { open = { edit = record("edit"), preview = record("preview") }, navigate = { parent_close = record("parent_close") } },
+    node = { open = { edit = record("edit"), preview = record("preview"), replace_tree_buffer = record("replace") },
+      navigate = { parent_close = record("parent_close") } },
     map = { on_attach = { default = function() end } },
     events = {
       Event = { TreeOpen = "TreeOpen", TreeClose = "TreeClose" },
@@ -785,28 +786,33 @@ do
   end)
   assert(last("help"), "? in the tree opens its help")
   local file = { name = "a.txt", absolute_path = "/p/a.txt", type = "file", parent = {} }
-  for _, case in ipairs({ { 40, true }, { 200, false } }) do
+  -- Narrow, a file opens in place of a tree that fills its tab page, or closes
+  -- a tree that shares it; Tab opens as Enter does there. Beside the code,
+  -- Enter keeps the tree and Tab keeps the cursor in it.
+  for _, case in ipairs({ { 40, "fills" }, { 40, "shares" }, { 200, "sidebar" } }) do
     vim.o.columns = case[1]
+    vim.cmd("silent! only")
+    if case[2] == "shares" then
+      vim.cmd.split()
+    end
     -- - goes to the open file in the tree: beside the code, or in its place
     fn.maparg("-", "n", false, true).callback()
-    assert(vim.deep_equal(last("find_file")[2], { open = true, focus = true, current_window = case[2] }),
+    assert(vim.deep_equal(last("find_file")[2], { open = true, focus = true, current_window = case[1] < 110 }),
       "- at " .. case[1] .. ": " .. vim.inspect(last("find_file")))
     api.nvim_buf_call(tree_buf, function()
       cursor_node = file
-      for _, key in ipairs({ "<CR>", "o", "<2-LeftMouse>", "l" }) do
+      for _, key in ipairs({ "<CR>", "o", "<2-LeftMouse>", "l", "<Tab>" }) do
         fn.maparg(key, "n", false, true).callback()
-        assert(last("edit")[3].quit_on_open == case[2], key .. " at " .. case[1] .. ": " .. vim.inspect(last("edit")))
+        local made = calls[#calls]
+        local expected = case[2] == "fills" and made[1] == "replace"
+          or case[2] == "shares" and made[1] == "edit" and made[3].quit_on_open == true
+          or case[2] == "sidebar" and made[1] == "edit"
+            and (key == "<Tab>" and made[3].focus == true or key ~= "<Tab>" and made[3].quit_on_open == false)
+        assert(expected, key .. " when the tree " .. case[2] .. ": " .. vim.inspect(made))
       end
-      -- Tab opens as Enter does in a narrow window; beside the code, the
-      -- cursor stays in the tree.
-      local edits = count("edit")
-      fn.maparg("<Tab>", "n", false, true).callback()
-      assert(count("edit") == edits + 1, "Tab at " .. case[1] .. " opened nothing")
-      local tab = last("edit")[3]
-      assert(case[2] and tab.quit_on_open == true or not case[2] and tab.focus == true,
-        "Tab at " .. case[1] .. ": " .. vim.inspect(tab))
     end)
   end
+  vim.cmd("silent! only")
   -- h closes an open folder, or the one holding the entry; l opens a closed
   -- folder and leaves the root line alone.
   api.nvim_buf_call(tree_buf, function()
@@ -927,6 +933,30 @@ do
     said = nil
     fn.maparg("<Esc>", "n", false, true).callback()
     assert(count("close") == escapes + 1 and said == nil, "Esc from a full-window tree")
+    handlers.TreeClose()
+    -- In a second tab page, a tree that fills it shows the covered file above
+    -- it before closing (Esc or q), so the tab page stays; each tab page keeps
+    -- its own covered file.
+    api.nvim_win_set_buf(0, one)
+    tree_win = nil
+    fn.maparg("-", "n", false, true).callback()
+    local first_tab = api.nvim_get_current_tabpage()
+    for _, key in ipairs({ "<Esc>", "q" }) do
+      vim.cmd.tabnew()
+      api.nvim_win_set_buf(0, two)
+      tree_win = nil
+      fn.maparg("-", "n", false, true).callback()
+      api.nvim_win_set_buf(0, tree_buf)
+      tree_win = api.nvim_get_current_win()
+      local closes = count("close")
+      fn.maparg(key, "n", false, true).callback()
+      local showing = vim.tbl_map(api.nvim_win_get_buf, api.nvim_tabpage_list_wins(0))
+      assert(count("close") == closes + 1 and vim.deep_equal(showing, { two }),
+        key .. " in a second tab page: " .. vim.inspect(showing))
+      handlers.TreeClose()
+      vim.cmd("tabclose!")
+    end
+    assert(api.nvim_tabpage_get_var(first_tab, "tree_covered") == one, "a second tab page changed the first's covered file")
     handlers.TreeClose()
     vim.notify = real_notify
     tree_win = nil
