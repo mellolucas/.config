@@ -207,13 +207,18 @@ require("nvim-tree").setup({
     end, "Open Preview")
     map("-", up, "Root: up to the parent folder")
     map("<C-]>", api.tree.change_root_to_node, "Root: into this folder")
-    -- Esc goes back to the code: beside the tree, or the file a full-window
-    -- tree covers; an empty window beside it holds no file to go back to
+    -- Esc goes back to the code: beside the tree (passing over an empty
+    -- window, which holds no file), or the file a full-window tree covers
     map("<Esc>", function()
-      local code = code_window()
-      if code and not blank(code) then
+      local here, code = vim.api.nvim_get_current_win(), code_window()
+      if code and blank(code) then
+        code = vim.tbl_filter(function(win)
+          return win ~= here and not blank(win)
+        end, windows())[1]
+      end
+      if code then
         vim.api.nvim_set_current_win(code)
-      elseif not code and vim.t.tree_covered then
+      elseif #windows() == 1 and vim.t.tree_covered then
         close()
       else
         vim.notify("No file to return to")
