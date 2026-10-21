@@ -177,12 +177,12 @@ press("-")
 press("q")
 expect({ "b.txt" }, "q in a second tab page")
 press("-")
-select("c.txt")
+select("d.txt")
 press("<CR>")
-expect({ "c.txt" }, "opening a file in a second tab page")
+expect({ "d.txt" }, "opening a file in a second tab page")
 press("-")
 resize(200)
-expect({ "tree", "c.txt" }, "widening a second tab page")
+expect({ "tree", "d.txt" }, "widening a second tab page")
 resize(40)
 assert(#api.nvim_list_tabpages() == 2, "the second tab page closed")
 vim.cmd.tabclose()
@@ -239,6 +239,7 @@ assert(current() == "a.txt", "catching up moved the cursor into the tree")
 
 -- Zoomed, Tab shows a file beside the tree and keeps the cursor there; the
 -- file stays through unzooming, and a full-window tree widens into the sidebar.
+assert(fn.bufloaded(project .. "/c.txt") == 0, "c.txt opened before the zoomed Tab check")
 select("c.txt") -- opened nowhere yet, so a preview would be temporary
 press("<Tab>")
 expect({ "tree", "c.txt" }, "zoomed Tab")
