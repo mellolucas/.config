@@ -157,6 +157,7 @@ check grep -Fxq 'bootstrap NONINTERACTIVE=0' "$test_root/bootstrap.log"
 
 with_layout install_dotfiles > "$test_root/install.log"
 check grep -Fq 'exec zsh -l' "$test_root/install.log"
+check grep -Fq 'then dotfiles doctor names anything left to set up' "$test_root/install.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
 check test -L "$HOME/.local/bin/dotfiles"

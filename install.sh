@@ -318,7 +318,8 @@ install_dotfiles() {
   bundle_dotfiles
 
   printf '\ndone.\n'
-  printf 'restart your shell or run: exec zsh -l; then keys shows what this setup adds\n'
+  printf 'restart your shell or run: exec zsh -l\n'
+  printf 'then dotfiles doctor names anything left to set up (such as your Git identity), and keys shows what this setup adds\n'
 }
 
 # Follows `brew bundle --global` Brewfile resolution (HOMEBREW_BUNDLE_FILE_GLOBAL
