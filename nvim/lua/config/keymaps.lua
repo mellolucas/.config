@@ -10,10 +10,33 @@ map({ "n", "i", "x" }, "<D-s>", "<Cmd>write<CR>", { desc = "Save" })
 map("n", "<D-o>", ":find ", { desc = "Open a file by name" })
 map("i", "<D-o>", "<Esc>:find ", { desc = "Open a file by name" })
 map("x", "<D-c>", '"+y', { desc = "Copy" })
-map("x", "<D-x>", '"+d', { desc = "Cut" })
+-- A cut leaves the insertion point where the text was, so Cmd+V puts it back;
+-- whole lines and blocks stay in normal mode
+map("x", "<D-x>", function()
+  return vim.fn.mode() == "v" and '"+c' or '"+d'
+end, { expr = true, desc = "Cut" })
 map("n", "<D-/>", "gcc", { remap = true, desc = "Toggle comment" })
 map("x", "<D-/>", "gc", { remap = true, desc = "Toggle comment" })
-map("i", "<D-/>", "<Cmd>normal gcc<CR>", { desc = "Toggle comment" })
+-- While typing, the cursor stays on its character. A comment marker opens
+-- after the indentation (and may close at the end), so finding the plain text
+-- inside the commented line gives the opening marker's width
+map("i", "<D-/>", function()
+  local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+  local before = vim.api.nvim_get_current_line()
+  vim.cmd.normal("gcc")
+  local after = vim.api.nvim_get_current_line()
+  local plain, commented, sign = before, after, 1
+  if #after < #before then
+    plain, commented, sign = after, before, -1
+  end
+  local indent = #plain:match("^%s*")
+  local text = plain:find("%S") and commented:find(plain:sub(indent + 1), indent + 1, true)
+  local shift = text and sign * (text - indent - 1) or #after - #before
+  if col >= indent then
+    col = math.min(math.max(indent, col + shift), #after)
+  end
+  vim.api.nvim_win_set_cursor(0, { row, col })
+end, { desc = "Toggle comment" })
 
 -- Content edit: <leader>c*
 map("n", "<leader>cf", function()

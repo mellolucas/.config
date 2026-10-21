@@ -144,7 +144,8 @@ assert(fn.mapcheck("<Esc>", "t") == "", "a terminal-mode map starts with Esc: " 
 
 -- Command keys do what they do in every Mac app (Ghostty passes them as
 -- <D-…>): Cmd+S saves, Cmd+O opens a file by name, Cmd+C / Cmd+X copy / cut
--- the selection to the clipboard, and Cmd+/ comments the line or selection.
+-- the selection to the clipboard, and Cmd+/ comments the line or selection,
+-- in the modes the guide names.
 do
   local copied = {}
   local real_clipboard = vim.g.clipboard
@@ -156,25 +157,60 @@ do
   local path = fn.tempname() .. ".lua"
   vim.cmd.edit(fn.fnameescape(path))
   local file = api.nvim_get_current_buf()
+  local function press(keys)
+    api.nvim_feedkeys(vim.keycode(keys), "mx", false)
+  end
+  local function text()
+    return api.nvim_buf_get_lines(file, 0, -1, false)
+  end
   api.nvim_buf_set_lines(file, 0, -1, false, { "local one = 1", "local two = 2" })
-  vim.bo.commentstring = "-- %s"
-  api.nvim_feedkeys(vim.keycode("<D-s>"), "mx", false)
+  press("<D-s>")
   assert(not vim.bo.modified and fn.readfile(path)[2] == "local two = 2", "Cmd+S did not save")
-  assert(fn.maparg("<D-o>", "n") == ":find ", "Cmd+O: " .. fn.maparg("<D-o>", "n"))
-  api.nvim_win_set_cursor(0, { 1, 0 })
-  api.nvim_feedkeys(vim.keycode("vee<D-c>"), "mx", false)
-  assert(vim.deep_equal(copied, { "local one" }), "Cmd+C copied " .. vim.inspect(copied))
-  copied = {}
-  api.nvim_feedkeys(vim.keycode("0vee<D-x>"), "mx", false)
-  assert(vim.deep_equal(copied, { "local one" }) and api.nvim_get_current_line() == " = 1",
-    "Cmd+X: " .. vim.inspect(copied) .. " " .. api.nvim_get_current_line())
+  -- Typing goes on after a save, and a selection saves the whole file.
+  press("A<D-s>Y<Esc>")
+  assert(fn.readfile(path)[1] == "local one = 1" and text()[1] == "local one = 1Y", "Cmd+S while typing")
+  press("V<D-s><Esc>")
+  assert(not vim.bo.modified and vim.deep_equal(fn.readfile(path), text()), "Cmd+S from a selection")
+  for _, keys in ipairs({ "<D-o>GUIDE.md<CR>", "i<D-o>GUIDE.md<CR>" }) do
+    press(keys)
+    local opened = api.nvim_get_current_buf()
+    assert(fn.fnamemodify(api.nvim_buf_get_name(opened), ":t") == "GUIDE.md", "Cmd+O from " .. keys)
+    vim.cmd.buffer(file)
+    api.nvim_buf_delete(opened, { force = true })
+  end
   api.nvim_buf_set_lines(file, 0, -1, false, { "local one = 1", "local two = 2" })
   api.nvim_win_set_cursor(0, { 1, 0 })
-  api.nvim_feedkeys(vim.keycode("<D-/>"), "mx", false)
-  assert(api.nvim_buf_get_lines(file, 0, 1, false)[1] == "-- local one = 1", "Cmd+/ on a line")
-  api.nvim_feedkeys(vim.keycode("<D-/>Vj<D-/>"), "mx", false)
-  assert(vim.deep_equal(api.nvim_buf_get_lines(file, 0, -1, false), { "-- local one = 1", "-- local two = 2" }),
-    "Cmd+/ on a selection: " .. vim.inspect(api.nvim_buf_get_lines(file, 0, -1, false)))
+  press("vee<D-c>")
+  assert(vim.deep_equal(copied, { "local one" }), "Cmd+C copied " .. vim.inspect(copied))
+  -- A cut leaves the insertion point where the text was, so a paste (typed
+  -- here, as Ghostty's Cmd+V reaches insert mode) puts it back; a cut of
+  -- whole lines stays in normal mode.
+  copied = {}
+  api.nvim_buf_set_lines(file, 0, -1, false, { "abcd", "line two" })
+  api.nvim_win_set_cursor(0, { 1, 1 })
+  press("vl<D-x>bc<Esc>")
+  assert(vim.deep_equal(copied, { "bc" }) and text()[1] == "abcd", "Cmd+X then Cmd+V: " .. text()[1])
+  press("V<D-x>")
+  assert(copied[1] == "abcd" and vim.deep_equal(text(), { "line two" }), "Cmd+X on a line: " .. vim.inspect(text()))
+  api.nvim_buf_set_lines(file, 0, -1, false, { "local one = 1", "local two = 2" })
+  api.nvim_win_set_cursor(0, { 1, 0 })
+  vim.bo.commentstring = "-- %s"
+  press("<D-/>")
+  assert(text()[1] == "-- local one = 1", "Cmd+/ on a line")
+  press("<D-/>Vj<D-/>")
+  assert(vim.deep_equal(text(), { "-- local one = 1", "-- local two = 2" }), "Cmd+/ on a selection: " .. vim.inspect(text()))
+  -- While typing, the cursor stays on its character: before a closing marker,
+  -- and in the indentation.
+  press("ggA<D-/>X<Esc>")
+  assert(text()[1] == "local one = 1X", "Cmd+/ uncommenting while typing: " .. text()[1])
+  press("A<D-/>Y<Esc>")
+  assert(text()[1] == "-- local one = 1XY", "Cmd+/ commenting while typing: " .. text()[1])
+  api.nvim_buf_set_lines(file, 0, -1, false, { "  a = 1" })
+  vim.bo.commentstring = "/* %s */"
+  press("A<D-/>;<Esc>")
+  assert(text()[1] == "  /* a = 1; */", "Cmd+/ with a closing marker: " .. text()[1])
+  press("0i<D-/>X<Esc>")
+  assert(text()[1] == "X  a = 1;", "Cmd+/ from the indentation: " .. text()[1])
   vim.cmd.enew()
   api.nvim_buf_delete(file, { force = true })
   fn.delete(path)
