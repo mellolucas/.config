@@ -580,6 +580,16 @@ RUBY
   done
 )
 
+# Parity contract: Option types characters, and Ghostty still sends
+# Option+Backspace as ESC DEL, which zsh and Neovim read as a word delete
+# (checked by behavior in .tests/zle.zsh and .tests/nvim.lua).
+(
+  setopt extendedglob
+  ghostty_lines=(${${(f)"$(<"$repo/ghostty/config.ghostty")"}##[[:space:]]#})
+  for line in 'macos-option-as-alt = false' 'keybind = alt+backspace=text:\x1b\x7f'; do
+    (( ${ghostty_lines[(Ie)$line]} )) || fail "ghostty lacks: $line"
+  done
+)
 
 git() {
   [[ $1 == -C ]] || fail "unexpected git invocation: $*"

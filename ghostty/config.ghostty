@@ -3,8 +3,11 @@ theme = dark:Catppuccin Mocha,light:Catppuccin Latte
 window-save-state = always
 auto-update = off
 
-# Left Option sends Alt; right Option retains native macOS character input.
-macos-option-as-alt = left
+# Option types characters with either key (ç, é), as in every Mac app; on US
+# layouts Ghostty would make it Alt. The word keys stay: Ghostty's own
+# Option+arrows jump words, and Option+Backspace deletes one
+macos-option-as-alt = false
+keybind = alt+backspace=text:\x1b\x7f
 
 # Ghostty's own Mac keys run panes, tabs, find, and scrollback. Two pass the
 # key on when they can't act: Cmd+Option+arrows at a pane's edge reach
