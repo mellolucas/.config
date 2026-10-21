@@ -7,6 +7,9 @@ command -v fzf >/dev/null 2>&1 || {
   return 1
 }
 
+local -a editor=("${(@Q)${(z)EDITOR}}")
+[[ -n $editor[1] ]] || { print -u2 'fzfv: EDITOR must name a command'; return 1 }
+
 local file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 -- {} || cat -- {}'
 local preview=$file_preview
 
@@ -15,4 +18,5 @@ if command -v glow >/dev/null 2>&1; then
   preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
 fi
 
-fzfe --preview "$preview" --preview-window=wrap "$@"
+# fzf executes a shell string; quote every literal editor token before joining.
+fzf --bind "enter:become(${(j: :)${(@q)editor}} -- {})" --preview "$preview" --preview-window=wrap "$@"

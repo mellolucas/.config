@@ -202,7 +202,6 @@ List what is here, then find a file by name or by content.
 | `lc` | Lines of code by language |
 | `v FILE` / `view FILE` | Edit / read-only in your editor |
 | `fzfv` | Search names with a preview; Enter opens the file |
-| `fzfe` | The same picker without a preview |
 | `Option+c` | Pick a directory below here (directories only, each previewed) and change to it |
 | `rg TEXT` | Search contents, including hidden files |
 | `rga TEXT` | Also search files that Git ignores |

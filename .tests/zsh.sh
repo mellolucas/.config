@@ -109,7 +109,7 @@ if [[ ${1:-} == --glance-render-child ]]; then
   print END
   exit 0
 fi
-for file in "$repo"/zsh/{homebrew.sh,.zprofile,.zshrc,functions/{fzfe,fzfv,git-glance,github-open,github-view,help,keys,rgv}} "$self"; do
+for file in "$repo"/zsh/{homebrew.sh,.zprofile,.zshrc,functions/{fzfv,git-glance,github-open,github-view,help,keys,rgv}} "$self"; do
   zsh -n "$file"
 done
 
@@ -128,7 +128,7 @@ print -r -- 'local README' > "$root/README.md"
 autoload -Uz run-help
 autoload +X run-help
 fpath=("$repo/zsh/functions")
-autoload -Uz fzfe fzfv github-open github-view help keys rgv
+autoload -Uz fzfv github-open github-view help keys rgv
 # Individual checks opt into isolated executables as needed.
 path=()
 
@@ -814,22 +814,20 @@ fzf() {
 
 export EDITOR='editor --clean'
 selection='-c quit | touch should-not-run'
-fzfe --query needle
+fzfv --query needle
 expect $'editor\n--clean\n--\n-c quit | touch should-not-run' "$(recorded)" 'editor option terminator and filename quoting'
 (
   editor_name='editor with spaces'
   functions[$editor_name]='record "editor with spaces" "$@"'
   EDITOR='"editor with spaces" --clean "profile name" "$HOME" "$(print injected > $test_root/injected)" ; literal'
-  fzfe
-  expect $'editor with spaces\n--clean\nprofile name\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\n--\n-c quit | touch should-not-run' "$(recorded)" 'fzfe literal quoted editor tokens'
-  [[ ! -e "$test_root/injected" ]] || fail 'fzfe evaluated editor command substitution'
+  fzfv
+  expect $'editor with spaces\n--clean\nprofile name\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\n--\n-c quit | touch should-not-run' "$(recorded)" 'fzfv literal quoted editor tokens'
+  [[ ! -e "$test_root/injected" ]] || fail 'fzfv evaluated editor command substitution'
   EDITOR=''
-  if fzfe >/dev/null 2>&1; then fail 'fzfe rejects empty editor'; fi
+  if fzfv >/dev/null 2>&1; then fail 'fzfv rejects empty editor'; fi
 )
-# Inspect forwarding separately without executing the binding.
+# Inspect the picker's arguments without executing the binding.
 fzf() { record "$@"; }
-fzfe --preview-window=wrap --bind ctrl-s:toggle-preview-wrap --query needle
-expect $'--bind\nenter:become(editor --clean -- {})\n--preview-window=wrap\n--bind\nctrl-s:toggle-preview-wrap\n--query\nneedle' "$(recorded)" 'fzf argument forwarding'
 
 for has_glow in 0 1; do
   (
