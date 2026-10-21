@@ -72,6 +72,30 @@ do
     api.nvim_buf_delete(buf, { force = true })
   end
 end
+-- Without the file tree, - opens netrw on this file's folder, on this file's
+-- line: its exact name, whatever the case (ignorecase and smartcase, as
+-- config.options sets them) and the pattern characters around it.
+do
+  local listing
+  api.nvim_create_user_command("Explore", function()
+    vim.cmd.enew()
+    listing = api.nvim_get_current_buf()
+    api.nvim_buf_set_lines(0, 0, -1, false,
+      { "../", "./", "Notes.md", "notesXmd", "xnotes.md", "notes.md.bak", "notes.md*" })
+  end, {})
+  local file = api.nvim_create_buf(true, false)
+  api.nvim_buf_set_name(file, fn.tempname() .. "/notes.md")
+  api.nvim_set_current_buf(file)
+  vim.o.ignorecase, vim.o.smartcase = true, true
+  fn.maparg("-", "n", false, true).callback()
+  vim.o.ignorecase, vim.o.smartcase = false, false
+  assert(api.nvim_get_current_buf() == listing and api.nvim_get_current_line() == "notes.md*",
+    "- without the file tree lands on " .. api.nvim_get_current_line())
+  api.nvim_del_user_command("Explore")
+  vim.cmd.enew()
+  api.nvim_buf_delete(listing, { force = true })
+  api.nvim_buf_delete(file, { force = true })
+end
 local toggle = fn.maparg(" tm", "n", false, true).callback
 assert(type(toggle) == "function")
 assert(fn.maparg(" tm", "t") == "")
@@ -507,10 +531,6 @@ end
 ok, err = pcall(function()
   assert(fn.maparg(" gd", "n") == "<Cmd>GitDiff<CR>")
   assert(fn.maparg(" gd", "i") == "" and fn.maparg(" gd", "t") == "")
-  local explored
-  api.nvim_create_user_command("Explore", function() explored = "Explore" end, {})
-  fn.maparg("-", "n", false, true).callback()
-  assert(explored == "Explore", "- without the file tree: " .. tostring(explored))
   assert(api.nvim_get_commands({}).GitDiff.nargs == "0")
   assert(not pcall(vim.cmd, "GitDiff extra"))
 

@@ -186,7 +186,7 @@ map("n", "-", function()
   local name = vim.fn.expand("%:t")
   vim.cmd.Explore()
   if name ~= "" then
-    vim.fn.search("\\V\\^" .. vim.fn.escape(name, "\\") .. "\\[*@/=|]\\?\\$")
+    vim.fn.search("\\V\\C\\^" .. vim.fn.escape(name, "\\") .. "\\[*@/=|]\\?\\$")
   end
 end, { desc = "Up to this file's folder" })
 
