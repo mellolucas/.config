@@ -240,14 +240,16 @@ do
   api.nvim_win_set_cursor(0, { 1, 6 })
   press("i<D-/>X<Esc>")
   assert(text()[1] == " X", "Cmd+/ on a blank comment: " .. text()[1])
-  -- In a code block, Neovim's toggle uses that language's markers (here from a
-  -- stand-in for Lua's ftplugin), and the cursor moves by what they add.
-  local lua_markers = api.nvim_create_augroup("test_lua_markers", {})
-  api.nvim_create_autocmd("FileType", { group = lua_markers, callback = function(event)
-    if event.match == "lua" then
-      vim.bo[event.buf].commentstring = "-- %s"
+  -- In a code block, Neovim's toggle uses that language's markers (here a
+  -- stand-in for the filetype plugins' values), and the cursor moves by what
+  -- they add.
+  local get_option = vim.filetype.get_option
+  vim.filetype.get_option = function(filetype, option)
+    if option == "commentstring" then
+      return filetype == "lua" and "-- %s" or ""
     end
-  end })
+    return get_option(filetype, option)
+  end
   local notes = api.nvim_create_buf(false, true)
   api.nvim_win_set_buf(0, notes)
   api.nvim_buf_set_lines(notes, 0, -1, false, { "```lua", "local x = 1", "<!-- x -->", "```" })
@@ -261,7 +263,7 @@ do
   api.nvim_win_set_cursor(0, { 3, 5 })
   press("i<D-/>X<Esc>")
   local fenced = api.nvim_buf_get_lines(notes, 1, 3, false)
-  api.nvim_del_augroup_by_id(lua_markers)
+  vim.filetype.get_option = get_option
   api.nvim_win_set_buf(0, file)
   api.nvim_buf_delete(notes, { force = true })
   assert(vim.deep_equal(fenced, { "-- local x = X1", "-- <!-- Xx -->" }), "Cmd+/ in a code block: " .. vim.inspect(fenced))
