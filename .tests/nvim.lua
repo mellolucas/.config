@@ -101,17 +101,20 @@ assert(type(toggle) == "function")
 assert(fn.maparg(" tm", "t") == "")
 
 -- Pane-edge Cmd+Option+arrows (<D-M-…>) move between windows in normal mode
--- and do nothing while typing.
+-- and do nothing otherwise: each, from mid-text, while typing or after an
+-- operator, leaves the text and the insertion point alone.
 local typing = api.nvim_create_buf(false, true)
 api.nvim_win_set_buf(0, typing)
 vim.o.showmode = false
-api.nvim_feedkeys(api.nvim_replace_termcodes("iabc<D-M-Left><D-M-Down><D-M-Up><D-M-Right>def<Esc>", true, false, true), "xt", false)
-assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "abcdef", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
 for arrow, key in pairs({ Left = "h", Down = "j", Up = "k", Right = "l" }) do
-  assert(fn.maparg("<D-M-" .. arrow .. ">", "n") == "<C-W>" .. key, "Cmd+Option+" .. arrow)
-  for _, mode in ipairs({ "v", "c" }) do
-    assert(fn.maparg("<D-M-" .. arrow .. ">", mode) == "<Nop>")
-  end
+  local chord = "<D-M-" .. arrow .. ">"
+  assert(fn.maparg(chord, "n") == "<C-W>" .. key, "Cmd+Option+" .. arrow)
+  api.nvim_buf_set_lines(typing, 0, -1, false, { "ab", "cd", "ef" })
+  api.nvim_win_set_cursor(0, { 2, 1 })
+  api.nvim_feedkeys(api.nvim_replace_termcodes("i" .. chord .. "X<Esc>ld" .. chord .. "<Esc>", true, false, true), "xt", false)
+  local lines = api.nvim_buf_get_lines(typing, 0, -1, false)
+  assert(vim.deep_equal(lines, { "ab", "cXd", "ef" }), "Cmd+Option+" .. arrow .. " typed or deleted: " .. vim.inspect(lines))
+  assert(fn.maparg(chord, "v") == "<Nop>" and fn.maparg(chord, "c") == "<Nop>", "Cmd+Option+" .. arrow)
 end
 
 -- Option+Left/Right (<M-b>/<M-f>) jump to word starts without leaving the mode.
@@ -211,6 +214,14 @@ do
   assert(text()[1] == "  /* a = 1; */", "Cmd+/ with a closing marker: " .. text()[1])
   press("0i<D-/>X<Esc>")
   assert(text()[1] == "X  a = 1;", "Cmd+/ from the indentation: " .. text()[1])
+  -- Inside the text, past whitespace after a closing marker, and on text that
+  -- looks like a marker.
+  api.nvim_buf_set_lines(file, 0, -1, false, { "/* abc */  " })
+  press("0fbi<D-/>X<Esc>")
+  assert(text()[1] == "aXbc  ", "Cmd+/ inside the text: " .. text()[1])
+  api.nvim_buf_set_lines(file, 0, -1, false, { "*" })
+  press("A<D-/>X<Esc>")
+  assert(text()[1] == "/* *X */", "Cmd+/ on a marker-like line: " .. text()[1])
   vim.cmd.enew()
   api.nvim_buf_delete(file, { force = true })
   fn.delete(path)

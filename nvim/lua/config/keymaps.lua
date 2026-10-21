@@ -17,21 +17,28 @@ map("x", "<D-x>", function()
 end, { expr = true, desc = "Cut" })
 map("n", "<D-/>", "gcc", { remap = true, desc = "Toggle comment" })
 map("x", "<D-/>", "gc", { remap = true, desc = "Toggle comment" })
--- While typing, the cursor stays on its character. A comment marker opens
--- after the indentation (and may close at the end), so finding the plain text
--- inside the commented line gives the opening marker's width
+-- While typing, the cursor stays on its character. Neovim's toggle opens a
+-- comment after the indentation with 'commentstring' as written or trimmed
+-- (and may close it at the end), so only that opening marker moves the text
 map("i", "<D-/>", function()
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
   local before = vim.api.nvim_get_current_line()
   vim.cmd.normal("gcc")
   local after = vim.api.nvim_get_current_line()
-  local plain, commented, sign = before, after, 1
+  local commented, sign = after, 1
   if #after < #before then
-    plain, commented, sign = after, before, -1
+    commented, sign = before, -1
   end
-  local indent = #plain:match("^%s*")
-  local text = plain:find("%S") and commented:find(plain:sub(indent + 1), indent + 1, true)
-  local shift = text and sign * (text - indent - 1) or #after - #before
+  local indent = #commented:match("^%s*")
+  local opening = vim.bo.commentstring:match("^(.-)%%s") or ""
+  -- An embedded language's own marker: the whole change, exact for line comments
+  local shift = #after - #before
+  for _, marker in ipairs({ opening, vim.trim(opening) }) do
+    if marker ~= "" and commented:sub(indent + 1, indent + #marker) == marker then
+      shift = sign * #marker
+      break
+    end
+  end
   if col >= indent then
     col = math.min(math.max(indent, col + shift), #after)
   end
@@ -226,11 +233,11 @@ map("n", "<leader>gd", "<cmd>GitDiff<CR>", { desc = "Diff saved file against ind
 
 -- Windows: Cmd+Option+arrows move between Ghostty's panes; at a pane's edge
 -- Ghostty passes them on (as <D-M-…>) and they move between these windows.
--- Unmapped, insert and command-line modes would read them as arrows.
+-- Unmapped, other modes would read them as arrows (after d, a motion).
 for _, move in ipairs({ { "Left", "h", "left" }, { "Down", "j", "lower" }, { "Up", "k", "upper" }, { "Right", "l", "right" } }) do
   local key = "<D-M-" .. move[1] .. ">"
   map("n", key, "<C-w>" .. move[2], { desc = "Go to " .. move[3] .. " window" })
-  map({ "i", "v", "c" }, key, "<Nop>", { desc = "Ignore a pane-edge Cmd+Option+arrow" })
+  map({ "i", "v", "o", "c" }, key, "<Nop>", { desc = "Ignore a pane-edge Cmd+Option+arrow" })
 end
 -- Option+Left/Right arrive as <M-b>/<M-f> (Ghostty's macOS word jumps) or as
 -- <M-Left>/<M-Right> (Windows Terminal, tmux); unmapped, they too would read
