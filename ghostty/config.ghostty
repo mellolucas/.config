@@ -7,3 +7,7 @@ auto-update = off
 macos-option-as-alt = left
 
 config-file = vim.ghostty
+
+# Cmd+C copies the terminal's selection; with none it reaches the program, so
+# Neovim copies its own
+keybind = performable:super+c=copy_to_clipboard:mixed
