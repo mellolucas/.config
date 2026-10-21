@@ -224,11 +224,17 @@ do
   assert(text()[1] == "  /* a = 1; */", "Cmd+/ with a closing marker: " .. text()[1])
   press("0i<D-/>X<Esc>")
   assert(text()[1] == "X  a = 1;", "Cmd+/ from the indentation: " .. text()[1])
-  -- Inside the text, past whitespace after a closing marker, and on text that
-  -- looks like a marker.
+  -- Inside the text, after a closing marker, with the markers trimmed, and on
+  -- text that looks like a marker.
   api.nvim_buf_set_lines(file, 0, -1, false, { "/* abc */  " })
   press("0fbi<D-/>X<Esc>")
   assert(text()[1] == "aXbc  ", "Cmd+/ inside the text: " .. text()[1])
+  api.nvim_buf_set_lines(file, 0, -1, false, { "/* abc */  " })
+  press("$i<D-/>X<Esc>")
+  assert(text()[1] == "abc X ", "Cmd+/ after a closing marker: " .. text()[1])
+  api.nvim_buf_set_lines(file, 0, -1, false, { "/* abc*/" })
+  press("0fbi<D-/>X<Esc>")
+  assert(text()[1] == " aXbc", "Cmd+/ with the markers trimmed: " .. text()[1])
   api.nvim_buf_set_lines(file, 0, -1, false, { "*" })
   press("A<D-/>X<Esc>")
   assert(text()[1] == "/* *X */", "Cmd+/ on a marker-like line: " .. text()[1])

@@ -17,32 +17,33 @@ map("x", "<D-x>", function()
 end, { expr = true, desc = "Cut" })
 map("n", "<D-/>", "gcc", { remap = true, desc = "Toggle comment" })
 map("x", "<D-/>", "gc", { remap = true, desc = "Toggle comment" })
--- While typing, the cursor stays on its character. Neovim's toggle opens a
--- comment after the indentation with 'commentstring' as written or trimmed
--- (and may close it at the end), so only that opening marker moves the text
+-- While typing, the cursor stays on its character. Neovim's toggle puts
+-- 'commentstring' around the text after the indentation, or takes it off as
+-- written or else trimmed, so the cursor moves by what changed before it
 map("i", "<D-/>", function()
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
-  local before = vim.api.nvim_get_current_line()
+  local line = vim.api.nvim_get_current_line()
   vim.cmd.normal("gcc")
-  local after = vim.api.nvim_get_current_line()
-  local commented, sign = after, 1
-  if #after < #before then
-    commented, sign = before, -1
-  end
-  local indent = #commented:match("^%s*")
-  local opening = vim.bo.commentstring:match("^(.-)%%s") or ""
-  -- An embedded language's own marker: the whole change, exact for line comments
-  local shift = #after - #before
-  for _, marker in ipairs({ opening, vim.trim(opening) }) do
-    if marker ~= "" and commented:sub(indent + 1, indent + #marker) == marker then
-      shift = sign * #marker
-      break
+  local new = vim.api.nvim_get_current_line()
+  local left, right = vim.bo.commentstring:match("^(.-)%%s(.-)$")
+  -- An embedded language's own markers: the whole change, exact for line comments
+  local moved = col < #line:match("^%s*") and 0 or #new - #line
+  if moved > 0 and left then
+    moved = #left
+  elseif moved < 0 and left then
+    local function before_cursor(from, to)
+      return math.max(0, math.min(col, to - 1) - (from - 1))
+    end
+    for _, pair in ipairs({ { left, right }, { vim.trim(left), vim.trim(right) } }) do
+      local open, text, close, trail =
+        line:match("^%s*()" .. vim.pesc(pair[1]) .. "().*()" .. vim.pesc(pair[2]) .. "()%s-$")
+      if open then
+        moved = -before_cursor(open, text) - before_cursor(close, trail)
+        break
+      end
     end
   end
-  if col >= indent then
-    col = math.min(math.max(indent, col + shift), #after)
-  end
-  vim.api.nvim_win_set_cursor(0, { row, col })
+  vim.api.nvim_win_set_cursor(0, { row, math.max(0, math.min(col + moved, #new)) })
 end, { desc = "Toggle comment" })
 
 -- Content edit: <leader>c*
