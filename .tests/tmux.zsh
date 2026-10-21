@@ -389,7 +389,7 @@ if (( $+commands[fzf] )); then
     local -a rows=("${(@f)$(screen)}")
     if [[ $rows[2] =~ '([0-9]+)/[0-9]+ ?(││|│) *$' ]]; then print -r -- $match[1]; else print 0; fi
   }
-  [[ $(preview_top) == 1 ]] || fail "keys preview did not open at its top: $(preview_top)"
+  wait_for 'keys preview did not open at its top' '[[ $(preview_top) == 1 ]]'
   tmux send-keys -t '=keys:' M-Down
   wait_for 'Option+Down did not scroll the keys preview' '(( $(preview_top) > 1 ))'
   tmux send-keys -t '=keys:' M-Up
