@@ -68,10 +68,11 @@ Changes since `v0.0.1`.
 - `rgfa`, `rgca`, `rgwa`, `rgwc`, and `rgwca` are gone: add `rg`'s short flags
   instead (`rga -l`, `rga -c`, `rga -w`, `rgw -c`). So is `bh`: `help COMMAND`
   shows a command's help.
-- In Neovim, `-` replaces `Space e e` (the tree, where `Esc` comes back),
-  `Ctrl+^` replaces `Space b -`, `:q` and `ZQ` replace `Space q q`, `Ctrl+L`
-  clears search highlighting in place of `Space t h`, and Neovim's own
-  `Ctrl+W` keys move between windows in place of `Space w`.
+- In Neovim, `-` replaces `Space e e` (to the tree; `Esc` comes back, `q`
+  hides it), and Vim's own `-` motion is `k^`. `Ctrl+^` replaces `Space b -`,
+  `:q` replaces `Space q q`, `ZQ` replaces `Space q q q`, and Neovim's own
+  `Ctrl+W` keys move between windows in place of `Space w`. Searches
+  highlight every match, as Neovim's do, until `Ctrl+L`; `Space t h` is gone.
 - In `HOMEBREW_CASK_OPTS`, write `--appdir=/path`; Homebrew ignores
   `--appdir /path`.
 - Agent homes moved to `~/.local/share/copilot`, `codex`, and `claude`. On a

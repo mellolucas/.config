@@ -291,7 +291,7 @@ vim.cmd.enew()
 resize(40)
 expect({ "tree" }, "narrowing beside an empty window")
 
--- l and h step into and out of folders; the root line stays put.
+-- l and h step into and out of folders; l leaves the root line alone.
 resize(200)
 select("src")
 local closed = api.nvim_buf_line_count(0)
