@@ -90,16 +90,16 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 | --- | --- |
 | `Cmd+Shift+Enter` (in the editor) | Zoom: the tree joins the code as a sidebar; again for the shells and agent |
 | `-` / `Esc` / `q` | From a file, to it in the tree / from the tree, back to the code / hide the tree |
-| `l` / `h` | Step into a folder or open a file / step out of a folder, closing it (on the top line, out of the root) |
+| `→` / `←` | Step into a folder or open a file / step out of a folder, closing it (on the top line, out of the root), as in Finder's list view |
 | `-` / `Ctrl+]` | Root: up to the parent folder, keeping yours open / into the folder under the cursor |
-| Enter / `Tab` | Open the file / show it, keeping the cursor in the tree |
+| Enter / `Space` or `Tab` | Open the file / show it, keeping the cursor in the tree, as Quick Look does |
 | `Ctrl+V` / `Ctrl+X` | Open beside / below the code, to compare files |
 | `f` / `H` / `I` | Filter by name / toggle hidden / ignored files |
 | `a` / `r` / `d` | Create / rename / delete |
 | `[c` / `]c` | Previous / next changed file |
 | `?` | Every key, by what it does |
 
-- Unzoomed, the tree and the code take turns in the narrow pane: Enter, `Tab`, or `l` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
+- Unzoomed, the tree and the code take turns in the narrow pane: Enter, `Space`, `Tab`, or `→` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
 - Hidden with `q` while zoomed, the tree stays out of later zooms until you show it again.
 - The tree follows the file you're in and marks Git changes as they happen: `✗` modified, `★` new, `✓` staged, `➜` renamed; a folder shows the marks of what it holds.
 - `-` (from a file) and `Esc` (from the tree) move between the tree and the code at any width. `Cmd+Option+arrows` move between terminal panes: in a workspace, `Cmd+Option+→` from the tree heads for the shell pane, and `Cmd+Option+←` reaches the tree only because no pane sits to the editor's left.

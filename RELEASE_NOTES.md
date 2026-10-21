@@ -30,7 +30,8 @@ Changes since `v0.0.1`.
   Ctrl+E` edits in Neovim, and fzf adds `Ctrl+T`, `Ctrl+R`, and `Esc` then `c`
   (which previews each directory).
 - **Exploring code:** Neovim opens on a file tree that sits beside the code
-  when there's room (`-` goes to it, `Esc` back; `?` lists its keys).
+  when there's room (`-` goes to it, `Esc` back; `?` lists its keys). As in
+  Finder, `→`/`←` open and close folders and `Space` previews a file.
   `rgv TEXT` browses ripgrep's matching lines file by file and opens Neovim
   with all of them in the quickfix list; `:grep` and `:find` search like the
   shell's `rg`.
