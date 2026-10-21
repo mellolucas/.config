@@ -19,18 +19,22 @@ map("n", "<D-/>", "gcc", { remap = true, desc = "Toggle comment" })
 map("x", "<D-/>", "gc", { remap = true, desc = "Toggle comment" })
 -- While typing, the cursor stays on its character. Neovim's toggle puts
 -- 'commentstring' around the text after the indentation, or takes it off as
--- written or else trimmed, so the cursor moves by what changed before it
+-- written or else trimmed (a blank body losing its indentation and trailing
+-- space too), so the cursor moves by what changed before it. Where that model
+-- doesn't give the new line (an embedded language's own markers), the whole
+-- change applies, exact for line comments
 map("i", "<D-/>", function()
   local row, col = unpack(vim.api.nvim_win_get_cursor(0))
   local line = vim.api.nvim_get_current_line()
   vim.cmd.normal("gcc")
   local new = vim.api.nvim_get_current_line()
+  local indent = #line:match("^%s*")
+  local moved = col < indent and 0 or #new - #line
   local left, right = vim.bo.commentstring:match("^(.-)%%s(.-)$")
-  -- An embedded language's own markers: the whole change, exact for line comments
-  local moved = col < #line:match("^%s*") and 0 or #new - #line
-  if moved > 0 and left then
-    moved = #left
-  elseif moved < 0 and left then
+  if left and new == line:sub(1, indent) .. left .. line:sub(indent + 1) .. right then
+    moved = col < indent and 0 or #left
+  elseif left then
+    -- Bytes of the removed range [from, to) (1-based) that lay before the cursor
     local function before_cursor(from, to)
       return math.max(0, math.min(col, to - 1) - (from - 1))
     end
@@ -38,7 +42,12 @@ map("i", "<D-/>", function()
       local open, text, close, trail =
         line:match("^%s*()" .. vim.pesc(pair[1]) .. "().*()" .. vim.pesc(pair[2]) .. "()%s-$")
       if open then
-        moved = -before_cursor(open, text) - before_cursor(close, trail)
+        if line:sub(text, close - 1):match("^%s*$") then
+          open, trail = 1, #line + 1
+        end
+        if new == line:sub(1, open - 1) .. line:sub(text, close - 1) .. line:sub(trail) then
+          moved = -before_cursor(open, text) - before_cursor(close, trail)
+        end
         break
       end
     end
