@@ -25,7 +25,6 @@ opt.smartindent = true
 -- Search
 opt.ignorecase = true
 opt.smartcase = true
-opt.hlsearch = false
 opt.grepprg = "rg --vimgrep --hidden --smart-case --follow --glob=!.git" -- default is rg -uu, which bypasses all ignore files; align with the shell rg discipline
 
 -- Diagnostics (toggle inline text with <leader>td)

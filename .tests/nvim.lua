@@ -1150,6 +1150,8 @@ fn.executable = real_executable
 local passed = "Markdown preview, DiffSaved, GitDiff, file tree, and focus background query tests passed"
 if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   dofile("nvim/lua/config/options.lua")
+  -- Searches highlight their matches until Ctrl+L, as the guide teaches.
+  assert(vim.o.hlsearch, "config.options turns search highlighting off")
   vim.o.shell = "zsh"
   local tree = fn.tempname()
   fn.mkdir(tree .. "/repo/.git", "p")
