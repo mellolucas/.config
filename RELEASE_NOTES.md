@@ -72,6 +72,10 @@ Changes since `v0.0.1`.
 - `rgfa`, `rgca`, `rgwa`, `rgwc`, and `rgwca` are gone: add `rg`'s short flags
   instead (`rga -l`, `rga -c`, `rga -w`, `rgw -c`). So is `bh`: `help COMMAND`
   shows a command's help.
+- Ghostty's own Mac keys run panes and scrollback (`keys panes`, `keys
+  browse`) in place of the `Option+v` key table.
+- OpenCode keeps its own keys: `Ctrl+X` is its leader in place of
+  `Ctrl+Space`, and `Ctrl+P` opens its palette.
 - In Neovim, `-` replaces `Space e e` (to the tree; `Esc` comes back, `q`
   hides it), and Vim's own `-` motion is `k^`. `Ctrl+^` replaces `Space b -`,
   `:q` replaces `Space q q`, `ZQ` replaces `Space q q q`, and Neovim's own
