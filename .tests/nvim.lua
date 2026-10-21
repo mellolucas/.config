@@ -135,6 +135,16 @@ assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one Ytwo Xthree")
 api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
 api.nvim_feedkeys(api.nvim_replace_termcodes("A<C-a>X<C-e>Y<Esc>", true, false, true), "xt", false)
 assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "Xone twoY")
+-- In normal mode and on a selection too, in place of Vim's increment and
+-- line scroll.
+api.nvim_buf_set_lines(typing, 0, -1, false, { "item 1 of 2" })
+api.nvim_win_set_cursor(0, { 1, 5 })
+api.nvim_feedkeys(api.nvim_replace_termcodes("<C-a>iX<Esc><C-e>aY<Esc>", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "Xitem 1 of 2Y", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
+api.nvim_feedkeys(api.nvim_replace_termcodes("05lv<C-e>d", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "Xitem", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
+api.nvim_feedkeys(api.nvim_replace_termcodes("$v<C-a>d", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
 api.nvim_feedkeys(api.nvim_replace_termcodes(":let g:ends = 'b'<C-a><M-f><M-f><M-f>'a'..<C-e>..'c'<CR>", true, false, true), "xt", false)
 assert(vim.g.ends == "abc")
 -- Option+Backspace deletes a word.

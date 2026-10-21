@@ -251,8 +251,9 @@ for _, forward in ipairs({ "<M-f>", "<M-Right>" }) do
   map({ "n", "x" }, forward, "w", { desc = "Word forward" })
 end
 -- Cmd+Left/Right arrive as Ctrl+A/E (Ghostty, VS Code on macOS): the line's
--- start and end, as at the prompt, instead of Vim's insert-mode repeats.
-map({ "i", "c" }, "<C-a>", "<Home>", { desc = "Line start" })
-map("i", "<C-e>", "<End>", { desc = "Line end" })
+-- start and end, as at the prompt, instead of Vim's increment (a selection
+-- still adds with g Ctrl+A), line scroll, and insert-mode repeats.
+map({ "n", "x", "i", "c" }, "<C-a>", "<Home>", { desc = "Line start" })
+map({ "n", "x", "i" }, "<C-e>", "<End>", { desc = "Line end" })
 -- Option+Backspace arrives as <M-BS>; delete a word as at the prompt.
 map({ "i", "c" }, "<M-BS>", "<C-w>", { desc = "Delete word back" })
