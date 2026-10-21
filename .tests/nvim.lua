@@ -906,6 +906,22 @@ do
       api.nvim_create_buf(false, true)
     api.nvim_buf_set_name(one, fn.tempname() .. "/one.lua")
     api.nvim_buf_set_name(two, fn.tempname() .. "/two.lua")
+    -- Beside only an empty window, as at the start, Esc says there is no file.
+    vim.cmd("silent! only")
+    vim.cmd.enew()
+    local empty = api.nvim_get_current_buf()
+    vim.cmd.vsplit()
+    api.nvim_win_set_buf(0, tree_buf)
+    local beside_empty = api.nvim_get_current_win()
+    fn.maparg("<Esc>", "n", false, true).callback()
+    assert(api.nvim_get_current_win() == beside_empty and said == "No file to return to",
+      "Esc beside an empty window: " .. tostring(said))
+    said = nil
+    vim.cmd("silent! only")
+    vim.cmd.buffer(one)
+    if api.nvim_buf_is_valid(empty) then
+      api.nvim_buf_delete(empty, { force = true })
+    end
     vim.cmd("silent! only")
     vim.cmd.buffer(one)
     vim.cmd.buffer(two)

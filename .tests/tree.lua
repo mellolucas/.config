@@ -100,7 +100,8 @@ assert(not api.nvim_buf_is_valid(listing), "narrow start keeps the directory lis
 -- not; the empty window a zoom leaves beside the tree is no file either.
 no_previous("Ctrl+^ at the start")
 expect({ "tree" }, "Ctrl+^ at the start")
--- Esc goes back to the code; at the start there is none to go back to.
+-- Esc goes back to the code; at the start there is none to go back to, zoomed
+-- or not.
 said = nil
 press("<Esc>")
 assert(said == "No file to return to" and current() == "tree", "Esc at the start: " .. tostring(said))
@@ -110,6 +111,9 @@ local empty = api.nvim_win_get_buf(api.nvim_tabpage_list_wins(0)[2])
 assert(not vim.bo[empty].buflisted, "the empty window a zoom leaves is listed as a file")
 no_previous("Ctrl+^ zoomed at the start")
 expect({ "tree", "[empty]" }, "Ctrl+^ zoomed at the start")
+said = nil
+press("<Esc>")
+assert(said == "No file to return to" and current() == "tree", "Esc zoomed at the start: " .. tostring(said))
 resize(40)
 expect({ "tree" }, "unzoom at the start")
 
