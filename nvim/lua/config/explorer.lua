@@ -218,17 +218,18 @@ require("nvim-tree").setup({
     map("q", close, "Close")
     -- ? opens and closes the list of keys, as g? does
     map("?", api.tree.toggle_help, "Help")
-    -- Ctrl+^ switches the code to its previous file, never to the tree:
-    -- the window beside the tree, or the file a full-window tree covers
+    -- Ctrl+^ switches the code to its previous file, never to the tree: the
+    -- window beside the tree, or the file a full-window tree covers. With a
+    -- count, Vim's own Ctrl+^ opens buffer N there
     map("<C-^>", function()
-      local code = code_window()
+      local count, code = vim.v.count, code_window()
       local file
       if code then
         file = previous(code)
       elseif vim.t.tree_covered and vim.t.tree_before and vim.fn.buflisted(vim.t.tree_before) == 1 then
         file = vim.t.tree_before
       end
-      if not file then
+      if count == 0 and not file then
         return vim.notify("No previous file")
       end
       if code then
@@ -236,7 +237,11 @@ require("nvim-tree").setup({
       else
         close()
       end
-      vim.cmd.buffer(file)
+      if count > 0 then
+        vim.api.nvim_feedkeys(count .. vim.keycode("<C-^>"), "n", false)
+      else
+        vim.cmd.buffer(file)
+      end
     end, "Previous file")
   end,
 })

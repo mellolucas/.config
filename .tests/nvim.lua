@@ -43,9 +43,10 @@ dofile("nvim/lua/config/keymaps.lua")
 -- Space b l lists buffers, then waits at :b for a number or name.
 assert(fn.maparg(" bl", "n") == ":ls<CR>:b ", "Space b l: " .. fn.maparg(" bl", "n"))
 assert(fn.maparg(" bl", "n", false, true).silent == 0, "Space b l must show its :b prompt")
--- Ctrl+^ (Ctrl+6, which Neovim also reads as <C-6>) switches to the previous
--- file, never to an unlisted buffer such as the file tree or a placeholder;
--- with none, it says so, and with a count it opens buffer N as Vim's does.
+-- Ctrl+^ (Ctrl+6, which Neovim reads as <C-6> and maps as <C-^>) switches to
+-- the previous file, never to an unlisted buffer such as the file tree or a
+-- placeholder: it says so instead. A count opens buffer N, and a missing one
+-- gets Vim's own message.
 do
   local one, two, scratch = api.nvim_create_buf(true, false), api.nvim_create_buf(true, false), api.nvim_create_buf(false, true)
   api.nvim_buf_set_name(one, fn.tempname() .. "/one.lua")
@@ -55,14 +56,17 @@ do
   vim.cmd.buffer(one)
   vim.cmd.buffer(two)
   api.nvim_feedkeys(vim.keycode("<C-6>"), "mx", false)
-  assert(api.nvim_get_current_buf() == one and said == nil, "Ctrl+^ did not switch to the previous file")
+  assert(api.nvim_get_current_buf() == one and said == nil, "Ctrl+6 did not switch to the previous file")
   api.nvim_set_current_buf(scratch)
   vim.cmd.buffer(one)
-  fn.maparg("<C-^>", "n", false, true).callback()
-  assert(api.nvim_get_current_buf() == one and said == "No previous file", "Ctrl+^ to an unlisted buffer: " .. tostring(said))
+  api.nvim_feedkeys(vim.keycode("<C-6>"), "mx", false)
+  assert(api.nvim_get_current_buf() == one and said == "No previous file", "Ctrl+6 to an unlisted buffer: " .. tostring(said))
   api.nvim_feedkeys(vim.keycode(two .. "<C-^>"), "mx", false)
-  vim.notify = real_notify
   assert(api.nvim_get_current_buf() == two, "Ctrl+^ with a count did not open that buffer")
+  vim.v.errmsg = ""
+  vim.cmd("silent! normal 99999" .. vim.keycode("<C-^>"))
+  vim.notify = real_notify
+  assert(api.nvim_get_current_buf() == two and vim.v.errmsg:find("^E92:"), "Ctrl+^ for a missing buffer: " .. vim.v.errmsg)
   vim.cmd.enew()
   for _, buf in ipairs({ one, two, scratch }) do
     api.nvim_buf_delete(buf, { force = true })
@@ -901,6 +905,12 @@ do
     api.nvim_set_current_win(in_tree)
     fn.maparg("<C-^>", "n", false, true).callback()
     assert(api.nvim_get_current_win() == in_tree and said == "No previous file", "Ctrl+^ from the tree, no previous file")
+    -- With a count, the code beside the tree opens buffer N, previous file or not.
+    said = nil
+    api.nvim_feedkeys(vim.keycode(one .. "<C-^>"), "mx", false)
+    assert(api.nvim_get_current_win() == code_win and api.nvim_get_current_buf() == one and said == nil,
+      "a count with Ctrl+^ from the tree beside the code: " .. tostring(said))
+    vim.cmd("normal! \27") -- a command without a count, so the direct calls below see none
     vim.cmd("silent! only")
     vim.o.columns = 40
     tree_win = nil

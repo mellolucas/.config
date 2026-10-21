@@ -14,7 +14,7 @@ end
 local project = fn.tempname()
 fn.mkdir(project .. "/src/deep", "p")
 project = vim.uv.fs_realpath(project)
-for _, name in ipairs({ "a.txt", "b.txt", "c.txt", "src/y.txt", "src/deep/x.txt" }) do
+for _, name in ipairs({ "a.txt", "b.txt", "c.txt", "d.txt", "src/y.txt", "src/deep/x.txt" }) do
   fn.writefile({ name }, project .. "/" .. name)
 end
 vim.cmd.cd(fn.fnameescape(project))
@@ -185,6 +185,16 @@ said = nil
 press("<Esc>")
 expect({ "a.txt" }, "Esc in the first tab page after the second's: " .. tostring(said))
 assert(alternate() == "b.txt", "alternate after Esc in the first tab page: " .. alternate())
+-- With a count, Ctrl+^ from a full-window tree opens buffer N in its place,
+-- here one that is no window's previous file.
+vim.cmd.badd(fn.fnameescape(project .. "/d.txt"))
+local d_txt = fn.bufnr(project .. "/d.txt")
+press("-")
+press(d_txt .. "<C-^>")
+expect({ "d.txt" }, "a count with Ctrl+^ from a full-window tree")
+assert(alternate() == "a.txt", "alternate after a count from the tree: " .. alternate())
+press("<C-^>")
+expect({ "a.txt" }, "Ctrl+^ back after a count")
 
 -- 110 columns bring the tree beside the code, leaving the cursor in it;
 -- 109 hand the window back to the code, and widening again brings it back.
@@ -254,6 +264,13 @@ assert(current() == "tree" and on("c.txt"), "- from the code beside the sidebar"
 press("<Esc>")
 expect({ "tree", "c.txt" }, "Esc from the sidebar")
 assert(current() == "c.txt", "Esc from the sidebar left the cursor in the tree")
+-- With a count, Ctrl+^ from the sidebar opens buffer N beside it and goes there.
+press("-")
+press(d_txt .. "<C-^>")
+expect({ "tree", "d.txt" }, "a count with Ctrl+^ from the sidebar")
+assert(current() == "d.txt", "a count with Ctrl+^ from the sidebar left the cursor in the tree")
+press("<C-^>")
+expect({ "tree", "c.txt" }, "Ctrl+^ back beside the sidebar")
 
 -- A split in the narrow window stays through resizes within it, widening
 -- restores the sidebar's width, and beside only an empty window, narrowing

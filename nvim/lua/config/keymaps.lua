@@ -165,20 +165,17 @@ map("n", "<leader>tm", markdown_preview, { desc = "Toggle markdown preview" })
 
 -- Buffers: <leader>b*
 map("n", "<leader>bl", ":ls<CR>:b ", { desc = "List buffers and pick one" })
--- Ctrl+^ (Ctrl+6), Vim's previous file, switches to the alternate only when it
--- is a listed buffer other than this one: never the file tree or an empty
--- placeholder, which are unlisted. With a count it opens buffer N, as Vim's does
+-- Ctrl+^ (Ctrl+6), Vim's previous file, never switches to an unlisted buffer
+-- such as the file tree or an empty placeholder: it says so instead. Vim's own
+-- Ctrl+^ does the switching, a count (buffer N) and its messages included
 map("n", "<C-^>", function()
-  if vim.v.count > 0 then
-    return vim.cmd.buffer(vim.v.count)
-  end
   local alternate = vim.fn.bufnr("#")
-  if alternate ~= vim.api.nvim_get_current_buf() and vim.fn.buflisted(alternate) == 1 then
-    vim.cmd.buffer(alternate)
-  else
-    vim.notify("No previous file")
+  if vim.v.count > 0 or (alternate ~= vim.api.nvim_get_current_buf() and vim.fn.buflisted(alternate) == 1) then
+    return "<C-^>"
   end
-end, { desc = "Switch to the previous file" })
+  vim.notify("No previous file")
+  return ""
+end, { expr = true, desc = "Switch to the previous file" })
 map("n", "<leader>bww", "<cmd>w<CR>", { desc = "Save buffer" })
 map("n", "<leader>bwq", "<cmd>wq<CR>", { desc = "Save and quit" })
 
