@@ -87,9 +87,10 @@ local function close()
 end
 
 -- A file opened from a tree that fills its tab page takes the tree's own
--- window, which keeps the tab page
+-- window, which keeps the tab page. It keeps the covered file as its previous
+-- file; the covered file itself gets its own previous file back
 local function open()
-  local quit, from = narrow(), vim.t.tree_covered
+  local quit, from, before = narrow(), vim.t.tree_covered, vim.t.tree_before
   if quit and #windows() == 1 then
     api.node.open.replace_tree_buffer()
   else
@@ -98,8 +99,12 @@ local function open()
   local opened = vim.api.nvim_get_current_buf()
   if quit and vim.bo[opened].filetype ~= "NvimTree" then
     vim.t.tree_covered, vim.t.tree_before = nil, nil
-    if from and from ~= opened and vim.api.nvim_buf_is_valid(from) then
-      vim.fn.setreg("#", from)
+    local previous = from
+    if opened == from then
+      previous = before
+    end
+    if previous and previous ~= opened and vim.api.nvim_buf_is_valid(previous) then
+      vim.fn.setreg("#", previous)
     end
   end
 end

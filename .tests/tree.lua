@@ -157,6 +157,13 @@ expect({ "b.txt" }, "Ctrl+^ from a full-window tree")
 assert(alternate() == "a.txt", "alternate after Ctrl+^ from the tree: " .. alternate())
 press("<C-^>")
 expect({ "a.txt" }, "Ctrl+^ back")
+-- Opening the covered file itself, with Enter or Tab, keeps its previous file.
+for _, key in ipairs({ "<CR>", "<Tab>" }) do
+  press("-")
+  press(key)
+  expect({ "a.txt" }, key .. " on the covered file")
+  assert(alternate() == "b.txt", "alternate after " .. key .. " on the covered file: " .. alternate())
+end
 -- Each tab page's full-window tree is its own: in a second tab page, leaving it
 -- (Esc, q), opening a file from it, and widening keep that tab page, and the
 -- first tab page's tree keeps its way back.
