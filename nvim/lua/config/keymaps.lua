@@ -1,9 +1,19 @@
--- Minimal native-first keymaps
--- Usage: <leader-key><scope-key>*
---        scope-key: groups related actions by the scope on which the action will take place;
---        *: the key under the scope represents the action to be taken (eg `<leader>cf` formats the buffer)
---          double pressing the scope key triggers the most obvious action under a given scope (eg `<leader>ff` finds a file)
+-- Minimal native-first keymaps: macOS's Command keys where Ghostty passes them
+-- (<D-…>), then Vim's own keys, then <leader><scope><action> for what neither
+-- has (eg `<leader>cf` formats the buffer; scopes: c code, d diagnostics,
+-- t toggles, b buffers, g Git)
 local map = vim.keymap.set
+
+-- Mac keys: Ghostty sends the Command chords it leaves free as <D-…>, with the
+-- meaning they have in every Mac app
+map({ "n", "i", "x" }, "<D-s>", "<Cmd>write<CR>", { desc = "Save" })
+map("n", "<D-o>", ":find ", { desc = "Open a file by name" })
+map("i", "<D-o>", "<Esc>:find ", { desc = "Open a file by name" })
+map("x", "<D-c>", '"+y', { desc = "Copy" })
+map("x", "<D-x>", '"+d', { desc = "Cut" })
+map("n", "<D-/>", "gcc", { remap = true, desc = "Toggle comment" })
+map("x", "<D-/>", "gc", { remap = true, desc = "Toggle comment" })
+map("i", "<D-/>", "<Cmd>normal gcc<CR>", { desc = "Toggle comment" })
 
 -- Content edit: <leader>c*
 map("n", "<leader>cf", function()
@@ -176,8 +186,6 @@ map("n", "<C-^>", function()
   vim.notify("No previous file")
   return ""
 end, { expr = true, desc = "Switch to the previous file" })
-map("n", "<leader>bww", "<cmd>w<CR>", { desc = "Save buffer" })
-map("n", "<leader>bwq", "<cmd>wq<CR>", { desc = "Save and quit" })
 
 -- Explore: - goes up a level, from a file to its folder (netrw, landing on the
 -- file; config.explorer swaps in the file tree when its plugins load). In the
@@ -189,9 +197,6 @@ map("n", "-", function()
     vim.fn.search("\\V\\C\\^" .. vim.fn.escape(name, "\\") .. "\\[*@/=|]\\?\\$")
   end
 end, { desc = "Up to this file's folder" })
-
--- Find: <leader>f* (fuzzy 'findfunc' in config.commands)
-map("n", "<leader>ff", ":find ", { desc = "Find a file by fuzzy name" })
 
 -- Git: <leader>g*
 map("n", "<leader>gd", "<cmd>GitDiff<CR>", { desc = "Diff saved file against index" })
@@ -223,8 +228,3 @@ map({ "i", "c" }, "<C-a>", "<Home>", { desc = "Line start" })
 map("i", "<C-e>", "<End>", { desc = "Line end" })
 -- Option+Backspace arrives as <M-BS>; delete a word as at the prompt.
 map({ "i", "c" }, "<M-BS>", "<C-w>", { desc = "Delete word back" })
-
--- ---- Terminal Mode ----
-map("t", "<Esc><Esc>", [[<C-\><C-n>]], {
-  desc = "Exit terminal mode",
-})

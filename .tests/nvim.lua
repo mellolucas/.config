@@ -137,6 +137,48 @@ assert(vim.g.ends == "abc")
 api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
 api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-BS>XY<Esc>", true, false, true), "xt", false)
 assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one XY")
+-- No terminal-mode map starts with Esc, so a single Esc reaches the program
+-- (less in :GitDiff) at once instead of waiting for a second key.
+assert(fn.mapcheck("<Esc>", "t") == "", "a terminal-mode map starts with Esc: " .. fn.mapcheck("<Esc>", "t"))
+
+-- Command keys do what they do in every Mac app (Ghostty passes them as
+-- <D-…>): Cmd+S saves, Cmd+O opens a file by name, Cmd+C / Cmd+X copy / cut
+-- the selection to the clipboard, and Cmd+/ comments the line or selection.
+do
+  local copied = {}
+  local real_clipboard = vim.g.clipboard
+  vim.g.clipboard = {
+    name = "test",
+    copy = { ["+"] = function(lines) copied = lines end, ["*"] = function(lines) copied = lines end },
+    paste = { ["+"] = function() return copied end, ["*"] = function() return copied end },
+  }
+  local path = fn.tempname() .. ".lua"
+  vim.cmd.edit(fn.fnameescape(path))
+  local file = api.nvim_get_current_buf()
+  api.nvim_buf_set_lines(file, 0, -1, false, { "local one = 1", "local two = 2" })
+  vim.bo.commentstring = "-- %s"
+  api.nvim_feedkeys(vim.keycode("<D-s>"), "mx", false)
+  assert(not vim.bo.modified and fn.readfile(path)[2] == "local two = 2", "Cmd+S did not save")
+  assert(fn.maparg("<D-o>", "n") == ":find ", "Cmd+O: " .. fn.maparg("<D-o>", "n"))
+  api.nvim_win_set_cursor(0, { 1, 0 })
+  api.nvim_feedkeys(vim.keycode("vee<D-c>"), "mx", false)
+  assert(vim.deep_equal(copied, { "local one" }), "Cmd+C copied " .. vim.inspect(copied))
+  copied = {}
+  api.nvim_feedkeys(vim.keycode("0vee<D-x>"), "mx", false)
+  assert(vim.deep_equal(copied, { "local one" }) and api.nvim_get_current_line() == " = 1",
+    "Cmd+X: " .. vim.inspect(copied) .. " " .. api.nvim_get_current_line())
+  api.nvim_buf_set_lines(file, 0, -1, false, { "local one = 1", "local two = 2" })
+  api.nvim_win_set_cursor(0, { 1, 0 })
+  api.nvim_feedkeys(vim.keycode("<D-/>"), "mx", false)
+  assert(api.nvim_buf_get_lines(file, 0, 1, false)[1] == "-- local one = 1", "Cmd+/ on a line")
+  api.nvim_feedkeys(vim.keycode("<D-/>Vj<D-/>"), "mx", false)
+  assert(vim.deep_equal(api.nvim_buf_get_lines(file, 0, -1, false), { "-- local one = 1", "-- local two = 2" }),
+    "Cmd+/ on a selection: " .. vim.inspect(api.nvim_buf_get_lines(file, 0, -1, false)))
+  vim.cmd.enew()
+  api.nvim_buf_delete(file, { force = true })
+  fn.delete(path)
+  vim.g.clipboard = real_clipboard
+end
 
 local source = api.nvim_create_buf(true, false)
 api.nvim_buf_set_name(source, "/virtual/preview.md")
@@ -1186,7 +1228,7 @@ if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   -- rg's diagnostics (here a symlink loop) never become candidates.
   package.loaded["config.commands"] = commands
   assert(vim.o.findfunc == "v:lua.require'config.commands'.find_files")
-  assert(fn.maparg(" ff", "n") == ":find ")
+  assert(fn.maparg("<D-o>", "n") == ":find ")
   assert(vim.deep_equal(fn.getcompletion("find fle", "cmdline"), { "file" }))
   fn.writefile({}, tree .. "/second")
   fn.mkdir(tree .. "/sub", "p")

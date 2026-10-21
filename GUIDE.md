@@ -52,16 +52,18 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 
 ## Editor: Edit in Neovim
 
-`Space` is the leader key, pressed in normal mode: the next key picks an area (`f` find, `b` buffers, `t` toggles, `g` Git), and a doubled key runs an area's main action (`Space f f`).
+Command keys do what they do in every Mac app. `Space` is the leader key, pressed in normal mode, for the rest: the next key picks an area (`c` code, `d` diagnostics, `t` toggles, `b` buffers, `g` Git).
 
 | Press | Result |
 | --- | --- |
+| `Cmd+S` | Save |
+| `Cmd+O` | Open a file by name: type part of it, `Tab` completes, `Enter` opens |
+| `Cmd+C` / `Cmd+X` / `Cmd+V` | Copy / cut the selection to the system clipboard / paste (`"+y` / `"+p` too; plain `y` stays in Neovim) |
+| `Cmd+/` | Comment or uncomment the line or the selection (Vim's `gcc` / `gc`) |
 | `-` | Up to this file in the file tree, where `Esc` comes back (`keys explore`) |
-| `Space f f` | Find a file by fuzzy name: type part of it, `Tab` completes, `Enter` opens |
 | `Space b l` / `Ctrl+^` (`Ctrl+6`) | List buffers and pick one (number or name, `Tab` completes) / switch to the previous file |
 | `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
-| `Space b w w` / `Space b w q` | Save / save and quit |
-| `:q` / `ZQ` | Quit / quit without saving |
+| `:q` / `ZZ` / `ZQ` | Quit / save and quit / quit without saving |
 | `Space t w` / `Space t d` | Toggle wrap / inline diagnostics |
 | `Ctrl+L` | Clear search highlighting until the next search |
 | `Space c f` | Format with the language server |
@@ -73,10 +75,9 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 | `grr` / `gri` / `grt` | References / implementations / type definition |
 | `Ctrl+]` / `Ctrl+T` | Jump to the definition / back |
 | `[d` / `]d` / `gO` | Previous / next diagnostic / list the file's symbols |
-| `"+y` / `"+p` | Copy to / paste from the system clipboard (plain `y` stays in Neovim) |
 | `Space g d` | Saved file against the Git index (`:GitDiff`; `q` leaves the pager, then closes the tab) |
 | `:DiffSaved` | Compare unsaved edits with the saved file |
-| `Esc Esc` | Leave terminal mode |
+| `Ctrl+\` then `Ctrl+N` | Leave terminal mode |
 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
 - `Option+←` / `Option+→` jump words everywhere; while typing and on the command line, `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
@@ -106,7 +107,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 - `-` (from a file) and `Esc` (from the tree) move between the tree and the code at any width. The Option chords move between terminal panes: in a workspace, `Option+l` from the tree heads for the shell pane, and `Option+h` reaches the tree only because no pane sits to the editor's left.
 - `Ctrl+^` (`Ctrl+6`) switches to your previous file, also from the tree; the tree is never one, and with no previous file it says so.
 - `Ctrl+V` and `Ctrl+X` split the code window; with only the tree showing, both open beside it. `Ctrl+W c` closes a split, while `Option+w` closes the whole editor pane.
-- Follow the code with `Ctrl+]` / `Ctrl+T`, `grr`, and `gO`, and search it with `Space f f` and `:grep` (`keys editor`).
+- Follow the code with `Ctrl+]` / `Ctrl+T`, `grr`, and `gO`, and search it with `Cmd+O` and `:grep` (`keys editor`).
 
 ## Agents: Choose a coding agent
 
