@@ -18,9 +18,11 @@ Changes since `v0.0.1`.
   `--layout lean` gives the editor and the agent half the width each.
   Elsewhere, tmux lays out the same panes.
 - **The same keys everywhere:** Option chords move between, split, resize,
-  zoom, and close (`Option+w`) Ghostty panes, tmux panes, and Neovim windows,
-  and `Option+b` browses a pane's output. Word and line keys (`Option+←/→`,
-  `Cmd+←/→`, `Option+Backspace`) work alike at the prompt and in Neovim.
+  zoom, and close (`Option+w`) Ghostty panes, and tmux panes where Ghostty is
+  absent; where no pane lies that way, `Option+h/j/k/l` moves between Neovim's
+  windows instead. `Option+b` browses a pane's output. Word and line keys
+  (`Option+←/→`, `Cmd+←/→`, `Option+Backspace`) work alike at the prompt and
+  in Neovim.
 - **The prompt:** vi keys with a cursor that shows the mode, `↑`/`↓` through
   commands that start with what you typed, `Ctrl+X Ctrl+E` to edit in
   Neovim, and fzf's `Ctrl+T`, `Ctrl+R`, and `Option+c` (which previews each
@@ -44,9 +46,11 @@ Changes since `v0.0.1`.
   bat, Delta, Glow, and the prompt.
 - **Files in their place:** configuration, data, state, and caches go to the
   XDG folders, agents and npm, Node, Python, and Go included.
-- **Beyond the Mac:** Linux, WSL, GitHub Codespaces, and containers get a lean
-  package set, tmux in Ghostty's place, and fallbacks for missing locales,
-  terminal entries, and older Neovims.
+- **Beyond the Mac:** Linux, WSL, GitHub Codespaces, and containers get tmux
+  in Ghostty's place and fallbacks for missing locales, terminal entries, and
+  older Neovims. Codespaces and dev, Docker, or Podman containers install the
+  lean package set by themselves; elsewhere `HOMEBREW_BUNDLE_FILE_GLOBAL`
+  chooses it.
 
 ### Migration
 
