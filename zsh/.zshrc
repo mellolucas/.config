@@ -218,7 +218,6 @@ fi
 if command -v bat >/dev/null 2>&1; then
   alias cat='bat --paging=never --style=plain'
   alias b='bat'
-  alias bh='bat --plain --language=help'
 fi
 
 if command -v eza >/dev/null 2>&1; then
@@ -237,13 +236,8 @@ fi
 alias rg='rg --hidden --follow --smart-case --glob="!.git" --max-columns=120 --max-columns-preview'
 alias rga='rg --no-ignore --glob="!.git"'
 alias rgf='rg --files-with-matches'
-alias rgfa='rga --files-with-matches'
 alias rgc='rg --count'
-alias rgca='rga --count'
 alias rgw='rg --word-regexp'
-alias rgwa='rga --word-regexp'
-alias rgwc='rgw --count'
-alias rgwca='rgwa --count'
 
 alias cmdv='command -v'
 alias cmdvs='where'

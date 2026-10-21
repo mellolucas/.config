@@ -186,6 +186,7 @@ Move around and build commands without retyping.
 - `Option+b` opens browse mode instead of jumping back a word as in other shells; `Option+←` / `Option+→` jump words here.
 - A red `❯` means the last command failed; an unfinished rebase or merge shows beside the branch (`main|rebase-i`).
 - Start a command with a space to keep it out of history.
+- To find what a name runs, skip `which`: `cmdv NAME` (`command -v`) shows what runs, alias or function included; `cmdvs NAME` (`where`) lists every match, such as both Gits.
 - `Ctrl+D` does not close the shell; type `exit`.
 
 ## Files: Find a file
@@ -204,9 +205,9 @@ List what is here, then find a file by name or by content.
 | `fzfe` | The same picker without a preview |
 | `Option+c` | Pick a directory below here (directories only, each previewed) and change to it |
 | `rg TEXT` | Search contents, including hidden files |
-| `rga TEXT` | Also search files that Git ignores (`rgfa`, `rgca` for files / counts) |
+| `rga TEXT` | Also search files that Git ignores |
 | `rgf TEXT` / `rgc TEXT` | Matching files only / matching-line counts per file |
-| `rgw TEXT` | Whole words only (combine: `rgwa`, `rgwc`, `rgwca`) |
+| `rgw TEXT` | Whole words only |
 | `rgv TEXT` | Browse the matching lines file by file, each file's in the preview; Enter opens Neovim at the first, with all of them in the quickfix list |
 
 In every picker with a preview (`fzfv`, `rgv`, `keys`, `Option+c`): `Option+↓` / `Option+↑` scroll it by half a page and `Shift+↓` / `Shift+↑` by a line, `Option+t` toggles its wrapping, Esc cancels. `fzfv` previews a file's first 500 lines.
@@ -214,6 +215,7 @@ In every picker with a preview (`fzfv`, `rgv`, `keys`, `Option+c`): `Option+↓`
 - Not sure where to look? Narrow down first: `Option+c` to the right directory, then `fzfv` or `Ctrl+T` from there.
 - Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.
 - `rg`, `rgv`, `:grep`, and Neovim's `/` are smart-case: all-lowercase text ignores case.
+- Combine with `rg`'s own short flags: `rga -l` (files), `rga -c` (counts), `rga -w` (whole words), `rgw -c`.
 - `rgv` takes `rg`'s options and paths: `rgv -w TEXT`, `rgv --no-ignore TEXT src/`, `rgv -C 5 TEXT` for more context. Options that change how `rg` prints (`-l`, `-N`, `--json`) don't fit, and files whose names hold a tab or a newline are left out.
 - Pipe a list into the pickers: `rgf TEXT | fzfv`.
 
