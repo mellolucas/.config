@@ -90,7 +90,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 | Press | Result |
 | --- | --- |
 | `Option+z` (in the editor) | Zoom: the tree joins the code as a sidebar; again for the shells and agent |
-| `-` / `Esc` / `q` | From a file, to it in the tree / back to the code / hide the tree |
+| `-` / `Esc` / `q` | From a file, to it in the tree / from the tree, back to the code / hide the tree |
 | `l` / `h` | Step into a folder or open a file / step out of a folder, closing it (on the top line, out of the root) |
 | `-` / `Ctrl+]` | Root: up to the parent folder, keeping yours open / into the folder under the cursor |
 | Enter / `Tab` | Open the file / show it, keeping the cursor in the tree |
@@ -103,7 +103,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 - Unzoomed, the tree and the code take turns in the narrow pane: Enter, `Tab`, or `l` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
 - Hidden with `q` while zoomed, the tree stays out of later zooms until you show it again.
 - The tree follows the file you're in and marks Git changes as they happen: `✗` modified, `★` new, `✓` staged, `➜` renamed; a folder shows the marks of what it holds.
-- `-` and `Esc` move between the tree and the code at any width. The Option chords move between terminal panes: in a workspace, `Option+l` from the tree heads for the shell pane, and `Option+h` reaches the tree only because no pane sits to the editor's left.
+- `-` (from a file) and `Esc` (from the tree) move between the tree and the code at any width. The Option chords move between terminal panes: in a workspace, `Option+l` from the tree heads for the shell pane, and `Option+h` reaches the tree only because no pane sits to the editor's left.
 - `Ctrl+^` (`Ctrl+6`) switches to your previous file, also from the tree; the tree is never one, and with no previous file it says so.
 - `Ctrl+V` and `Ctrl+X` split the code window; with only the tree showing, both open beside it. `Ctrl+W c` closes a split, while `Option+w` closes the whole editor pane.
 - Follow the code with `Ctrl+]` / `Ctrl+T`, `grr`, and `gO`, and search it with `Space f f` and `:grep` (`keys editor`).
