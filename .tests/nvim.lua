@@ -925,41 +925,43 @@ do
       "- at " .. case[1] .. ": " .. vim.inspect(last("find_file")))
     api.nvim_buf_call(tree_buf, function()
       cursor_node = file
-      for _, key in ipairs({ "<CR>", "o", "<2-LeftMouse>", "l", "<Tab>" }) do
+      for _, key in ipairs({ "<CR>", "o", "<2-LeftMouse>", "<Right>", "<Tab>", "<Space>" }) do
         fn.maparg(key, "n", false, true).callback()
         local made = calls[#calls]
+        local preview = key == "<Tab>" or key == "<Space>"
         local expected = case[2] == "fills" and made[1] == "replace"
           or case[2] == "shares" and made[1] == "edit" and made[3].quit_on_open == true
           or case[2] == "sidebar" and made[1] == "edit"
-            and (key == "<Tab>" and made[3].focus == true or key ~= "<Tab>" and made[3].quit_on_open == false)
+            and (preview and made[3].focus == true or not preview and made[3].quit_on_open == false)
         assert(expected, key .. " when the tree " .. case[2] .. ": " .. vim.inspect(made))
       end
     end)
   end
   vim.cmd("silent! only")
-  -- h closes an open folder, or the one holding the entry; l opens a closed
-  -- folder and leaves the root line alone.
+  -- ← closes an open folder, or the one holding the entry; → opens a closed
+  -- folder and leaves the root line alone. l and h stay Vim's own motions.
   api.nvim_buf_call(tree_buf, function()
+    assert(fn.maparg("l", "n") == "" and fn.maparg("h", "n") == "", "l or h is mapped in the tree")
     local folder = { name = "src", absolute_path = "/p/src", type = "directory", nodes = {}, open = true, parent = {} }
     cursor_node = folder
-    fn.maparg("h", "n", false, true).callback()
-    assert(last("edit")[2] == folder, "h on an open folder: " .. vim.inspect(last("edit")))
+    fn.maparg("<Left>", "n", false, true).callback()
+    assert(last("edit")[2] == folder, "← on an open folder: " .. vim.inspect(last("edit")))
     cursor_node = file
-    fn.maparg("h", "n", false, true).callback()
-    assert(last("parent_close")[2] == file, "h on a file: " .. vim.inspect(last("parent_close")))
+    fn.maparg("<Left>", "n", false, true).callback()
+    assert(last("parent_close")[2] == file, "← on a file: " .. vim.inspect(last("parent_close")))
     folder.open = false
     cursor_node = folder
     local edits = count("edit")
-    fn.maparg("l", "n", false, true).callback()
-    assert(count("edit") == edits + 1, "l on a closed folder opens it")
+    fn.maparg("<Right>", "n", false, true).callback()
+    assert(count("edit") == edits + 1, "→ on a closed folder opens it")
     local top = { name = "..", absolute_path = "/p", type = "directory", nodes = {}, open = true }
     cursor_node = top
     local before_root = #calls
-    fn.maparg("l", "n", false, true).callback()
-    assert(#calls == before_root, "l acted on the root line: " .. vim.inspect(calls[#calls]))
-    -- On the root line h, -, Enter, and Tab go up a level, finding the folder
-    -- they left; from an entry, - goes up with nvim-tree keeping it in view.
-    for _, key in ipairs({ "h", "-", "<CR>", "<Tab>" }) do
+    fn.maparg("<Right>", "n", false, true).callback()
+    assert(#calls == before_root, "→ acted on the root line: " .. vim.inspect(calls[#calls]))
+    -- On the root line ←, -, Enter, Tab, and Space go up a level, finding the
+    -- folder they left; from an entry, - goes up with nvim-tree keeping it in view.
+    for _, key in ipairs({ "<Left>", "-", "<CR>", "<Tab>", "<Space>" }) do
       local from = #calls
       fn.maparg(key, "n", false, true).callback()
       local made = vim.list_slice(calls, from + 1)
@@ -975,7 +977,7 @@ do
     into.callback()
     assert(last("into"), "Ctrl+] in the tree made no folder the root")
   end)
-  -- l on an open folder steps onto its first entry, when the next line is one.
+  -- → on an open folder steps onto its first entry, when the next line is one.
   local tree_api = package.loaded["nvim-tree.api"].tree
   local src = { name = "src", absolute_path = "/p/src", type = "directory", nodes = {}, open = true, parent = {} }
   local rows = { { name = "..", absolute_path = "/p", nodes = {}, open = true }, src,
@@ -986,13 +988,13 @@ do
   api.nvim_win_set_buf(0, tree_buf)
   tree_api.get_node_under_cursor = function() return rows[api.nvim_win_get_cursor(0)[1]] end
   api.nvim_win_set_cursor(0, { 2, 0 })
-  fn.maparg("l", "n", false, true).callback()
-  assert(api.nvim_win_get_cursor(0)[1] == 3, "l on an open folder did not step onto its first entry")
+  fn.maparg("<Right>", "n", false, true).callback()
+  assert(api.nvim_win_get_cursor(0)[1] == 3, "→ on an open folder did not step onto its first entry")
   rows[2] = { name = "empty", absolute_path = "/p/empty", type = "directory", nodes = {}, open = true, parent = {} }
   rows[3] = rows[4]
   api.nvim_win_set_cursor(0, { 2, 0 })
-  fn.maparg("l", "n", false, true).callback()
-  assert(api.nvim_win_get_cursor(0)[1] == 2, "l on an open empty folder left it for the next entry")
+  fn.maparg("<Right>", "n", false, true).callback()
+  assert(api.nvim_win_get_cursor(0)[1] == 2, "→ on an open empty folder left it for the next entry")
   tree_api.get_node_under_cursor = function() return cursor_node end
   api.nvim_win_set_buf(0, shown)
 

@@ -133,8 +133,8 @@ local function root_line()
   return node and not node.parent
 end
 
--- l and h step into and out of folders, as file managers do; h on the root
--- line steps out of the root itself
+-- → and ← step into and out of folders, as in Finder's list view; ← on the
+-- root line steps out of the root itself
 local function step_in()
   local node = api.tree.get_node_under_cursor()
   if not node or not node.parent then
@@ -192,11 +192,12 @@ require("nvim-tree").setup({
         open()
       end, "Open")
     end
-    map("l", step_in, "Open")
-    map("h", step_out, "Close Directory")
-    -- Tab shows the file beside the tree, keeping the cursor there; without
-    -- room beside it, Tab opens the file as Enter does
-    map("<Tab>", function()
+    map("<Right>", step_in, "Open")
+    map("<Left>", step_out, "Close Directory")
+    -- Tab, and Space as Finder's Quick Look, show the file beside the tree,
+    -- keeping the cursor there; without room beside it, they open the file as
+    -- Enter does
+    local function preview()
       if root_line() then
         up()
       elseif narrow() then
@@ -204,7 +205,9 @@ require("nvim-tree").setup({
       else
         api.node.open.edit(nil, { focus = true })
       end
-    end, "Open Preview")
+    end
+    map("<Tab>", preview, "Open Preview")
+    map("<Space>", preview, "Open Preview")
     map("-", up, "Root: up to the parent folder")
     map("<C-]>", api.tree.change_root_to_node, "Root: into this folder")
     -- Esc goes back to the code: beside the tree (passing over an empty
