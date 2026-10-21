@@ -1,8 +1,8 @@
 #!/usr/bin/env zsh
-# Real tmux on a private server. tmux.conf mirrors ghostty/vim.ghostty where
-# Ghostty is absent: every Option chord and browse key, read from the key
-# tables, then pressed through attached clients; workspace lays out its panes.
-# It all runs in a fixture home whose panes start zsh without user
+# Real tmux on a private server. Where Ghostty is absent, tmux.conf keeps
+# tmux's own keys behind its Ctrl+B prefix, with splits in the pane's directory
+# and no Esc delay, checked through attached clients; workspace lays out its
+# panes. It all runs in a fixture home whose panes start zsh without user
 # configuration, so nothing reaches real history, caches, or applications.
 emulate -LR zsh
 setopt errexit pipefail
@@ -39,10 +39,14 @@ stop() {
   done
 }
 trap stop EXIT
-# Raw, as zsh and Neovim read keys: the line discipline would erase on DEL.
-tmux new-session -d -s test -x 120 -y 40 'stty raw -echo; exec cat -v'
-[[ $(tmux show -gv prefix) == None ]] || fail 'XDG tmux.conf not loaded'
+# Raw, as zsh and Neovim read keys: the line discipline would erase on DEL. The
+# program runs in a directory of its own, apart from the session's.
+mkdir -p "$HOME/inner"
+tmux new-session -d -s test -x 120 -y 40 -c "$HOME" "cd ${(q)HOME}/inner && stty raw -echo && exec cat -v"
+[[ $(tmux show -gv history-limit) == 50000 ]] || fail 'XDG tmux.conf not loaded'
+[[ $(tmux show -gv prefix) == C-b ]] || fail "tmux's prefix is $(tmux show -gv prefix)"
 (( $(tmux show -sv escape-time) <= 20 )) || fail "escape-time above Neovim's 10-20 ms"
+[[ $(tmux show -gv mouse) == on ]] || fail 'the mouse is off'
 
 # A binding's command, or failure when the table lacks the key.
 binding() {
@@ -56,47 +60,13 @@ binding() {
   return 1
 }
 
-local -A flag=(left L right R up U down D) edge=(left left right right up top down bottom)
-lines=(${${(f)"$(<"$repo/ghostty/vim.ghostty")"}##[[:space:]]#})
-integer chords=0
-for line in ${(M)lines:#keybind = (performable:|)alt+*}; do
-  spec=${${line#keybind = }#performable:}
-  chord=${spec%%=*} action=${spec#*=}
-  key=${chord#alt+}
-  [[ $key != shift+? ]] || key=${(U)key#shift+}
-  [[ $key != equal ]] || key==
-  key=M-$key
-  command=$(binding root $key) || fail "tmux lacks $chord"
-  case $action in
-    goto_split:*)
-      direction=${action#*:}
-      [[ $command == *"pane_at_$edge[$direction]"*"send-keys $key"*"select-pane -$flag[$direction]"* ]] ;;
-    new_split:down) [[ $command == split-window\ -v* ]] ;;
-    new_split:right) [[ $command == split-window\ -h* ]] ;;
-    # Ghostty steps in pixels, tmux in cells: only the direction matches.
-    resize_split:*) [[ $command == "resize-pane -$flag[${${action#*:}%%,*}]"* ]] ;;
-    equalize_splits) [[ $command == 'select-layout -E' ]] ;;
-    toggle_split_zoom) [[ $command == 'resize-pane -Z' ]] ;;
-    close_surface) [[ $command == *kill-pane* ]] ;;
-    activate_key_table:browse) [[ $command == *copy-mode ]] ;;
-    *) fail "unmapped Ghostty action: $action" ;;
-  esac || fail "$chord ($action) runs: $command"
-  # Browse mode keeps the chords Ghostty's browse table keeps; the rest do nothing.
-  if [[ $action == activate_key_table:browse ]]; then
-    [[ $(binding copy-mode-vi $key) == 'send-keys -X cancel' ]] || fail "$chord does not leave browse mode"
-  elif (( ${lines[(I)keybind = browse/$chord=*]} )); then
-    ! binding copy-mode-vi $key > /dev/null || fail "browse mode shadows $chord"
-  else
-    [[ $(binding copy-mode-vi $key) == '' ]] || fail "browse mode runs $chord"
-  fi
-  (( ++chords ))
-done
-(( chords == 14 )) || fail "expected 14 Option chords, found $chords"
-for key command in y 'send-keys -X copy-selection-no-clear' : command-prompt \
-  Escape 'send-keys -X cancel' q 'send-keys -X cancel' i 'send-keys -X cancel'; do
-  [[ $(binding copy-mode-vi $key) == "$command" ]] || fail "browse key $key"
-done
-print -r -- "ok: $chords Option chords and the browse keys match ghostty/vim.ghostty"
+# tmux's own keys: splits open in the pane's directory, as Ghostty's do, and
+# no key outside the prefix belongs to tmux (the root table only has the mouse).
+[[ $(binding prefix '\"') == 'split-window -v -c "#{pane_current_path}"' ]] || fail "prefix \" runs: $(binding prefix '\"')"
+[[ $(binding prefix '\%') == 'split-window -h -c "#{pane_current_path}"' ]] || fail "prefix % runs: $(binding prefix '\%')"
+taken=(${${(f)"$(tmux list-keys -T root)"}:#*-T root *(Mouse|Wheel|Click)*})
+(( ! $#taken )) || fail "keys taken from programs: ${(F)taken}"
+print -r -- "ok: tmux's own keys, with splits in the pane's directory"
 
 # Fixture terminals answer tmux's queries as real terminals do, reporting their
 # own size, and name themselves through XTVERSION, which tmux keeps as
@@ -171,66 +141,31 @@ state() { tmux display -p -t test "$1"; }
 shows() { [[ $(tmux capture-pane -p -t "$1" 2>/dev/null) == *"$2"* ]]; }
 
 left=$(state '#{pane_id}')
-right=$(tmux split-window -h -t "$left" -P -F '#{pane_id}' 'cat -v')
-tmux select-pane -t "$left"
 attach fixture 'fixture 1.0'
-press $'\eh'
-wait_for 'Option+h at an edge did not reach the program' 'shows $left "^[h"'
-[[ $(state '#{pane_id}') == $left ]] || fail 'Option+h at an edge moved'
-press $'\x02'
-wait_for 'Ctrl+B did not reach the program' 'shows $left "^B"'
-# Word keys from Windows Terminal (Alt+Left) and VS Code or Linux (Ctrl+Right),
-# and Option+Backspace, which tmux 3.7 reads as one key
+# Keys reach the program: word keys from Windows Terminal (Alt+Left) and VS Code
+# or Linux (Ctrl+Right), Option+Backspace, which tmux 3.7 reads as one key, and
+# Ctrl+B pressed twice (once, it is tmux's prefix).
 press $'\e[1;3D'
 wait_for 'Alt+Left did not reach the program' 'shows $left "^[[1;3D"'
 press $'\e[1;5C'
 wait_for 'Ctrl+Right did not reach the program' 'shows $left "^[[1;5C"'
 press $'\e\x7f'
 wait_for 'Option+Backspace did not reach the program' 'shows $left "^[^?"'
-press $'\el'
-wait_for 'Option+l did not move right' '[[ $(state "#{pane_id}") == $right ]]'
-press $'\eb'
-wait_for 'Option+b did not enter browse mode' '[[ $(state "#{pane_in_mode}") == 1 ]]'
-# Focus chords do nothing while browsing; the zoom after one shows it was read.
-press $'\eh'
-press $'\ez'
-wait_for 'Option+z did not zoom while browsing' '[[ $(state "#{window_zoomed_flag}") == 1 ]]'
-[[ $(state '#{pane_id}') == $right && $(state '#{pane_in_mode}') == 1 ]] || fail 'Option+h moved while browsing'
-press $'\ez'
-wait_for 'Option+z did not unzoom' '[[ $(state "#{window_zoomed_flag}") == 0 ]]'
-# Neovim and zsh vi mode need a prompt Esc from an answering terminal:
-# escape-time, not the 500 ms hold; the bound leaves room for a busy machine.
+press $'\x02\x02'
+wait_for 'Ctrl+B twice did not reach the program' 'shows $left "^B"'
+# Neovim needs a prompt Esc from an answering terminal: escape-time, not the
+# 500 ms hold; the bound leaves room for a busy machine.
 settle
 local -F start=$EPOCHREALTIME
 zpty -w -n fixture $'\e'
-wait_for 'Esc did not leave browse mode' '[[ $(state "#{pane_in_mode}") == 0 ]]'
+wait_for 'Esc did not reach the program' '[[ $(tmux capture-pane -p -t "$left") == *"^B^[" ]]'
 (( EPOCHREALTIME - start < 0.4 )) || fail "Esc took $(( (EPOCHREALTIME - start) * 1000 )) ms"
-# Closing asks while a program runs: n keeps the pane, which still gets Ctrl+B.
-press $'\ew'
-press n
-press $'\x02'
-wait_for 'Option+w closed a running program without asking' 'shows $right "^B"'
-press $'\es'
-wait_for 'Option+s did not split' '[[ $(state "#{window_panes}") == 3 ]]'
+# Ctrl+B then % splits beside the program, in its directory, not the session's.
+press $'\x02%'
+wait_for 'Ctrl+B then % did not split' '[[ $(state "#{window_panes}") == 2 ]]'
 wait_for 'the new pane does not run zsh' '[[ $(state "#{pane_current_command}") == zsh ]]'
-press $'\ew'
-wait_for 'Option+w did not close a pane at its prompt' '[[ $(state "#{window_panes}") == 2 ]]'
-# Ghostty keeps Option+b for its own browse mode, so from Ghostty ESC b is
-# Option+Left: a word jump for the program. Ghostty names itself so.
-tmux select-pane -t "$left"
-attach ghostty 'ghostty 1.3.1'
-press $'\eb' ghostty
-wait_for 'Option+Left from Ghostty did not reach the program' 'shows $left "^[b"'
-[[ $(state '#{pane_in_mode}') == 0 ]] || fail 'Option+Left from Ghostty entered browse mode'
-# y copies the selection and stays in browse mode, as Ghostty's does.
-press $'\eb'
-wait_for 'Option+b did not enter browse mode' '[[ $(state "#{pane_in_mode}") == 1 ]]'
-for key in g 0 ' ' '$' y; do press $key; done
-wait_for 'y did not copy the selection' '[[ $(tmux show-buffer 2>/dev/null) == *"^[h^B"* ]]'
-[[ $(state '#{pane_in_mode}') == 1 ]] || fail 'y left browse mode'
-press q
-wait_for 'q did not leave browse mode' '[[ $(state "#{pane_in_mode}") == 0 ]]'
-print -r -- 'ok: chords behave through attached clients'
+[[ $(state '#{pane_current_path}') == $HOME/inner ]] || fail "the split opened in $(state '#{pane_current_path}')"
+print -r -- 'ok: keys reach programs through attached clients, and Ctrl+B splits in place'
 
 # workspace: a session per directory, reattached on rerun, with its commands
 # run in the right panes (harmless ones: never an editor or an agent).
