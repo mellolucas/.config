@@ -105,7 +105,7 @@ if [[ -z $topic && -t 0 && -t 1 ]] && (( ! plain )) && command -v fzf >/dev/null
     preview='cat "$KEYS_SHELF"/{1}.md'
     command -v glow >/dev/null 2>&1 &&
       preview='glow --style "$KEYS_STYLE" --width "$FZF_PREVIEW_COLUMNS" "$KEYS_SHELF"/{1}.md'
-    # Only the repository's fzf options (colors); personal ones could reshape the picker.
+    # Only the repository's fzf options (colors and preview keys); personal ones could reshape the picker.
     # The preview sits beside the list from 110 columns (its threshold measures
     # the preview), and the wrap key shows beside the count once results do.
     selection=$(KEYS_SHELF=$shelf KEYS_STYLE=$repo/glow/guide.json \

@@ -8,11 +8,11 @@ if [[ $1 == (-h|--help) ]]; then
 
 Search with ripgrep, then browse the matching files: one line per file with
 its number of matching lines, and those lines in the preview, with two lines
-of context. Typing filters the files by path; Ctrl+D / Ctrl+U scroll the
-preview and Option+t toggles its wrapping. Enter opens the file at its first
-match; in Neovim, with every matching line in the quickfix list: ]q / [q go
-to the next / previous one, ] then Ctrl+Q / [ then Ctrl+Q to the next /
-previous file.
+of context. Typing filters the files by path; Option+Up / Option+Down scroll
+the preview and Option+t toggles its wrapping. Enter opens the file at its
+first match; in Neovim, with every matching line in the quickfix list: ]q /
+[q go to the next / previous one, ] then Ctrl+Q / [ then Ctrl+Q to the next
+/ previous file.
 
 Options and paths are rg's (rg --help), after the rg alias's defaults: hidden
 files, symlinks followed, smart case, .git skipped. Options that change how
@@ -83,8 +83,7 @@ zf_mkdir -m 700 "$shelf" || return
   result=0
   selection=$(print -rl -- $menu | RGV_SHELF=$shelf fzf --layout=reverse --no-multi \
       --delimiter=$'\t' --with-nth=3.. --prompt='Matches > ' --header=${(F)header} \
-      --preview='sed -n {1}p "$RGV_SHELF/matches"' --preview-window='right,60%,wrap,<66(down,60%,wrap)' \
-      --bind='alt-t:toggle-preview-wrap,ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down') ||
+      --preview='sed -n {1}p "$RGV_SHELF/matches"' --preview-window='right,60%,wrap,<66(down,60%,wrap)') ||
     result=$?
   case $result in
     0) ;;

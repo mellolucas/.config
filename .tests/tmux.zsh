@@ -382,6 +382,18 @@ if (( $+commands[fzf] )); then
   tmux resize-window -t '=keys:' -x 120 -y 24
   wait_for "keys at 120 columns did not list all ${#page_rows} pages" listed
   [[ $(screen) != *'Ctrl+/'* ]] || fail 'keys shows the wrap key before any results'
+  # fzf/fzfrc's preview keys reach the picker: Option+Down scrolls the page
+  # down by half a screen, Option+Up back to its top. The preview's first row
+  # ends with its position, N/TOTAL, before the border.
+  preview_top() {
+    local -a rows=("${(@f)$(screen)}")
+    if [[ $rows[2] =~ '([0-9]+)/[0-9]+ ?(││|│) *$' ]]; then print -r -- $match[1]; else print 0; fi
+  }
+  [[ $(preview_top) == 1 ]] || fail "keys preview did not open at its top: $(preview_top)"
+  tmux send-keys -t '=keys:' M-Down
+  wait_for 'Option+Down did not scroll the keys preview' '(( $(preview_top) > 1 ))'
+  tmux send-keys -t '=keys:' M-Up
+  wait_for 'Option+Up did not scroll the keys preview back' '[[ $(preview_top) == 1 ]]'
   tmux send-keys -t '=keys:' -l split
   wait_for 'keys did not show the wrap key with its results' '[[ $(screen) == *"Ctrl+/ toggles wrapping"* ]]'
   wait_for 'keys did not settle on its results' settled
@@ -394,7 +406,7 @@ if (( $+commands[fzf] )); then
   wait_for 'Esc did not close keys' '! tmux has-session -t "=keys" 2>/dev/null'
   leftovers=("$HOME"/tmp/*(DN))
   (( ! $#leftovers )) || fail "keys left temporary files: ${leftovers:t}"
-  print -r -- 'ok: keys lists every page beside its preview and toggles wrapping in results'
+  print -r -- 'ok: keys lists every page beside its preview, scrolls it, and toggles wrapping in results'
 else
   print -r -- 'SKIP: keys picker through real fzf (fzf missing)'
 fi

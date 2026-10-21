@@ -209,7 +209,7 @@ List what is here, then find a file by name or by content.
 | `rgw TEXT` | Whole words only (combine: `rgwa`, `rgwc`, `rgwca`) |
 | `rgv TEXT` | Browse the matching lines file by file, each file's in the preview; Enter opens Neovim at the first, with all of them in the quickfix list |
 
-In `fzfv` and `rgv`: `Ctrl+D` / `Ctrl+U` scroll the preview (`fzfv` shows a file's first 500 lines), `Option+t` toggles wrapping, Esc cancels.
+In every picker with a preview (`fzfv`, `rgv`, `keys`, `Option+c`): `Option+↓` / `Option+↑` scroll it by half a page and `Shift+↓` / `Shift+↑` by a line, `Option+t` toggles its wrapping, Esc cancels. `fzfv` previews a file's first 500 lines.
 
 - Not sure where to look? Narrow down first: `Option+c` to the right directory, then `fzfv` or `Ctrl+T` from there.
 - Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.

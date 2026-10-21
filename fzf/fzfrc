@@ -1,3 +1,6 @@
 # Terminal palette colors, so fzf follows Catppuccin Mocha or Latte with the
 # terminal; every override stays at least 3:1 against both backgrounds
 --color=base16,fg+:-1:bold,bg+:-1,hl:red,hl+:red,info:blue,marker:blue
+# Every picker's preview, leaving the typing keys alone: Option+Up/Down by half
+# a page (Shift+Up/Down, fzf's own, by a line); Option+t toggles its wrapping
+--bind=alt-up:preview-half-page-up,alt-down:preview-half-page-down,alt-t:toggle-preview-wrap

@@ -840,7 +840,7 @@ for has_glow in 0 1; do
       md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 -- {}'
       preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
     fi
-    expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap\n--bind\nalt-t:toggle-preview-wrap,ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down'
+    expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap'
     fzfv
     expect "$expected" "$(recorded)" "fzfv preview shape: glow=$has_glow"
     fzfv --preview 'caller preview {}' --preview-window=nowrap --bind alt-t:ignore --query 'file name'
@@ -941,7 +941,7 @@ if [[ -n $rg_bin ]]; then
       "$(recorded rgv-rg)" 'rgv: the rg alias options, its own, then the arguments'
     [[ $(<$test_root/rgv-stderr) == *src/broken* ]] || fail "rgv: rg's report on stderr: $(<$test_root/rgv-stderr)"
     picker=$'--layout=reverse\n--no-multi\n--delimiter=\t\n--with-nth=3..\n--prompt=Matches > \n--header='
-    picker_rest=$'\n--preview=sed -n {1}p "$RGV_SHELF/matches"\n--preview-window=right,60%,wrap,<66(down,60%,wrap)\n--bind=alt-t:toggle-preview-wrap,ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down'
+    picker_rest=$'\n--preview=sed -n {1}p "$RGV_SHELF/matches"\n--preview-window=right,60%,wrap,<66(down,60%,wrap)'
     expect "$picker"$'Enter opens its first match in Neovim:\n]q goes to the next matching line,\n] then Ctrl+Q to the next file'"$picker_rest" \
       "$(recorded rgv-fzf)" 'rgv picker options'
     menu_lines=("${(@f)$(recorded rgv-menu)}")
