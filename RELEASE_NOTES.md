@@ -21,13 +21,14 @@ Changes since `v0.0.1`.
   (`Cmd+Option+arrows`), resize, zoom (`Cmd+Shift+Enter`), and close
   (`Cmd+W`) panes, and search and scroll their output, as Terminal does; where
   no pane lies that way, `Cmd+Option+arrows` move between Neovim's windows
-  instead. Elsewhere tmux keeps its own keys behind `Ctrl+B`. Word and line
-  keys (`Option+←/→`, `Cmd+←/→`, `Option+Backspace`) work alike at the prompt
-  and in Neovim.
-- **The prompt:** vi keys with a cursor that shows the mode, `↑`/`↓` through
-  commands that start with what you typed, `Ctrl+X Ctrl+E` to edit in
-  Neovim, and fzf's `Ctrl+T`, `Ctrl+R`, and `Option+c` (which previews each
-  directory).
+  instead. Elsewhere tmux keeps its own keys behind `Ctrl+B`.
+- **The prompt:** it edits like any Mac text field, with zsh's emacs keys
+  (`Ctrl+A`/`Ctrl+E`/`Ctrl+K`/`Ctrl+Y`), and the word and line keys
+  (`Option+←/→`, `Cmd+←/→`, `Option+Backspace`) work alike in Neovim. Option
+  types characters with either key; `Esc` then a key stands in for Alt.
+  `↑`/`↓` step through commands that start with what you typed, `Ctrl+X
+  Ctrl+E` edits in Neovim, and fzf adds `Ctrl+T`, `Ctrl+R`, and `Esc` then `c`
+  (which previews each directory).
 - **Exploring code:** Neovim opens on a file tree that sits beside the code
   when there's room (`-` goes to it, `Esc` back; `?` lists its keys).
   `rgv TEXT` browses ripgrep's matching lines file by file and opens Neovim
@@ -37,8 +38,7 @@ Changes since `v0.0.1`.
   name, `Cmd+C`/`Cmd+X` copy and cut the selection to the clipboard, and
   `Cmd+/` comments, as in any Mac app.
 - **Pickers:** in every fzf picker, `Option+↑`/`Option+↓` scroll the preview
-  (`Shift+↑`/`Shift+↓` by a line) and `Option+t` wraps it. `fzfv` picks a file
-  with a preview.
+  (`Shift+↑`/`Shift+↓` by a line). `fzfv` picks a file with a preview.
 - **Git:** `gg` and `ggg` show a repository card, which also appears when you
   enter a repository; short diff and log aliases follow a small grammar
   (`keys git`); Delta shows unified diffs.
@@ -82,7 +82,14 @@ Changes since `v0.0.1`.
   `Ctrl+W` keys move between windows in place of `Space w`. Searches
   highlight every match, as Neovim's do, until `Ctrl+L`; `Space t h` is gone.
   `Cmd+S` saves in place of `Space b w w`, `ZZ` replaces `Space b w q`, and
-  `Ctrl+\` then `Ctrl+N` leaves terminal mode in place of `Esc Esc`.
+  `Ctrl+\` then `Ctrl+N` leaves terminal mode in place of `Esc Esc`. In
+  normal mode `Cmd+←`/`Cmd+→` (Vim's `Ctrl+A`/`Ctrl+E`) reach the line's
+  start and end: add 1 to a number with `g` then `Ctrl+A` on a selection.
+- The prompt uses zsh's emacs keys, as Terminal does, in place of vi mode;
+  `Ctrl+X Ctrl+E` opens a long command in Neovim. Option types characters
+  with either key, where Ghostty made it Alt on US layouts: press `Esc` then
+  the key for an Alt key, as for fzf's directory picker (`Esc` then `c`) or
+  the last word (`Esc` then `.`).
 - In `HOMEBREW_CASK_OPTS`, write `--appdir=/path`; Homebrew ignores
   `--appdir /path`.
 - Agent homes moved to `~/.local/share/copilot`, `codex`, and `claude`. On a

@@ -2,7 +2,7 @@
 
 A field guide to the shortcuts this setup adds. Run `keys` to browse its pages with a preview of each, typing to search every line; `keys TOPIC` reads one page and `keys WORDS` searches; `help COMMAND` explains any command.
 
-**Notation:** `Cmd+D` is a chord: hold Command and press d. Left Option sends Alt to programs (Alt on Linux and WSL), and right Option types accents. `Space t m` is a sequence typed in Neovim normal mode. Case matters (`n` and `N` differ), except in Ctrl chords: `Ctrl+T` is Ctrl and t.
+**Notation:** `Cmd+D` is a chord: hold Command and press d. Option types characters (ç, é) with either key, as in every Mac app; for a program's Alt key, press `Esc` then the key (Alt itself on Linux and WSL). `Space t m` is a sequence typed in Neovim normal mode. Case matters (`n` and `N` differ), except in Ctrl chords: `Ctrl+T` is Ctrl and t.
 
 Each tool also lists its own keys: `:nmap` in Neovim, `Cmd+Shift+P` in Ghostty, `Ctrl+Option+K` in OpenCode.
 
@@ -78,7 +78,7 @@ Command keys do what they do in every Mac app. They reach Neovim through Ghostty
 | `Ctrl+\` then `Ctrl+N` | Leave terminal mode |
 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
-- `Option+←` / `Option+→` jump words everywhere; while typing and on the command line, `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.
+- `Option+←` / `Option+→` jump words and `Cmd+←` / `Cmd+→` reach the line's start / end everywhere; while typing and on the command line, `Option+Backspace` deletes a word. `Cmd+←` / `Cmd+→` arrive as Vim's `Ctrl+A` / `Ctrl+E`: to add 1 to a number, select it and press `g` then `Ctrl+A`.
 - Undo history survives closing and reopening a file.
 - The file tree has its own page: `keys explore`.
 
@@ -181,10 +181,11 @@ Move around and build commands without retyping.
 | `Option+←` / `Option+→` | Jump a word back / forward |
 | `Cmd+←` / `Cmd+→` | Jump to the start / end of the line |
 | `Option+Backspace` or `Ctrl+W` / `Cmd+Backspace` or `Ctrl+U` | Delete the word / everything before the cursor |
+| `Ctrl+K` / `Ctrl+Y` | Delete to the end of the line / paste back what a delete removed |
 
 - Typing a directory name alone changes into it; `zsh/local.zsh.example` shows how to reach any project by its name (`cdpath`).
-- The prompt uses vi keys: Esc enters command mode, `i` returns to typing. Where the terminal supports cursor shapes, the cursor shows which: a block in command mode, a bar while typing.
-- `Option+←` / `Option+→` jump words here.
+- The prompt edits like any Mac text field, with zsh's emacs keys (Terminal's own). Words stop at punctuation: on `~/code/project`, `Option+Backspace` deletes `project`.
+- `Esc` then a key stands in for an Alt key: `Esc` then `.` inserts the last command's last word.
 - A red `❯` means the last command failed; an unfinished rebase or merge shows beside the branch (`main|rebase-i`).
 - Start a command with a space to keep it out of history.
 - To find what a name runs, skip `which`: `cmdv NAME` (`command -v`) shows what runs, alias or function included; `cmdvs NAME` (`where`) lists every match, such as both Gits.
@@ -203,16 +204,16 @@ List what is here, then find a file by name or by content.
 | `lc` | Lines of code by language |
 | `v FILE` / `view FILE` | Edit / read-only in your editor |
 | `fzfv` | Search names with a preview; Enter opens the file |
-| `Option+c` | Pick a directory below here (directories only, each previewed) and change to it |
+| `Esc` then `c` | Pick a directory below here (directories only, each previewed) and change to it |
 | `rg TEXT` | Search contents, including hidden files |
 | `rga TEXT` | Also search files that Git ignores |
 | `rgf TEXT` / `rgc TEXT` | Matching files only / matching-line counts per file |
 | `rgw TEXT` | Whole words only |
 | `rgv TEXT` | Browse the matching lines file by file, each file's in the preview; Enter opens Neovim at the first, with all of them in the quickfix list |
 
-In every picker with a preview (`fzfv`, `rgv`, `keys`, `Option+c`): `Option+↓` / `Option+↑` scroll it by half a page and `Shift+↓` / `Shift+↑` by a line, `Option+t` toggles its wrapping, Esc cancels. `fzfv` previews a file's first 500 lines.
+In every picker with a preview (`fzfv`, `rgv`, `keys`, `Esc` then `c`): `Option+↓` / `Option+↑` scroll it by half a page and `Shift+↓` / `Shift+↑` by a line, Esc cancels. `fzfv` previews a file's first 500 lines.
 
-- Not sure where to look? Narrow down first: `Option+c` to the right directory, then `fzfv` or `Ctrl+T` from there.
+- Not sure where to look? Narrow down first: `Esc` then `c` to the right directory, then `fzfv` or `Ctrl+T` from there.
 - Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.
 - `rg`, `rgv`, `:grep`, and Neovim's `/` are smart-case: all-lowercase text ignores case.
 - Combine with `rg`'s own short flags: `rga -l` (files), `rga -c` (counts), `rga -w` (whole words), `rgw -c`.
