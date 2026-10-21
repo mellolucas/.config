@@ -267,9 +267,9 @@ STUB
   done
   # Words that name no page search every entry, bullets included, by topic.
   output=$(keys detach) || fail 'keys search status'
-  [[ $output == 'panes '*detach* && $output != *$'\n'*'Option+h'* ]] || fail "keys search: $output"
-  output=$(keys --plain browse mode leave) || fail 'keys multi-word search status'
-  [[ $output == 'browse '*'Leave browse mode'* ]] || fail "keys multi-word search: $output"
+  [[ $output == 'panes '*detach* && $output != *$'\n'*'Cmd+Option+arrows'* ]] || fail "keys search: $output"
+  output=$(keys --plain browse prompt previous) || fail 'keys multi-word search status'
+  [[ $output == 'browse '*'Previous / next prompt'* ]] || fail "keys multi-word search: $output"
 
   # Present viewers must remain unused for redirected or explicitly plain output.
   fzf() { fail 'keys unexpectedly invoked the picker'; }

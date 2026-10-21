@@ -17,12 +17,13 @@ Changes since `v0.0.1`.
   Ghostty tab, or in the current tab when its shell is alone there.
   `--layout lean` gives the editor and the agent half the width each.
   Elsewhere, tmux lays out the same panes.
-- **The same keys everywhere:** Option chords move between, split, resize,
-  zoom, and close (`Option+w`) Ghostty panes, and tmux panes where Ghostty is
-  absent; where no pane lies that way, `Option+h/j/k/l` moves between Neovim's
-  windows instead. `Option+b` browses a pane's output. Word and line keys
-  (`Option+←/→`, `Cmd+←/→`, `Option+Backspace`) work alike at the prompt and
-  in Neovim.
+- **Mac keys for panes:** Ghostty's own keys split (`Cmd+D`), move
+  (`Cmd+Option+arrows`), resize, zoom (`Cmd+Shift+Enter`), and close
+  (`Cmd+W`) panes, and search and scroll their output, as Terminal does; where
+  no pane lies that way, `Cmd+Option+arrows` move between Neovim's windows
+  instead. Elsewhere tmux keeps its own keys behind `Ctrl+B`. Word and line
+  keys (`Option+←/→`, `Cmd+←/→`, `Option+Backspace`) work alike at the prompt
+  and in Neovim.
 - **The prompt:** vi keys with a cursor that shows the mode, `↑`/`↓` through
   commands that start with what you typed, `Ctrl+X Ctrl+E` to edit in
   Neovim, and fzf's `Ctrl+T`, `Ctrl+R`, and `Option+c` (which previews each
@@ -113,11 +114,9 @@ Known limits:
   display when displays of different scales are connected.
 - Markdown previews render the saved file, with approximate positioning, and
   Delta can truncate long lines.
-- On Linux, Ghostty wraps split navigation at the window's edges, so
-  `Option+h/j/k/l` reaches Neovim only in a single pane.
-- In tmux, panes resize a cell at a time, `Option+=` evens out only the
-  current pane and its neighbors, browse mode copies with `y` (a mouse
-  selection copies as you let go), and Neovim follows a light/dark switch once
-  tmux rereads the terminal's colors. From Ghostty, which keeps `Option+b`,
-  the mouse wheel browses a tmux pane.
+- On Linux, Ghostty keeps its own pane keys, and Neovim's windows are
+  `Ctrl+W h/j/k/l`.
+- In tmux, Command keys never arrive: its own keys follow its prefix,
+  `Ctrl+B`, Neovim's windows are `Ctrl+W h/j/k/l`, and Neovim follows a
+  light/dark switch once tmux rereads the terminal's colors.
 - Opening netrw files in neighboring Ghostty panes is future work.
