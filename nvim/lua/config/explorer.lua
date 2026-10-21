@@ -73,8 +73,32 @@ local function open()
   end
 end
 
--- l and h step into and out of folders, as file managers do; the root line
--- stays put (Enter there would move the tree up to the project's parent)
+-- Up a level: the parent folder becomes the root. From an entry nvim-tree keeps
+-- the way down to it open; from the root line the folder left behind stays
+-- open, with the cursor on it, where Ctrl+] makes it the root again
+local function up()
+  local node = api.tree.get_node_under_cursor()
+  if node and node.parent then
+    return api.tree.change_root_to_parent(node)
+  end
+  local root = node and node.absolute_path
+  api.tree.change_root_to_parent()
+  if not root then
+    return
+  end
+  api.tree.find_file({ buf = root, focus = true })
+  local left = api.tree.get_node_under_cursor()
+  if left and left.absolute_path == root and left.nodes and not left.open then
+    api.node.open.edit(left)
+  end
+end
+local function root_line()
+  local node = api.tree.get_node_under_cursor()
+  return node and not node.parent
+end
+
+-- l and h step into and out of folders, as file managers do; h on the root
+-- line steps out of the root itself
 local function step_in()
   local node = api.tree.get_node_under_cursor()
   if not node or not node.parent then
@@ -95,8 +119,11 @@ local function step_in()
 end
 local function step_out()
   local node = api.tree.get_node_under_cursor()
-  if not node or not node.parent then
+  if not node then
     return
+  end
+  if not node.parent then
+    return up()
   end
   if node.nodes and node.open then
     api.node.open.edit(node)
@@ -122,19 +149,28 @@ require("nvim-tree").setup({
       vim.keymap.set("n", key, action, { buffer = buf, nowait = true, silent = true, desc = "nvim-tree: " .. desc })
     end
     for _, key in ipairs({ "<CR>", "o", "<2-LeftMouse>" }) do
-      map(key, open, "Open")
+      map(key, function()
+        if root_line() then
+          return up()
+        end
+        open()
+      end, "Open")
     end
     map("l", step_in, "Open")
     map("h", step_out, "Close Directory")
     -- Tab shows the file beside the tree, keeping the cursor there; without
     -- room beside it, Tab opens the file as Enter does
     map("<Tab>", function()
-      if narrow() then
+      if root_line() then
+        up()
+      elseif narrow() then
         open()
       else
         api.node.open.edit(nil, { focus = true })
       end
     end, "Open Preview")
+    map("-", up, "Root: up to the parent folder")
+    map("<C-]>", api.tree.change_root_to_node, "Root: into this folder")
     -- ? opens and closes the list of keys, as g? does
     map("?", api.tree.toggle_help, "Help")
     -- Space b - switches the code to its previous file, never to the tree:

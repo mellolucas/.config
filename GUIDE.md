@@ -90,7 +90,8 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 | --- | --- |
 | `Option+z` (in the editor) | Zoom: the tree joins the code as a sidebar; again for the shells and agent |
 | `Space e e` / `Space e r` | Show or hide the tree / find the current file in it |
-| `l` / `h` | Step into a folder or open a file / step out of a folder, closing it |
+| `l` / `h` | Step into a folder or open a file / step out of a folder, closing it (on the top line, out of the root) |
+| `-` / `Ctrl+]` | Root: up to the parent folder, keeping yours open / into the folder under the cursor |
 | Enter / `Tab` | Open the file / show it, keeping the cursor in the tree |
 | `Ctrl+V` / `Ctrl+X` | Open beside / below the code, to compare files |
 | `f` / `H` / `I` | Filter by name / toggle hidden / ignored files |

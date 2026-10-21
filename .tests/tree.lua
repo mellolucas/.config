@@ -254,9 +254,18 @@ assert(on("src") and api.nvim_buf_line_count(0) == closed, "h does not close an 
 press("h")
 assert(api.nvim_win_get_cursor(0)[1] == 1, "h on a top entry does not reach the root line")
 local root = api.nvim_get_current_line()
-press("h")
 press("l")
-assert(api.nvim_win_get_cursor(0)[1] == 1 and api.nvim_get_current_line() == root, "h or l moved the root line")
+assert(api.nvim_win_get_cursor(0)[1] == 1 and api.nvim_get_current_line() == root, "l moved the root line")
+-- h on the root line steps out of the root itself: the parent becomes the root,
+-- with the project open under the cursor, and Ctrl+] makes it the root again.
+local tree_api = require("nvim-tree.api").tree
+press("h")
+local left = tree_api.get_node_under_cursor()
+assert(left and left.absolute_path == project and left.open,
+  "h on the root line: " .. api.nvim_get_current_line() .. " " .. vim.inspect(left and left.absolute_path))
+assert(api.nvim_buf_get_lines(0, 0, 1, false)[1] ~= root, "h on the root line kept the root")
+press("<C-]>")
+assert(api.nvim_buf_get_lines(0, 0, 1, false)[1] == root, "Ctrl+] did not make the project the root again")
 select("a.txt")
 press("l")
 assert(current() == "a.txt", "l on a file does not open it")
@@ -267,4 +276,4 @@ end, vim.split(fn.execute("messages"), "\n"))
 assert(#errors == 0, "messages: " .. table.concat(errors, " | "))
 vim.cmd.cd(fn.fnameescape(repo))
 fn.delete(project, "rf")
-print("ok: file tree with the real plugins (narrow, zoom at 110 columns, tab pages, Tab, h and l, alternate file)")
+print("ok: file tree with the real plugins (narrow, zoom at 110 columns, tab pages, Tab, h and l, the root, alternate file)")

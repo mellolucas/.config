@@ -708,6 +708,7 @@ do
     tree = {
       open = record("open"), toggle = record("toggle"), find_file = record("find_file"),
       resize = record("resize"), toggle_help = record("help"),
+      change_root_to_parent = record("up"), change_root_to_node = record("into"),
       -- As nvim-tree does, close the tree's window unless it is the last one.
       close = function()
         calls[#calls + 1] = { "close" }
@@ -790,7 +791,7 @@ do
     end)
   end
   -- h closes an open folder, or the one holding the entry; l opens a closed
-  -- folder; both leave the root line alone.
+  -- folder and leaves the root line alone.
   api.nvim_buf_call(tree_buf, function()
     local folder = { name = "src", absolute_path = "/p/src", type = "directory", nodes = {}, open = true, parent = {} }
     cursor_node = folder
@@ -804,11 +805,28 @@ do
     local edits = count("edit")
     fn.maparg("l", "n", false, true).callback()
     assert(count("edit") == edits + 1, "l on a closed folder opens it")
-    cursor_node = { name = "..", absolute_path = "/p", type = "directory", nodes = {}, open = true }
+    local top = { name = "..", absolute_path = "/p", type = "directory", nodes = {}, open = true }
+    cursor_node = top
     local before_root = #calls
     fn.maparg("l", "n", false, true).callback()
-    fn.maparg("h", "n", false, true).callback()
-    assert(#calls == before_root, "h or l acted on the root line: " .. vim.inspect(calls[#calls]))
+    assert(#calls == before_root, "l acted on the root line: " .. vim.inspect(calls[#calls]))
+    -- On the root line h, -, Enter, and Tab go up a level, finding the folder
+    -- they left; from an entry, - goes up with nvim-tree keeping it in view.
+    for _, key in ipairs({ "h", "-", "<CR>", "<Tab>" }) do
+      local from = #calls
+      fn.maparg(key, "n", false, true).callback()
+      local made = vim.list_slice(calls, from + 1)
+      assert(vim.deep_equal(made, { { "up" }, { "find_file", { buf = "/p", focus = true } } }),
+        key .. " on the root line: " .. vim.inspect(made))
+    end
+    cursor_node = file
+    fn.maparg("-", "n", false, true).callback()
+    assert(vim.deep_equal(last("up"), { "up", file }), "- on an entry: " .. vim.inspect(last("up")))
+    -- Ctrl+] makes the folder under the cursor the root, named so in ? .
+    local into = fn.maparg("<C-]>", "n", false, true)
+    assert(into.desc == "nvim-tree: Root: into this folder", "Ctrl+] in the tree: " .. vim.inspect(into.desc))
+    into.callback()
+    assert(last("into"), "Ctrl+] in the tree made no folder the root")
   end)
   -- l on an open folder steps onto its first entry, when the next line is one.
   local tree_api = package.loaded["nvim-tree.api"].tree
