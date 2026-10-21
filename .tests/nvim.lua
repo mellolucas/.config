@@ -1,9 +1,9 @@
 -- Run from the repository root: nvim --headless -u NONE -l .tests/nvim.lua
 local api = vim.api
 local fn = vim.fn
-local real_jobstart, real_jobstop = fn.jobstart, fn.jobstop
+local real_jobstart, real_system = fn.jobstart, vim.system
 local real_executable = fn.executable
-local notifications, jobs, timers = {}, {}, {}
+local notifications, renders = {}, {}
 local start_result, readable = 1, 1
 
 vim.notify = function(message, level)
@@ -16,26 +16,26 @@ end
 fn.filereadable = function()
   return readable
 end
-fn.jobstart = function(command, opts)
-  assert(command[1] == "glow" and opts.term)
-  assert(vim.bo.scrollback == 1000000)
+-- glow runs once the preview's terminal is open; each test below finishes the
+-- run, and stopping it ends it as a signal does.
+vim.system = function(command, opts, on_exit)
+  assert(command[1] == "glow" and vim.deep_equal(opts, { text = true, timeout = 5000 }), vim.inspect(opts))
+  assert(vim.bo.buftype == "terminal" and vim.bo.scrollback == 1000000)
   if start_result == "throw" then
     error("mock spawn failure")
   end
-  if start_result <= 0 then
-    return start_result
-  end
-  jobs[#jobs + 1] = { command = command, opts = opts, stops = 0 }
-  return #jobs
-end
-fn.jobstop = function(id)
-  jobs[id].stops = jobs[id].stops + 1
-  jobs[id].opts.on_exit(id, 143)
-  return 1
-end
-vim.defer_fn = function(callback, delay)
-  assert(delay == 5000)
-  timers[#timers + 1] = callback
+  local render = { command = command, on_exit = on_exit, kills = 0, closing = false }
+  renders[#renders + 1] = render
+  return {
+    is_closing = function()
+      return render.closing
+    end,
+    kill = function(_, signal)
+      assert(signal == "sigterm")
+      render.kills, render.closing = render.kills + 1, true
+      on_exit({ code = 0, signal = 15, stdout = "", stderr = "" })
+    end,
+  }
 end
 
 vim.g.mapleader = " "
@@ -145,90 +145,113 @@ local function warning(text)
   notifications = {}
 end
 
-local function complete(code)
-  jobs[#jobs].opts.on_exit(#jobs, code)
+-- glow's render: styled lines, as the terminal shows them once it takes them in.
+local rendering = {}
+for i = 1, 100 do
+  rendering[i] = "\27[1mrender line " .. i .. "\27[0m"
+end
+rendering = table.concat(rendering, "\n") .. "\n"
+
+local function complete(code, signal, stdout)
+  local render = renders[#renders]
+  render.closing = true
+  render.on_exit({ code = code, signal = signal or 0, stdout = stdout or "", stderr = "" })
+  drain()
+end
+
+-- The terminal takes in the render on its next refresh; the cursor moves after.
+local function shown(preview, last)
+  assert(vim.wait(1000, function()
+    return vim.tbl_contains(api.nvim_buf_get_lines(preview, 0, -1, false), last)
+  end), "render missing " .. last)
   drain()
 end
 
 -- Repeat successful toggles preserve the full source view and render ratio;
--- the preview's own q leaves it as Space t m does.
+-- the preview's own q leaves it as Space t m does, and i keeps it in normal
+-- mode, as the render takes no input.
 for round = 1, 2 do
   local view = source_view()
   assert(fn.maparg("q", "n") == "", "q mapped in the markdown source")
   toggle()
   local preview = api.nvim_get_current_buf()
-  assert(preview ~= source and vim.bo[preview].bufhidden == "wipe")
-  assert(jobs[#jobs].command[6] == "/virtual/preview.md")
-  api.nvim_buf_set_lines(preview, 0, -1, false, vim.list_slice(lines, 1, 100))
-  complete(0)
-  assert(api.nvim_win_get_cursor(0)[1] == 45, "render position changed")
+  assert(preview ~= source and vim.bo[preview].bufhidden == "wipe" and vim.bo[preview].buftype == "terminal")
+  assert(renders[#renders].command[6] == "/virtual/preview.md")
+  complete(0, 0, rendering)
+  shown(preview, "render line 100")
+  local total = api.nvim_buf_line_count(preview)
+  assert(api.nvim_win_get_cursor(0)[1] == math.floor(90 / 200 * total + 0.5), "render position changed")
+  local stays = api.nvim_get_autocmds({ event = "TermEnter", buffer = preview })
+  assert(#stays == 1 and stays[1].command == "stopinsert", "i in the preview: " .. vim.inspect(stays))
   local leave = fn.maparg("q", "n", false, true)
   assert(leave.buffer == 1 and leave.callback == toggle, "preview q: " .. vim.inspect(leave))
   if round == 1 then toggle() else leave.callback() end
-  timers[#timers]()
   restored(view, preview)
-  assert(jobs[#jobs].stops == 0)
+  assert(renders[#renders].kills == 0)
 end
 assert(#notifications == 0)
 
--- Missing/unreadable paths never replace the source or launch a job.
+-- Missing/unreadable paths never replace the source or start glow.
 local view = source_view()
-local count = #jobs
+local count = #renders
 readable = 0
 toggle()
-assert(api.nvim_get_current_buf() == source and #jobs == count)
+assert(api.nvim_get_current_buf() == source and #renders == count)
 assert(vim.deep_equal(fn.winsaveview(), view))
 warning("file missing or unreadable")
 readable = 1
 
-for _, result in ipairs({ 0, -1, "throw" }) do
-  local buffers = api.nvim_list_bufs()
-  start_result = result
-  toggle()
-  assert(api.nvim_get_current_buf() == source)
-  assert(vim.deep_equal(fn.winsaveview(), view))
-  assert(vim.deep_equal(api.nvim_list_bufs(), buffers), "spawn failure leaked scratch")
-  warning("glow failed to start")
-end
+local buffers = api.nvim_list_bufs()
+start_result = "throw"
+toggle()
 start_result = 1
+assert(api.nvim_get_current_buf() == source)
+assert(vim.deep_equal(fn.winsaveview(), view))
+assert(vim.deep_equal(api.nvim_list_bufs(), buffers), "spawn failure leaked scratch")
+warning("glow failed to start")
 
+-- A failed, stopped, or timed-out glow gives the window back to the source.
+for _, case in ipairs({ { 2, 0, "glow exited with code 2" }, { 0, 9, "glow stopped by signal 9" },
+  { 124, 15, "glow timed out" } }) do
+  toggle()
+  local preview = api.nvim_get_current_buf()
+  complete(case[1], case[2])
+  restored(view, preview)
+  warning(case[3])
+  assert(renders[#renders].kills == 0)
+end
+
+-- Early toggle-back stops glow; its late exit stays silent, as does a render
+-- that finished just before the toggle.
 toggle()
 local preview = api.nvim_get_current_buf()
-complete(2)
-timers[#timers]()
-restored(view, preview)
-warning("glow exited with code 2")
-assert(jobs[#jobs].stops == 0)
-
-toggle()
-preview = api.nvim_get_current_buf()
-timers[#timers]()
-drain()
-timers[#timers]()
-restored(view, preview)
-warning("glow timed out")
-assert(jobs[#jobs].stops == 1)
-
--- Early toggle-back cancels the job; late exits and timeout stay silent.
-toggle()
-preview = api.nvim_get_current_buf()
 toggle()
 restored(view, preview)
 complete(1)
-timers[#timers]()
-assert(jobs[#jobs].stops == 1 and #notifications == 0)
+assert(renders[#renders].kills == 1 and #notifications == 0)
+toggle()
+preview = api.nvim_get_current_buf()
+local late = renders[#renders]
+late.closing = true
+late.on_exit({ code = 0, signal = 0, stdout = rendering, stderr = "" })
+vim.v.errmsg = ""
+toggle()
+restored(view, preview)
+drain()
+assert(late.kills == 0 and #notifications == 0 and vim.v.errmsg == "", "a late render: " .. vim.v.errmsg)
 
 -- A queued completion cannot affect a new preview of the same source.
 toggle()
-local old_job, old_timer = jobs[#jobs], timers[#timers]
-old_job.opts.on_exit(#jobs, 1)
+local old = renders[#renders]
+old.closing = true
+old.on_exit({ code = 1, signal = 0, stdout = "", stderr = "" })
 toggle()
 toggle()
 preview = api.nvim_get_current_buf()
 drain()
-old_timer()
 assert(api.nvim_get_current_buf() == preview and #notifications == 0)
-complete(0)
+complete(0, 0, rendering)
+shown(preview, "render line 100")
 toggle()
 restored(view, preview)
 
@@ -241,11 +264,10 @@ api.nvim_win_set_buf(0, other)
 api.nvim_win_set_cursor(0, { 2, 4 })
 local other_view = fn.winsaveview()
 complete(1)
-timers[#timers]()
 assert(api.nvim_get_current_buf() == other)
 assert(vim.deep_equal(fn.winsaveview(), other_view))
 assert(not api.nvim_buf_is_valid(preview))
-assert(jobs[#jobs].stops == 1 and #notifications == 0)
+assert(renders[#renders].kills == 1 and #notifications == 0)
 
 -- Closing the preview window cancels work without touching another window.
 vim.cmd("split")
@@ -254,10 +276,9 @@ toggle()
 preview = api.nvim_get_current_buf()
 api.nvim_win_close(0, true)
 complete(1)
-timers[#timers]()
 assert(api.nvim_get_current_buf() == other)
 assert(not api.nvim_buf_is_valid(preview))
-assert(jobs[#jobs].stops == 1 and #notifications == 0)
+assert(renders[#renders].kills == 1 and #notifications == 0)
 
 -- Failure restores the owning window, not whichever window is current.
 local other_win = api.nvim_get_current_win()
@@ -279,27 +300,24 @@ assert(not api.nvim_buf_is_valid(preview))
 warning("glow exited with code 2")
 api.nvim_win_close(preview_win, true)
 
--- Real PTY output must retain the prefix beyond Neovim's default scrollback.
--- Lower only the test terminal's budget to exercise saturation cheaply.
+-- Real output must retain the prefix beyond Neovim's default scrollback, with no
+-- exit line after it. Lower only the test render's budget to exercise
+-- saturation cheaply, and the stalled run's time limit to time out quickly.
 api.nvim_win_set_buf(0, source)
-fn.jobstop = real_jobstop
-local terminal_exited
-local output_count, scrollback = 12000, 1000000
-local stall = false
-fn.jobstart = function(command, opts)
-  assert(command[1] == "glow" and opts.term)
-  assert(vim.bo.scrollback == 1000000)
+local exited
+local output_count, scrollback, stall, time_limit = 12000, 1000000, false, nil
+vim.system = function(command, opts, on_exit)
+  assert(command[1] == "glow" and vim.deep_equal(opts, { text = true, timeout = 5000 }))
+  assert(vim.bo.buftype == "terminal" and vim.bo.scrollback == 1000000)
   vim.bo.scrollback = scrollback
-  terminal_exited = false
-  local on_exit = opts.on_exit
-  opts.on_exit = function(id, code)
-    on_exit(id, code)
-    vim.schedule(function() terminal_exited = true end)
-  end
-  return real_jobstart({ "sh", "-c",
+  exited = false
+  return real_system({ "sh", "-c",
     stall and 'printf "waiting\\n"; exec sleep 30'
       or 'i=1; while [ "$i" -le "$1" ]; do printf "line %s\\n" "$i"; i=$((i + 1)); done',
-    "preview-test", tostring(output_count) }, opts)
+    "preview-test", tostring(output_count) }, { text = true, timeout = time_limit or opts.timeout }, function(result)
+    on_exit(result)
+    vim.schedule(function() exited = true end)
+  end)
 end
 local global_scrollback = vim.go.scrollback
 local windows = api.nvim_list_wins()
@@ -308,12 +326,10 @@ for _, bounded in ipairs({ false, true }) do
   view = source_view()
   toggle()
   preview = api.nvim_get_current_buf()
-  assert(vim.bo[preview].buftype == "terminal")
-  assert(vim.wait(5000, function() return terminal_exited end), "terminal fixture timed out")
-  drain()
+  assert(vim.wait(5000, function() return exited end), "render fixture timed out")
+  shown(preview, "line " .. output_count)
   assert(vim.deep_equal(api.nvim_list_wins(), windows), "preview changed layout")
   local rendered = api.nvim_buf_get_lines(preview, 0, -1, false)
-  assert(vim.tbl_contains(rendered, "line " .. output_count), "terminal suffix missing")
   if bounded then
     assert(rendered[1] ~= "line 1", "fixture did not exhaust scrollback")
     warning("beginning may be truncated")
@@ -323,26 +339,30 @@ for _, bounded in ipairs({ false, true }) do
     assert(rendered[1] == "line 1", "terminal prefix lost")
     assert(#notifications == 0)
     assert(api.nvim_win_get_cursor(0)[1] == math.floor(90 / 200 * #rendered + 0.5))
+    assert(#api.nvim_buf_get_extmarks(preview, -1, 0, -1, {}) == 0, "the render has an exit line")
   end
   toggle()
-  timers[#timers]()
   restored(view, preview)
   assert(vim.go.scrollback == global_scrollback, "preview changed global scrollback")
 end
-stall = true
+stall, time_limit = true, 200
 view = source_view()
 toggle()
 preview = api.nvim_get_current_buf()
-assert(vim.wait(1000, function()
-  return api.nvim_buf_get_lines(preview, 0, 1, false)[1] == "waiting"
-end), "stalled terminal fixture did not start")
-timers[#timers]()
+assert(vim.wait(5000, function() return exited end), "timed-out process not stopped")
+drain()
 restored(view, preview)
 warning("glow timed out")
-assert(vim.wait(1000, function() return terminal_exited end), "timed-out process not stopped")
+-- Leaving early stops the real process well before its time limit, silently.
+time_limit = nil
+toggle()
+preview = api.nvim_get_current_buf()
+toggle()
+restored(view, preview)
+assert(vim.wait(1000, function() return exited end), "leaving the preview did not stop glow")
 drain()
-assert(#notifications == 0, "late exit duplicated timeout warning")
-fn.jobstart = real_jobstart
+assert(#notifications == 0, "a stopped render warned")
+vim.system = real_system
 
 -- Saved comparisons use native decoding, including explicitly selected encodings.
 fn.executable = real_executable
@@ -407,7 +427,6 @@ assert(ok, err)
 
 -- Guard and lifecycle tests stub Git discovery and replace the pager with a PTY fixture.
 notifications = {}
-local real_system = vim.system
 local real_environ = fn.environ
 local cwd = fn.getcwd()
 local root = directory .. "/repo with spaces"

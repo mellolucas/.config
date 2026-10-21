@@ -29,8 +29,10 @@ map("n", "<leader>td", function()
   vim.diagnostic.config({ virtual_text = not config.virtual_text })
 end, { desc = "Toggle inline diagnostics" })
 -- Markdown preview: swaps the current window between markdown source and a glow
--- render of the file on disk. term=true: a terminal buffer displays glow's ANSI colors.
--- Explicit --style (aliases don't reach jobs); --width = min(window, 120), glow.yaml's width.
+-- render of the file on disk, shown in a terminal with no process behind it: it
+-- displays glow's ANSI colors, and no "[Process exited]" line follows them.
+-- Explicit --style (aliases don't reach Neovim's processes); --width = min(window,
+-- 120), glow.yaml's width.
 local function markdown_preview()
   local paired = vim.b.tm_source
   if paired then
@@ -74,85 +76,90 @@ local function markdown_preview()
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = "wipe"
   vim.bo[buf].scrollback = 1000000
-  -- Count screen rows too: warn conservatively before scrollback can lose the prefix.
-  local saturated = false
-  vim.api.nvim_buf_attach(buf, false, {
-    on_lines = function()
-      saturated = saturated or vim.api.nvim_buf_line_count(buf) >= vim.bo[buf].scrollback
-    end,
-  })
   vim.b[buf].tm_source = source
   vim.b[buf].tm_view = view
   -- q leaves the preview, as it leaves the other readers
   map("n", "q", markdown_preview, { buffer = buf, desc = "Back to the markdown source" })
   vim.api.nvim_win_set_buf(0, buf)
-  local job
-  local exited = false
-  local finished = false
-  local function finish(message)
-    if finished then
-      return
-    end
-    finished = true
-    if job and not exited then
-      vim.fn.jobstop(job)
-    end
-    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf
-      and vim.b[buf].tm_source == source then
-      if message then
-        if vim.api.nvim_buf_is_valid(source) then
-          vim.api.nvim_win_set_buf(win, source)
-          vim.api.nvim_win_call(win, function()
-            vim.fn.winrestview(view)
-          end)
-        end
-        vim.notify("Markdown preview: " .. message, vim.log.levels.WARN)
-      elseif saturated then
-        vim.notify("Markdown preview: output reached the scrollback limit; beginning may be truncated, "
-          .. "proportional positioning skipped", vim.log.levels.WARN)
-      else
-        local total = vim.api.nvim_buf_line_count(buf)
-        local target = math.max(1, math.min(total, math.floor(ratio * total + 0.5)))
-        vim.api.nvim_win_set_cursor(win, { target, 0 })
+  -- Opened in the preview's window, the terminal takes its size and settings
+  local terminal = vim.api.nvim_open_term(buf, {})
+  -- The render takes no input: i and the like stay in normal mode
+  vim.api.nvim_create_autocmd("TermEnter", { buffer = buf, command = "stopinsert" })
+  local function showing()
+    return vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf
+      and vim.b[buf].tm_source == source
+  end
+  local function fail(message)
+    if showing() then
+      if vim.api.nvim_buf_is_valid(source) then
+        vim.api.nvim_win_set_buf(win, source)
+        vim.api.nvim_win_call(win, function()
+          vim.fn.winrestview(view)
+        end)
       end
+      vim.notify("Markdown preview: " .. message, vim.log.levels.WARN)
     end
-    if message and vim.api.nvim_buf_is_valid(buf) then
+    if vim.api.nvim_buf_is_valid(buf) then
       vim.api.nvim_buf_delete(buf, { force = true })
     end
   end
+  -- The terminal takes in the whole render on its next refresh; the cursor goes
+  -- to the matching spot after it. Count screen rows too: warn conservatively
+  -- before scrollback can lose the prefix.
+  local saturated, placing = false, false
+  local function place()
+    if not showing() then
+      return
+    end
+    if saturated then
+      vim.notify("Markdown preview: output reached the scrollback limit; beginning may be truncated, "
+        .. "proportional positioning skipped", vim.log.levels.WARN)
+    else
+      local total = vim.api.nvim_buf_line_count(buf)
+      local target = math.max(1, math.min(total, math.floor(ratio * total + 0.5)))
+      vim.api.nvim_win_set_cursor(win, { target, 0 })
+    end
+  end
+  local function show(render)
+    vim.api.nvim_buf_attach(buf, false, {
+      on_lines = function()
+        saturated = saturated or vim.api.nvim_buf_line_count(buf) >= vim.bo[buf].scrollback
+        if not placing then
+          placing = true
+          vim.schedule(place)
+        end
+      end,
+    })
+    vim.api.nvim_chan_send(terminal, render)
+  end
+  local started, glow = pcall(vim.system, { "glow", "--style", theme, "--width", width, path },
+    { text = true, timeout = 5000 }, vim.schedule_wrap(function(result)
+      if not vim.api.nvim_buf_is_valid(buf) then
+        return
+      end
+      if result.code == 124 then
+        fail("glow timed out")
+      elseif result.signal ~= 0 then
+        fail("glow stopped by signal " .. result.signal)
+      elseif result.code ~= 0 then
+        fail("glow exited with code " .. result.code)
+      elseif result.stdout:find("%S") then -- an empty file renders blank: nothing to show or place
+        show(result.stdout)
+      end
+    end))
+  if not started then
+    return fail("glow failed to start")
+  end
+  -- Leaving the preview before glow finishes stops it
   vim.api.nvim_create_autocmd("BufWipeout", {
     buffer = buf,
     once = true,
     callback = function()
-      if not finished then
-        finished = true
-        if job and not exited then
-          vim.fn.jobstop(job)
-        end
+      if not glow:is_closing() then
+        glow:kill("sigterm")
       end
     end,
   })
-  local started
-  started, job = pcall(vim.fn.jobstart, { "glow", "--style", theme, "--width", width, path }, {
-    term = true,
-    on_exit = function(_, code)
-      exited = true
-      vim.schedule(function()
-        finish(code ~= 0 and ("glow exited with code " .. code) or nil)
-      end)
-    end,
-  })
-  if not started or job <= 0 then
-    job = nil
-    finish("glow failed to start")
-    return
-  end
-  vim.defer_fn(function()
-    if exited then
-      return
-    end
-    finish("glow timed out")
-  end, 5000)
 end
 map("n", "<leader>tm", markdown_preview, { desc = "Toggle markdown preview" })
 
