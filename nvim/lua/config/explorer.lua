@@ -8,7 +8,7 @@ local ok, err = pcall(vim.pack.add, {
   { src = "https://github.com/nvim-mini/mini.icons" },
 })
 if not ok then
-  -- config.keymaps keeps netrw on <leader>ee and <leader>er
+  -- config.keymaps keeps netrw on -
   vim.notify("File tree unavailable: " .. tostring(err), vim.log.levels.WARN)
   return
 end
@@ -49,6 +49,15 @@ local function previous(win)
   if alternate ~= vim.api.nvim_win_get_buf(win) and vim.fn.buflisted(alternate) == 1 then
     return alternate
   end
+end
+-- The code beside the tree: the window last used, or any other
+local function code_window()
+  local here = vim.api.nvim_get_current_win()
+  local others = vim.tbl_filter(function(win)
+    return win ~= here
+  end, windows())
+  local last = vim.fn.win_getid(vim.fn.winnr("#"))
+  return vim.tbl_contains(others, last) and last or others[1]
 end
 
 -- A full-window tree covers the file being edited; a file opened from it keeps
@@ -171,17 +180,24 @@ require("nvim-tree").setup({
     end, "Open Preview")
     map("-", up, "Root: up to the parent folder")
     map("<C-]>", api.tree.change_root_to_node, "Root: into this folder")
+    -- Esc goes back to the code: beside the tree, or the file a full-window
+    -- tree covers
+    map("<Esc>", function()
+      local code = code_window()
+      if code then
+        vim.api.nvim_set_current_win(code)
+      elseif covered then
+        api.tree.close()
+      else
+        vim.notify("No file to return to")
+      end
+    end, "Back to the code")
     -- ? opens and closes the list of keys, as g? does
     map("?", api.tree.toggle_help, "Help")
     -- Space b - switches the code to its previous file, never to the tree:
     -- the window beside the tree, or the file a full-window tree covers
     map("<leader>b-", function()
-      local here = vim.api.nvim_get_current_win()
-      local others = vim.tbl_filter(function(win)
-        return win ~= here
-      end, windows())
-      local last = vim.fn.win_getid(vim.fn.winnr("#"))
-      local code = vim.tbl_contains(others, last) and last or others[1]
+      local code = code_window()
       local file
       if code then
         file = previous(code)
@@ -228,14 +244,12 @@ api.events.subscribe(api.events.Event.TreeClose, function()
   end)
 end)
 
-vim.keymap.set("n", "<leader>ee", function()
-  cover()
-  api.tree.toggle({ current_window = narrow(), focus = true })
-end, { desc = "Show or hide the file tree" })
-vim.keymap.set("n", "<leader>er", function()
+-- - goes up a level, from a file to it in the tree: beside the code, or in its
+-- place without room; in the tree, - moves the root up
+vim.keymap.set("n", "-", function()
   cover()
   api.tree.find_file({ open = true, focus = true, current_window = narrow() })
-end, { desc = "Find this file in the tree" })
+end, { desc = "Up to this file in the tree" })
 
 -- `nvim DIR`, as the workspace's editor pane runs, opens the tree in place of
 -- that directory's listing; a file a +command opened, or a restored session,

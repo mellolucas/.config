@@ -28,9 +28,10 @@ Changes since `v0.0.1`.
   Neovim, and fzf's `Ctrl+T`, `Ctrl+R`, and `Option+c` (which previews each
   directory).
 - **Exploring code:** Neovim opens on a file tree that sits beside the code
-  when there's room (`Space e e`; `?` lists its keys). `rgv TEXT` browses
-  ripgrep's matching lines file by file and opens Neovim with all of them in
-  the quickfix list; `:grep` and `:find` search like the shell's `rg`.
+  when there's room (`-` goes to it, `Esc` back; `?` lists its keys).
+  `rgv TEXT` browses ripgrep's matching lines file by file and opens Neovim
+  with all of them in the quickfix list; `:grep` and `:find` search like the
+  shell's `rg`.
 - **Pickers:** in every fzf picker, `Option+↑`/`Option+↓` scroll the preview
   (`Shift+↑`/`Shift+↓` by a line) and `Option+t` wraps it. `fzfv` picks a file
   with a preview.

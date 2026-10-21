@@ -52,11 +52,11 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 
 ## Editor: Edit in Neovim
 
-`Space` is the leader key, pressed in normal mode: the next key picks an area (`e` explorer, `f` find, `b` buffers, `t` toggles), and a doubled key runs an area's main action (`Space e e`, `Space f f`, `Space q q`).
+`Space` is the leader key, pressed in normal mode: the next key picks an area (`f` find, `b` buffers, `t` toggles, `g` Git), and a doubled key runs an area's main action (`Space f f`, `Space q q`).
 
 | Press | Result |
 | --- | --- |
-| `Space e e` / `Space e r` | Show or hide the file tree / find this file in it |
+| `-` | Up to this file in the file tree, where `Esc` comes back (`keys explore`) |
 | `Space f f` | Find a file by fuzzy name: type part of it, `Tab` completes, `Enter` opens |
 | `Space b l` / `Space b -` | List buffers and pick one (number or name, `Tab` completes) / switch to the previous file |
 | `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
@@ -89,7 +89,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 | Press | Result |
 | --- | --- |
 | `Option+z` (in the editor) | Zoom: the tree joins the code as a sidebar; again for the shells and agent |
-| `Space e e` / `Space e r` | Show or hide the tree / find the current file in it |
+| `-` / `Esc` / `q` | From a file, to it in the tree / back to the code / hide the tree |
 | `l` / `h` | Step into a folder or open a file / step out of a folder, closing it (on the top line, out of the root) |
 | `-` / `Ctrl+]` | Root: up to the parent folder, keeping yours open / into the folder under the cursor |
 | Enter / `Tab` | Open the file / show it, keeping the cursor in the tree |
@@ -99,10 +99,10 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 | `[c` / `]c` | Previous / next changed file |
 | `?` | Every key, by what it does |
 
-- Unzoomed, the tree and the code take turns in the narrow pane: Enter, `Tab`, or `l` on a file gives it the pane, and `Space e e` brings the tree back.
-- Hidden with `Space e e` while zoomed, the tree stays out of later zooms until you show it again.
+- Unzoomed, the tree and the code take turns in the narrow pane: Enter, `Tab`, or `l` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
+- Hidden with `q` while zoomed, the tree stays out of later zooms until you show it again.
 - The tree follows the file you're in and marks Git changes as they happen: `✗` modified, `★` new, `✓` staged, `➜` renamed; a folder shows the marks of what it holds.
-- `Option+h` goes from the code to the tree, and `Ctrl+W p` back; in a workspace, `Option+l` heads for the shell pane instead.
+- `-` and `Esc` move between the tree and the code at any width. The Option chords move between terminal panes: in a workspace, `Option+l` from the tree heads for the shell pane, and `Option+h` reaches the tree only because no pane sits to the editor's left.
 - `Space b -` switches to your previous file, also from the tree; the tree is never one, and with no previous file it says so.
 - `Ctrl+V` and `Ctrl+X` split the code window; with only the tree showing, both open beside it. `Ctrl+W c` closes a split, while `Option+w` closes the whole editor pane.
 - Follow the code with `Ctrl+]` / `Ctrl+T`, `grr`, and `gO`, and search it with `Space f f` and `:grep` (`keys editor`).

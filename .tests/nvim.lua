@@ -483,11 +483,8 @@ ok, err = pcall(function()
   assert(fn.maparg(" gd", "i") == "" and fn.maparg(" gd", "t") == "")
   local explored
   api.nvim_create_user_command("Explore", function() explored = "Explore" end, {})
-  api.nvim_create_user_command("Rexplore", function() explored = "Rexplore" end, {})
-  for _, pair in ipairs({ { " ee", "Explore" }, { " er", "Rexplore" } }) do
-    fn.maparg(pair[1], "n", false, true).callback()
-    assert(explored == pair[2])
-  end
+  fn.maparg("-", "n", false, true).callback()
+  assert(explored == "Explore", "- without the file tree: " .. tostring(explored))
   assert(api.nvim_get_commands({}).GitDiff.nargs == "0")
   assert(not pcall(vim.cmd, "GitDiff extra"))
 
@@ -692,13 +689,13 @@ do
     end
   end
   local real_pack, real_notify, real_columns = vim.pack, vim.notify, vim.o.columns
-  -- An offline first launch warns and keeps netrw on Space e e.
+  -- An offline first launch warns and keeps netrw on -.
   vim.pack = { add = function() error("offline") end }
   vim.notify = function(message) warned = message end
   dofile("nvim/lua/config/explorer.lua")
   vim.notify = real_notify
   assert(warned and warned:find("offline", 1, true), "file tree failure warning: " .. tostring(warned))
-  assert(fn.maparg(" ee", "n", false, true).desc == "Explore files", "netrw stays on Space e e")
+  assert(fn.maparg("-", "n", false, true).desc == "Up to this file's folder", "netrw stays on -")
 
   vim.pack = { add = function(specs) for _, spec in ipairs(specs) do packs[#packs + 1] = spec.src end end }
   package.loaded["mini.icons"] = { setup = function() end, mock_nvim_web_devicons = record("icons") }
@@ -768,12 +765,10 @@ do
   local file = { name = "a.txt", absolute_path = "/p/a.txt", type = "file", parent = {} }
   for _, case in ipairs({ { 40, true }, { 200, false } }) do
     vim.o.columns = case[1]
-    fn.maparg(" ee", "n", false, true).callback()
-    assert(vim.deep_equal(last("toggle")[2], { current_window = case[2], focus = true }),
-      "Space e e at " .. case[1] .. ": " .. vim.inspect(last("toggle")))
-    fn.maparg(" er", "n", false, true).callback()
+    -- - goes to the open file in the tree: beside the code, or in its place
+    fn.maparg("-", "n", false, true).callback()
     assert(vim.deep_equal(last("find_file")[2], { open = true, focus = true, current_window = case[2] }),
-      "Space e r at " .. case[1] .. ": " .. vim.inspect(last("find_file")))
+      "- at " .. case[1] .. ": " .. vim.inspect(last("find_file")))
     api.nvim_buf_call(tree_buf, function()
       cursor_node = file
       for _, key in ipairs({ "<CR>", "o", "<2-LeftMouse>", "l" }) do
@@ -866,6 +861,10 @@ do
     vim.cmd.vsplit()
     api.nvim_win_set_buf(0, tree_buf)
     local in_tree = api.nvim_get_current_win()
+    -- Esc goes back to the code beside the tree.
+    fn.maparg("<Esc>", "n", false, true).callback()
+    assert(api.nvim_get_current_win() == code_win and said == nil, "Esc from the tree beside the code")
+    api.nvim_set_current_win(in_tree)
     fn.maparg(" b-", "n", false, true).callback()
     assert(api.nvim_get_current_win() == code_win and api.nvim_get_current_buf() == one and said == nil,
       "Space b - from the tree beside the code")
@@ -879,7 +878,7 @@ do
     tree_win = nil
     vim.cmd.buffer(one)
     vim.cmd.buffer(two)
-    fn.maparg(" ee", "n", false, true).callback() -- the tree covers two, whose previous file is one
+    fn.maparg("-", "n", false, true).callback() -- the tree covers two, whose previous file is one
     api.nvim_win_set_buf(0, tree_buf)
     tree_win = api.nvim_get_current_win()
     local closes = count("close")
@@ -892,6 +891,21 @@ do
     tree_win = api.nvim_get_current_win()
     fn.maparg(" b-", "n", false, true).callback()
     assert(api.nvim_get_current_buf() == tree_buf and said == "No previous file", "Space b - from a tree covering nothing")
+    -- From a full-window tree, Esc gives the window back to the file it covers,
+    -- and covering nothing says so.
+    said = nil
+    fn.maparg("<Esc>", "n", false, true).callback()
+    assert(api.nvim_get_current_buf() == tree_buf and said == "No file to return to", "Esc from a tree covering nothing")
+    api.nvim_win_set_buf(0, two)
+    tree_win = nil
+    fn.maparg("-", "n", false, true).callback()
+    api.nvim_win_set_buf(0, tree_buf)
+    tree_win = api.nvim_get_current_win()
+    local escapes = count("close")
+    said = nil
+    fn.maparg("<Esc>", "n", false, true).callback()
+    assert(count("close") == escapes + 1 and said == nil, "Esc from a full-window tree")
+    handlers.TreeClose()
     vim.notify = real_notify
     tree_win = nil
     api.nvim_win_set_buf(0, shown)
@@ -1029,7 +1043,7 @@ do
   vim.cmd.buffer(second)
   local other = api.nvim_get_current_win()
   api.nvim_set_current_win(covering)
-  fn.maparg(" ee", "n", false, true).callback()
+  fn.maparg("-", "n", false, true).callback()
   vim.cmd.enew() -- the tree takes the window
   vim.cmd.buffer(second) -- and hands it back on closing
   handlers.TreeClose()

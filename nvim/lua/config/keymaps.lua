@@ -2,7 +2,7 @@
 -- Usage: <leader-key><scope-key>*
 --        scope-key: groups related actions by the scope on which the action will take place;
 --        *: the key under the scope represents the action to be taken (eg `<leader>cf` formats the buffer)
---          double pressing the scope key triggers the most obvious action under a given scope (eg `<leader>ee` opens explorer)
+--          double pressing the scope key triggers the most obvious action under a given scope (eg `<leader>ff` finds a file)
 local map = vim.keymap.set
 
 -- Content edit: <leader>c*
@@ -172,11 +172,16 @@ end, { desc = "Switch to the previous file" })
 map("n", "<leader>bww", "<cmd>w<CR>", { desc = "Save buffer" })
 map("n", "<leader>bwq", "<cmd>wq<CR>", { desc = "Save and quit" })
 
--- Explore: <leader>e (netrw; config.explorer swaps in the file tree when its plugins load)
-map("n", "<leader>ee", vim.cmd.Explore, {
-  desc = "Explore files",
-})
-map("n", "<leader>er", vim.cmd.Rexplore, { desc = "Return to explorer" })
+-- Explore: - goes up a level, from a file to its folder (netrw, landing on the
+-- file; config.explorer swaps in the file tree when its plugins load). In the
+-- listing, netrw's own - goes up again
+map("n", "-", function()
+  local name = vim.fn.expand("%:t")
+  vim.cmd.Explore()
+  if name ~= "" then
+    vim.fn.search("\\V\\^" .. vim.fn.escape(name, "\\") .. "\\[*@/=|]\\?\\$")
+  end
+end, { desc = "Up to this file's folder" })
 
 -- Find: <leader>f* (fuzzy 'findfunc' in config.commands)
 map("n", "<leader>ff", ":find ", { desc = "Find a file by fuzzy name" })

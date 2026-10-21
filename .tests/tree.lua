@@ -100,6 +100,10 @@ assert(not api.nvim_buf_is_valid(listing), "narrow start keeps the directory lis
 -- not; the empty window a zoom leaves beside the tree is no file either.
 no_previous("Space b - at the start")
 expect({ "tree" }, "Space b - at the start")
+-- Esc goes back to the code; at the start there is none to go back to.
+said = nil
+press("<Esc>")
+assert(said == "No file to return to" and current() == "tree", "Esc at the start: " .. tostring(said))
 resize(200)
 expect({ "tree", "[empty]" }, "zoom at the start")
 local empty = api.nvim_win_get_buf(api.nvim_tabpage_list_wins(0)[2])
@@ -125,28 +129,29 @@ press("?")
 assert(not help_window(), "? leaves the help open")
 
 -- Narrow: the tree takes the window and hands it to the opened file, Tab as
--- Enter does, and the file keeps the covered one as its alternate; glancing at
--- the tree and back keeps the alternate too.
+-- Enter does, and the file keeps the covered one as its alternate; a glance at
+-- the tree (- and Esc back) keeps the alternate too.
 select("a.txt")
 press("<CR>")
 expect({ "a.txt" }, "narrow open")
 no_previous("Space b - on the first file")
 assert(vim.wo.statusline ~= " ? keys", "the tree's status line stayed on a.txt")
-press(" ee")
-expect({ "tree" }, "narrow Space e e")
+press("-")
+expect({ "tree" }, "narrow -")
+assert(on("a.txt"), "- does not land on the open file")
 select("b.txt")
 press("<Tab>")
 expect({ "b.txt" }, "narrow Tab")
 assert(alternate() == "a.txt", "alternate after narrow open: " .. alternate())
 press(" b-")
 expect({ "a.txt" }, "Space b - after narrow open")
-press(" ee")
-press(" ee")
+press("-")
+press("<Esc>")
 expect({ "a.txt" }, "a glance at the tree")
 assert(alternate() == "b.txt", "alternate after a glance at the tree: " .. alternate())
 -- From a full-window tree, Space b - switches the file it covers to that
 -- file's previous one, handing the window back.
-press(" ee")
+press("-")
 press(" b-")
 expect({ "b.txt" }, "Space b - from a full-window tree")
 assert(alternate() == "a.txt", "alternate after Space b - from the tree: " .. alternate())
@@ -164,14 +169,16 @@ resize(109)
 expect({ "a.txt" }, "unzoom to 109")
 resize(200)
 expect({ "tree", "a.txt" }, "zoom again")
--- Hidden while zoomed, it stays out of later zooms until shown again.
-press(" ee")
-expect({ "a.txt" }, "Space e e while zoomed")
+-- Hidden while zoomed (q in the tree), it stays out of later zooms until
+-- shown again.
+press("-")
+press("q")
+expect({ "a.txt" }, "q while zoomed")
 resize(40)
 resize(200)
 expect({ "a.txt" }, "a zoom after hiding the tree")
-press(" ee")
-expect({ "tree", "a.txt" }, "Space e e shows the tree again")
+press("-")
+expect({ "tree", "a.txt" }, "- shows the tree again")
 -- Each tab page keeps its own: one opened while narrow that never showed the
 -- tree, as :GitDiff's, widens without it, and the editor's tab catches up on
 -- returning after a resize made elsewhere.
@@ -195,7 +202,7 @@ local shown = api.nvim_win_get_buf(api.nvim_tabpage_list_wins(0)[2])
 assert(vim.bo[shown].bufhidden == "", "zoomed Tab opened a temporary preview")
 resize(40)
 expect({ "c.txt" }, "unzoom after Tab")
-press(" ee")
+press("-")
 expect({ "tree" }, "narrow tree")
 resize(200)
 expect({ "tree", "c.txt" }, "a full-window tree becomes the sidebar")
@@ -207,18 +214,24 @@ select("a.txt")
 press("<CR>")
 expect({ "tree", "a.txt" }, "zoomed open")
 assert(current() == "a.txt" and alternate() == "c.txt", "zoomed open: " .. current() .. ", alternate " .. alternate())
-press(" er")
-assert(current() == "tree" and on("a.txt"), "Space e r does not land on the open file")
+press("-")
+assert(current() == "tree" and on("a.txt"), "- does not land on the open file")
 -- From the sidebar, Space b - switches the code beside it and goes there.
 press(" b-")
 expect({ "tree", "c.txt" }, "Space b - from the sidebar")
 assert(current() == "c.txt", "Space b - from the sidebar left the cursor in the tree")
+-- From the sidebar, Esc goes back to the code beside it.
+press("-")
+assert(current() == "tree" and on("c.txt"), "- from the code beside the sidebar")
+press("<Esc>")
+expect({ "tree", "c.txt" }, "Esc from the sidebar")
+assert(current() == "c.txt", "Esc from the sidebar left the cursor in the tree")
 
 -- A split in the narrow window stays through resizes within it, widening
 -- restores the sidebar's width, and beside only an empty window, narrowing
 -- keeps the tree.
 resize(40)
-press(" ee")
+press("-")
 select("c.txt")
 press("<C-v>")
 expect({ "tree", "c.txt" }, "narrow Ctrl+V")
