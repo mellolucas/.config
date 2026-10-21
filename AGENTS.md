@@ -23,6 +23,15 @@ Operating rules for anyone (human or agent) working on this dotfiles repository.
 - **Native-first**: prefer app-native config locations and mechanisms
   (e.g. `vim.pack` and native LSP in nvim, `vcs_info` for the prompt, Ghostty key
   tables, `brew bundle --global`). No frameworks, no plugin managers.
+- **Mac-first keys**: shortcuts follow macOS first (Apple's HIG keyboard
+  table; for app-specific actions, Apple's own apps: Finder for files,
+  Terminal for the terminal, Safari for tabs and history, Xcode for code),
+  then each tool's own default. A custom binding only carries a Mac shortcut
+  into a program or fixes a default that misbehaves, never adds a second key
+  for one action. Modifiers keep their HIG meaning: Command for commands,
+  Shift for the reverse, Option for characters and word-level text, Control
+  for the text-editing and terminal keys. Where Command can't reach (tmux,
+  Linux, VS Code, browsers), the host's own conventions apply.
 - **Terminal-focused, cross-OS-friendly**: macOS is primary; guard macOS-only
   behavior (`uname -s`, `OS.mac?`, `has("macunix")`) so Linux degrades cleanly.
 - **Tidy and explicit**: readable code, descriptive naming, clear structure.
