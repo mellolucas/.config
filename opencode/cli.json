@@ -5,10 +5,6 @@
     "mode": "system"
   },
   "keybinds": {
-    "leader": {
-      "key": "ctrl+space"
-    },
-    "command.palette.show": "ctrl+p,<leader>:",
     "app.exit": "ctrl+c,<leader>q"
   },
   "scroll": {

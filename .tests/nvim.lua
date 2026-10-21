@@ -133,9 +133,9 @@ api.nvim_feedkeys(api.nvim_replace_termcodes("A<C-a>X<C-e>Y<Esc>", true, false, 
 assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "Xone twoY")
 api.nvim_feedkeys(api.nvim_replace_termcodes(":let g:ends = 'b'<C-a><M-f><M-f><M-f>'a'..<C-e>..'c'<CR>", true, false, true), "xt", false)
 assert(vim.g.ends == "abc")
--- Option+Backspace deletes a word; Ctrl+Space (OpenCode's leader) does nothing.
+-- Option+Backspace deletes a word.
 api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
-api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-BS>X<C-Space><C-@>Y<Esc>", true, false, true), "xt", false)
+api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-BS>XY<Esc>", true, false, true), "xt", false)
 assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one XY")
 
 local source = api.nvim_create_buf(true, false)

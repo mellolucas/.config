@@ -223,11 +223,6 @@ map({ "i", "c" }, "<C-a>", "<Home>", { desc = "Line start" })
 map("i", "<C-e>", "<End>", { desc = "Line end" })
 -- Option+Backspace arrives as <M-BS>; delete a word as at the prompt.
 map({ "i", "c" }, "<M-BS>", "<C-w>", { desc = "Delete word back" })
--- Ctrl+Space is OpenCode's leader; typed here (as <C-Space> or NUL) it would
--- repeat the last insert and leave insert mode.
-for _, chord in ipairs({ "<C-Space>", "<C-@>" }) do
-  map("i", chord, "<Nop>", { desc = "Ignore OpenCode's leader" })
-end
 
 -- ---- Terminal Mode ----
 map("t", "<Esc><Esc>", [[<C-\><C-n>]], {
