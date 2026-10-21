@@ -21,10 +21,9 @@ if [[ $1 == --child ]]; then
   zstyle -s ':completion:*' cache-path cache_path ||:
   [[ ${cache_path-} == "$XDG_CACHE_HOME/zsh/zcompcache" ]] ||
     { print -u2 "FAIL: completion cache in ${cache_path:-ZDOTDIR}"; exit 1; }
-  # Ctrl+X Ctrl+E opens the command line in the editor from either vi mode
-  for keymap in viins vicmd; do
-    [[ $(bindkey -M $keymap '^X^E') == *' edit-command-line' ]] || { print -u2 "FAIL: $keymap Ctrl+X Ctrl+E"; exit 1; }
-  done
+  # The emacs keymap, though EDITOR names nvim, and Ctrl+X Ctrl+E for the editor
+  [[ $(bindkey -lL main) == 'bindkey -A emacs main' ]] || { print -u2 "FAIL: keymap $(bindkey -lL main)"; exit 1; }
+  [[ $(bindkey '^X^E') == *' edit-command-line' ]] || { print -u2 'FAIL: Ctrl+X Ctrl+E'; exit 1; }
   # Completion must never invoke the helpers or pane commands.
   workspace keys dotfiles zle-test-command() { print -r -- "$0 $*" >> "$HOME/helper-calls"; }
   config=$(<"$repo/zsh/.zshrc")
@@ -79,17 +78,15 @@ if [[ $1 == --child ]]; then
     print -r -- "ZLE-PWD:$PWD:END-PWD"
     print -r -- "ZLE-SNAPSHOT:${(qqqq)BUFFER}|$KEYMAP:END-SNAPSHOT"
   }
-  _test_reset() { zle end-of-history; BUFFER=''; CURSOR=0; zle -K viins; }
+  _test_reset() { zle end-of-history; BUFFER=''; CURSOR=0; zle -K main; }
   _test_glob() { BUFFER="$(print -r -- glob/*)"; CURSOR=$#BUFFER; }
   zle -N _test_snapshot
   zle -N _test_reset
   zle -N _test_glob
-  for keymap in viins vicmd; do
-    bindkey -M "$keymap" '^X^B' _test_snapshot
-    bindkey -M "$keymap" '^X^R' _test_reset
-    bindkey -M "$keymap" '^X^G' _test_glob
-    bindkey -M "$keymap" '^X^L' list-choices
-  done
+  bindkey '^X^B' _test_snapshot
+  bindkey '^X^R' _test_reset
+  bindkey '^X^G' _test_glob
+  bindkey '^X^L' list-choices
   # The marker joins zsh's hook dispatcher after the tracked line-init hooks;
   # defining zle-line-init itself would replace them.
   _test_ready() { print -r -- 'ZLE-READY'; }
@@ -200,7 +197,7 @@ snapshot() {
   actual=${actual%%:END-SNAPSHOT*}
 }
 expect() {
-  local label=$1 expected="${(qqqq)2}|${3:-viins}"
+  local label=$1 expected="${(qqqq)2}|${3:-main}"
   (( ++checks ))
   if [[ $actual != "$expected" ]]; then
     print -ru2 -- "FAIL [$mode]: $label: expected $expected, got $actual"
@@ -212,7 +209,7 @@ complete() {
   expect "$1" "$3"
 }
 expect_widget() {
-  expect "$1" "$2" "${5:-viins}"
+  expect "$1" "$2" "${5:-main}"
   local cwd=${${transcript##*ZLE-PWD:}%%:END-PWD*}
   local picker_options=$(<"$HOME/picker-options")
   (( ++checks ))
@@ -228,7 +225,7 @@ for mode in native fzf; do
     continue
   fi
   [[ $mode != fzf ]] || ln -s "$fzf_bin" "$HOME/bin/fzf"
-  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
+  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim \
     "$zsh_bin" -dfi "$self" --child "$repo" "${(j.:.)native_fpath}"
   wait_for 'ZLE-READY'
   (( ++checks ))
@@ -246,31 +243,23 @@ for mode in native fzf; do
   expect 'empty prefix includes hidden file beside visible file' 'cat all/.hidden '
   snapshot $'\x18\x12cd dirs/\t\t'
   expect 'empty prefix includes hidden directory beside visible directory' 'cd dirs/.xxsecretxx/'
+  # One mode, with the Mac text keys: Backspace and Ctrl+H cross a typed
+  # newline; Ctrl+F, Ctrl+K, and Ctrl+Y move, cut, and paste; Ctrl+D deletes
+  # forward (Ctrl+T stays fzf's file picker).
   for erase in $'\x7f' $'\x08'; do
-    snapshot $'\x18\x12abc\e'
-    expect 'Esc enters native vi command mode' abc vicmd
-    snapshot "a$erase$erase$erase"
-    expect 'Backspace crosses insertion boundary after Esc/a' '' main
-    snapshot $'\x18\x12abc\e'
-    snapshot "i$erase$erase"
-    expect 'Backspace crosses insertion boundary after Esc/i' c main
     snapshot $'\x18\x12abc\x16\n'"$erase$erase"
     expect 'Backspace crosses logical newline' ab
   done
-  snapshot $'\x18\x12abc\e'
-  snapshot '0x'
-  expect 'native vi command editing' bc vicmd
+  snapshot $'\x18\x12abcd\x01\x06\x0b\x01\x19'
+  expect 'Ctrl+A, Ctrl+F, Ctrl+K, and Ctrl+Y' bcda
+  snapshot $'\x18\x12abcd\x01\x04'
+  expect 'Ctrl+D deletes forward' bcd
   snapshot $'\x18\x12abc\e[1;11D\e[1;11B\e[1;11A\e[1;11C'
-  expect 'pane-edge Cmd+Option+arrows do nothing while typing' abc
-  snapshot $'\x18\x12abc\e'
-  snapshot $'\e[1;11D\e[1;11C'
-  expect 'pane-edge Cmd+Option+arrows do nothing in command mode' abc vicmd
+  expect 'pane-edge Cmd+Option+arrows do nothing' abc
   snapshot $'\x18\x12one two\ebX'
   expect 'Option+Left jumps a word back and keeps typing' 'one Xtwo'
   snapshot $'\x18\x12one two\eb\efX'
   expect 'Option+Right jumps a word forward and keeps typing' 'one twoX'
-  snapshot $'\x18\x12one two\e0\efX'
-  expect 'Option+Right in command mode moves a word instead of finding' onetwo vicmd
   # Cmd+Left/Right (Ctrl+A/E) and Home/End in every form terminals send
   for key in $'\x01' $'\e[H' $'\eOH' $'\e[1~'; do
     snapshot $'\x18\x12abc'"$key"X
@@ -280,10 +269,6 @@ for mode in native fzf; do
     snapshot $'\x18\x12abc\x01'"$key"X
     expect "line end: ${(V)key}" abcX
   done
-  snapshot $'\x18\x12abc\e\x01iX'
-  expect 'Cmd+Left in command mode' Xabc main
-  snapshot $'\x18\x12abc\e\x01\x05iX'
-  expect 'Cmd+Right in command mode lands on the last character' abXc main
   snapshot $'\x18\x12abc\x01\e[3~X'
   expect 'Delete removes the character under the cursor' Xbc
   # xterm word keys: Alt+arrows (Windows Terminal), Ctrl+arrows (VS Code, Linux)
@@ -303,54 +288,25 @@ for mode in native fzf; do
   expect 'Up again, in application cursor form, keeps the prefix' 'echo alpha'
   snapshot $'\x18\x12echo\e[A\eOA\e[B'
   expect 'Down returns toward the latest' 'echo beta'
-  # Without Ghostty's integration, the cursor shows the vi mode (each snapshot's
-  # transcript holds just its own output)
-  snapshot $'\x18\x12abc\e'
-  expect 'Esc reaches command mode' abc vicmd
-  (( ++checks ))
-  [[ $transcript == *$'\e[1 q'* ]] || { print -ru2 -- "FAIL [$mode]: no block cursor in command mode"; (( ++failures )); }
-  snapshot i
-  expect 'i returns to typing' abc main
-  (( ++checks ))
-  [[ $transcript == *$'\e[5 q'* ]] || { print -ru2 -- "FAIL [$mode]: no bar cursor while typing"; (( ++failures )); }
+  # Word keys stop at punctuation, as on a Mac, and what they delete pastes back
   snapshot $'\x18\x12cd foo/bar.baz\ebX'
-  expect 'Option+Left stops at punctuation, like Neovim' 'cd foo/bar.Xbaz'
+  expect 'Option+Left stops at punctuation' 'cd foo/bar.Xbaz'
+  snapshot $'\x18\x12cd ~/code/project\e\x7f'
+  expect 'Option+Backspace deletes the last part of a path' 'cd ~/code/'
   snapshot $'\x18\x12one two\e\x7fX'
   expect 'Option+Backspace deletes a word and keeps typing' 'one X'
-  snapshot $'\x18\x12alpha omega\e\x7f\ep'
-  expect 'Option+Backspace keeps the word for a vi paste' 'alpha omega' vicmd
-  snapshot $'\x18\x12alpha omega\x17\ep'
-  expect 'Ctrl+W keeps the word for a vi paste' 'alpha omega' vicmd
-  snapshot $'\x18\x12alpha beta gamma\x17\x17\ep'
-  expect 'consecutive Ctrl+W keep the last word, as zsh vi kills do' 'alpha beta ' vicmd
-  snapshot $'\x18\x12one two\ea\x17'
-  expect 'Ctrl+W deletes past where typing began' 'one ' main
-  snapshot $'\x18\x12one two\ea\x15'
-  expect 'Ctrl+U deletes past where typing began' '' main
-  snapshot $'\x18\x12abc\exu\x12'
-  expect 'Ctrl+R redoes in command mode' ab vicmd
+  snapshot $'\x18\x12alpha omega\e\x7f\x19'
+  expect 'Ctrl+Y pastes back what Option+Backspace deleted' 'alpha omega'
+  snapshot $'\x18\x12alpha omega\x17\x19'
+  expect 'Ctrl+Y pastes back what Ctrl+W deleted' 'alpha omega'
+  snapshot $'\x18\x12one two\eb\x15'
+  expect 'Cmd+Backspace (Ctrl+U) deletes to the line start' two
   snapshot $'\x18\x12\x18\x07'
   expect 'completion does not leak globdots into ordinary expansion' glob/visible
   zpty -d shell
-  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
+  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim \
     "$zsh_bin" -dfi
   zpty -w shell "source ${(q)self} --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --commands"
-  wait_for 'ZLE-READY'
-  # At a real prompt, Enter restores the terminal's cursor for the command and
-  # the next prompt sets the bar; beside Ghostty's integration the hooks stay quiet.
-  zpty -w -n shell $'\x18\x12true\r'
-  wait_for 'ZLE-READY'
-  (( ++checks ))
-  [[ $transcript == *$'\e[0 q'*$'\e[5 q'*ZLE-READY* ]] ||
-    { print -ru2 -- "FAIL [commands]: cursor reset, then bar at the next prompt: ${(qqqq)transcript}"; (( ++failures )); }
-  zpty -w -n shell $'\x18\x12_ghostty_zle_keymap_select() { :; }\r'
-  wait_for 'ZLE-READY'
-  snapshot $'\x18\x12abc\e'
-  expect 'Esc beside Ghostty integration' abc vicmd
-  (( ++checks ))
-  [[ $transcript != *$'\e['[0-9]' q'* ]] ||
-    { print -ru2 -- "FAIL [commands]: cursor shape set beside Ghostty's integration"; (( ++failures )); }
-  zpty -w -n shell $'\x18\x12unfunction _ghostty_zle_keymap_select\r'
   wait_for 'ZLE-READY'
   for helper in workspace dotscode; do
     for option in agent editor status shell; do
@@ -443,7 +399,7 @@ if [[ -n $fzf_bin ]]; then
   widget_checks=$checks
   # Native history extraction needs awk; omit Perl to exercise its fc fallback.
   ln -s "${commands[awk]}" "$HOME/bin/awk"
-  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
+  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim \
     "$zsh_bin" -dfi
   zpty -w shell "source ${(q)self} --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --widgets"
   wait_for 'ZLE-READY'
@@ -462,7 +418,7 @@ if [[ -n $fzf_bin ]]; then
   zpty -w -n shell $'\x18\x12zle-test-command pending-sentinel\ec'
   wait_for 'ZLE-READY'
   snapshot ''
-  expect_widget 'Option+c changes cwd and restores the unexecuted buffer at the next prompt' \
+  expect_widget 'Esc then c (fzf'\''s Alt+C) changes cwd and restores the unexecuted buffer at the next prompt' \
     'zle-test-command pending-sentinel' "$fixture/widget files/directory space" '*--walker=dir,*--preview*eza --all*-1 -- {}*ls -A -- {}*' main
   zpty -d shell
   (( failures )) || print -r -- "ok: $((checks - widget_checks)) native fzf prompt checks (deterministic picker)"
@@ -470,4 +426,4 @@ else
   print -r -- 'SKIP: native fzf prompt widgets and **Tab (fzf not installed)'
 fi
 (( failures == 0 )) || { print -ru2 -- "$failures/$checks ZLE checks failed"; exit 1; }
-print -r -- "ok: $checks native ZLE checks (completion, helper aliases, wildcard isolation, vi editing, Ghostty, fzf, optional eza aliases)"
+print -r -- "ok: $checks native ZLE checks (completion, helper aliases, wildcard isolation, Mac text keys, Ghostty, fzf, optional eza aliases)"

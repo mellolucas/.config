@@ -57,72 +57,37 @@ zstyle ':completion:*' matcher-list '' 'm:{a-zA-Z}={A-Za-z}' 'm:{a-zA-Z}={A-Za-z
 zstyle ':completion:*' menu select
 
 # ---- Behavior ----
-bindkey -v
-# Erase across vi insertion boundaries and logical newlines in insert mode.
-bindkey -M viins '^?' backward-delete-char
-bindkey -M viins '^H' backward-delete-char
-# 10ms for snappy insert/vicmd switching; terminals send Alt chords as one burst
-KEYTIMEOUT=1
-# Word keys use vi words, as in Neovim. Option+Left/Right arrive as ESC b/f and
-# Option+Backspace as ESC DEL (macOS word keys); unbound, vi modes would read
-# them as Esc plus a vi motion. zsh's own vi kills stop where typing began, so
-# Ctrl+W and Ctrl+U (Cmd+Backspace in Ghostty) reach past it.
-backward-kill-vi-word() {
-  local end=$CURSOR
-  zle vi-backward-word
-  MARK=$end
-  zle kill-region
-}
-zle -N backward-kill-vi-word
-bindkey -M viins '^[b' vi-backward-word
-bindkey -M viins '^[f' vi-forward-word
-bindkey -M viins '^[^?' backward-kill-vi-word
-bindkey -M viins '^W' backward-kill-vi-word
-bindkey -M viins '^U' backward-kill-line
-bindkey -M vicmd '^[b' vi-backward-word
-bindkey -M vicmd '^[f' vi-forward-word
+# zsh's emacs keymap, Terminal's own: the Mac text keys (Ctrl+A/E/B/F/K/Y/D,
+# and Option or Cmd with the arrows and Backspace, which Ghostty sends as
+# ESC b/f/DEL and Ctrl+A/E/U). zsh would pick vi mode, as EDITOR is nvim
+bindkey -e
+# Word keys stop at punctuation, as in Mac text fields: Option+Backspace
+# deletes a path's last part
+WORDCHARS=''
+# Cmd+Backspace arrives as Ctrl+U: delete to the line's start, as on a Mac
+bindkey '^U' backward-kill-line
 # Other terminals send xterm sequences for the word keys: Alt+Left/Right in
-# Windows Terminal, Ctrl+Left/Right in VS Code and on Linux. Cmd+Left/Right
-# arrive as Ctrl+A/E; Home and End come in normal, application, and tmux forms.
+# Windows Terminal, Ctrl+Left/Right in VS Code and on Linux. Home and End come
+# in normal, application, and tmux forms.
 () {
-  local keymap key
-  for keymap in viins vicmd; do
-    for key in '^[[1;3D' '^[[1;5D'; do bindkey -M $keymap $key vi-backward-word; done
-    for key in '^[[1;3C' '^[[1;5C'; do bindkey -M $keymap $key vi-forward-word; done
-    for key in '^A' '^[[H' '^[OH' '^[[1~'; do bindkey -M $keymap $key vi-beginning-of-line; done
-    for key in '^E' '^[[F' '^[OF' '^[[4~'; do bindkey -M $keymap $key vi-end-of-line; done
-    bindkey -M $keymap '^[[3~' delete-char
-  done
+  local key
+  for key in '^[[1;3D' '^[[1;5D'; do bindkey $key backward-word; done
+  for key in '^[[1;3C' '^[[1;5C'; do bindkey $key forward-word; done
+  for key in '^[[H' '^[OH' '^[[1~'; do bindkey $key beginning-of-line; done
+  for key in '^[[F' '^[OF' '^[[4~'; do bindkey $key end-of-line; done
+  bindkey '^[[3~' delete-char
 }
 # Ctrl+X Ctrl+E edits the command line in the editor, like OpenCode's leader e
 autoload -Uz edit-command-line
 zle -N edit-command-line
-bindkey -M viins '^X^E' edit-command-line
-bindkey -M vicmd '^X^E' edit-command-line
-# Up and Down while typing step through earlier commands that start with the
-# text so far (in either cursor-key form)
+bindkey '^X^E' edit-command-line
+# Up and Down step through earlier commands that start with the text so far
+# (in either cursor-key form)
 autoload -Uz up-line-or-beginning-search down-line-or-beginning-search
 zle -N up-line-or-beginning-search
 zle -N down-line-or-beginning-search
-bindkey -M viins '^[[A' up-line-or-beginning-search '^[OA' up-line-or-beginning-search
-bindkey -M viins '^[[B' down-line-or-beginning-search '^[OB' down-line-or-beginning-search
-# The cursor shows the vi mode, a block in command mode and a bar while typing,
-# as Ghostty's shell integration does in the shells it starts; elsewhere (tmux,
-# other terminals) these hooks do it, and commands get the terminal's own cursor.
-_vi_mode_cursor() {
-  (( $+functions[_ghostty_zle_keymap_select] )) && return
-  case $KEYMAP in
-    vicmd|visual) print -n '\e[1 q' ;;
-    *) print -n '\e[5 q' ;;
-  esac
-}
-_vi_mode_cursor_reset() {
-  (( $+functions[_ghostty_zle_keymap_select] )) || print -n '\e[0 q'
-}
-autoload -Uz add-zle-hook-widget
-add-zle-hook-widget keymap-select _vi_mode_cursor
-add-zle-hook-widget line-init _vi_mode_cursor
-add-zle-hook-widget line-finish _vi_mode_cursor_reset
+bindkey '^[[A' up-line-or-beginning-search '^[OA' up-line-or-beginning-search
+bindkey '^[[B' down-line-or-beginning-search '^[OB' down-line-or-beginning-search
 
 setopt interactive_comments
 setopt prompt_subst
@@ -133,26 +98,21 @@ setopt complete_in_word # Complete at the cursor, not the end of the word
 
 # ---- Integrations ----
 # Cmd+Option+arrows pass through Ghostty at a pane's edge, as ESC [1;11 and the
-# arrow; without these no-ops zsh would read ESC as a mode switch and the rest
-# as commands
-for arrow in A B C D; do
-  bindkey -M viins -s "^[[1;11$arrow" ''
-  bindkey -M vicmd -s "^[[1;11$arrow" ''
-done
+# arrow; without these no-ops zsh would type the rest of the sequence
+bindkey -s '^[[1;11A' '' '^[[1;11B' '' '^[[1;11C' '' '^[[1;11D' ''
 
-# Fuzzy finding (ctrl-r history, ctrl-t files, alt-c dirs); fzf < 0.48 lacks --zsh
+# Fuzzy finding: Ctrl+R history, Ctrl+T files, Esc then c directories
+# (fzf < 0.48 lacks --zsh)
 if command -v fzf >/dev/null 2>&1; then
   # fzf refuses to start when its options file is missing
   if [[ -z $FZF_DEFAULT_OPTS_FILE && -r $XDG_CONFIG_HOME/fzf/fzfrc ]]; then
     export FZF_DEFAULT_OPTS_FILE=$XDG_CONFIG_HOME/fzf/fzfrc
   fi
-  # Key bindings need a terminal (without one, fzf's script prints zle errors);
-  # command mode keeps vi redo on Ctrl+R
+  # Key bindings need a terminal (without one, fzf's script prints zle errors)
   if [[ -t 0 ]]; then
     source <(fzf --zsh 2>/dev/null)
-    bindkey -M vicmd '^R' redo
   fi
-  # Option+c previews what each directory holds, as l lists it
+  # The directory picker (fzf's Alt+C) previews what each holds, as l lists it
   export FZF_ALT_C_OPTS="--preview 'eza --all --group-directories-first --icons=always --color=always -1 -- {} 2>/dev/null || ls -A -- {}'"
 fi
 

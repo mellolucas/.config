@@ -86,13 +86,11 @@ Deliberate duplication that must stay behavior-identical across copies:
    editor windows. Change both together. tmux has no Command key; Neovim's
    Ctrl+W keys apply there.
 2. **Word and line keys**: Ghostty sends Option+←/→ as `ESC b`/`ESC f`,
-   Option+Backspace as `ESC DEL`, and Cmd+←/→ as Ctrl+A/E; other terminals
-   and tmux send xterm forms for the arrows, Home, and End. `zsh/.zshrc` binds
-   them in vi insert and command mode (Option+Backspace in insert mode only),
-   with vi word boundaries, and `nvim/lua/config/keymaps.lua` maps
-   `<M-b>`/`<M-f>`, `<M-Left>`/`<M-Right>`, and `<M-BS>`, plus `<C-a>`/`<C-e>`
-   while typing, so word navigation and insert-mode line navigation match at
-   the prompt and in Neovim. Change both together.
+   Option+Backspace as `ESC DEL`, and Cmd+←/→/Backspace as Ctrl+A/E/U; other
+   terminals send xterm forms. zsh's emacs keymap reads them with Cocoa word
+   boundaries (empty WORDCHARS), and `nvim/lua/config/keymaps.lua` maps
+   `<M-b>`/`<M-f>`, `<M-Left>`/`<M-Right>`, `<M-BS>`, and `<C-a>`/`<C-e>` to
+   match. Change both together.
 
 ## Agent working rules
 
