@@ -147,9 +147,11 @@ local function complete(code)
   drain()
 end
 
--- Repeat successful toggles preserve the full source view and render ratio.
-for _ = 1, 2 do
+-- Repeat successful toggles preserve the full source view and render ratio;
+-- the preview's own q leaves it as Space t m does.
+for round = 1, 2 do
   local view = source_view()
+  assert(fn.maparg("q", "n") == "", "q mapped in the markdown source")
   toggle()
   local preview = api.nvim_get_current_buf()
   assert(preview ~= source and vim.bo[preview].bufhidden == "wipe")
@@ -157,7 +159,9 @@ for _ = 1, 2 do
   api.nvim_buf_set_lines(preview, 0, -1, false, vim.list_slice(lines, 1, 100))
   complete(0)
   assert(api.nvim_win_get_cursor(0)[1] == 45, "render position changed")
-  toggle()
+  local leave = fn.maparg("q", "n", false, true)
+  assert(leave.buffer == 1 and leave.callback == toggle, "preview q: " .. vim.inspect(leave))
+  if round == 1 then toggle() else leave.callback() end
   timers[#timers]()
   restored(view, preview)
   assert(jobs[#jobs].stops == 0)

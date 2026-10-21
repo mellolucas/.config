@@ -32,7 +32,7 @@ end, { desc = "Toggle inline diagnostics" })
 -- Markdown preview: swaps the current window between markdown source and a glow
 -- render of the file on disk. term=true: a terminal buffer displays glow's ANSI colors.
 -- Explicit --style (aliases don't reach jobs); --width = min(window, 120), glow.yaml's width.
-map("n", "<leader>tm", function()
+local function markdown_preview()
   local paired = vim.b.tm_source
   if paired then
     if not vim.api.nvim_buf_is_valid(paired) then
@@ -84,6 +84,8 @@ map("n", "<leader>tm", function()
   })
   vim.b[buf].tm_source = source
   vim.b[buf].tm_view = view
+  -- q leaves the preview, as it leaves the other readers
+  map("n", "q", markdown_preview, { buffer = buf, desc = "Back to the markdown source" })
   vim.api.nvim_win_set_buf(0, buf)
   local job
   local exited = false
@@ -152,7 +154,8 @@ map("n", "<leader>tm", function()
     end
     finish("glow timed out")
   end, 5000)
-end, { desc = "Toggle markdown preview" })
+end
+map("n", "<leader>tm", markdown_preview, { desc = "Toggle markdown preview" })
 
 -- Buffers: <leader>b*
 map("n", "<leader>bl", ":ls<CR>:b ", { desc = "List buffers and pick one" })

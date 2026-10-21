@@ -255,7 +255,7 @@ Render Markdown and read long text comfortably.
 | `←` / `→` (in less) | Scroll horizontally |
 | `q` (in less) | Back to the shell |
 | `Shift`+drag | Select text while less owns the mouse |
-| `Space t m` (in Neovim) | Swap Markdown source and rendered view |
+| `Space t m` (in Neovim) | Swap Markdown source and rendered view (`q` also leaves the view) |
 
 - `b FILE` shows a file with syntax colors; `cat` is bat without decoration.
 - Previews render the saved file, not unsaved edits; very long renders can lose their beginning. Toggle again after resizing.
