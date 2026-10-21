@@ -567,28 +567,19 @@ RUBY
     fail '.zshrc must run session setup for non-login shells'
 )
 
-# Parity contract: at a pane's edge, Ghostty's Cmd+Option+arrows reach
-# Neovim's window maps; zsh ignores them.
+# Parity contract: at a pane's edge, Ghostty's Cmd+Option+arrows reach the
+# program, where Neovim moves between windows and zsh ignores them (both
+# checked by behavior, in .tests/nvim.lua and .tests/zle.zsh).
 (
   # Whole active lines only (indentation stripped), so commented-out binds fail.
   setopt extendedglob
   ghostty_lines=(${${(f)"$(<"$repo/ghostty/config.ghostty")"}##[[:space:]]#})
-  nvim_lines=(${${(f)"$(<"$repo/nvim/lua/config/keymaps.lua")"}##[[:space:]]#})
-  zsh_lines=(${${(f)"$(<"$repo/zsh/.zshrc")"}##[[:space:]]#})
-  for arrow key dir in Left h left Down j down Up k up Right l right; do
+  for dir in left down up right; do
     (( ${ghostty_lines[(Ie)keybind = performable:super+alt+arrow_$dir=goto_split:$dir]} )) ||
-      fail "ghostty Cmd+Option+$arrow navigation"
-    nvim_entry="{ \"$arrow\", \"$key\", "
-    (( ${nvim_lines[(I)*${(b)nvim_entry}*]} )) || fail "nvim <D-M-$arrow> window map"
-  done
-  nvim_loop='local key = "<D-M-" .. move[1] .. ">"'
-  (( ${nvim_lines[(Ie)$nvim_loop]} )) || fail 'nvim <D-M-…> window maps'
-  (( ${zsh_lines[(Ie)for arrow in A B C D; do]} )) || fail 'zsh Cmd+Option+arrow no-ops'
-  for keymap in viins vicmd; do
-    zsh_noop="bindkey -M $keymap -s \"^[[1;11\$arrow\" ''"
-    (( ${zsh_lines[(Ie)$zsh_noop]} )) || fail "zsh $keymap Cmd+Option+arrow no-op"
+      fail "ghostty Cmd+Option+$dir navigation"
   done
 )
+
 
 git() {
   [[ $1 == -C ]] || fail "unexpected git invocation: $*"
