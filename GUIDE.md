@@ -73,9 +73,9 @@ Ghostty owns these chords in every program; without Ghostty, tmux takes them in 
 | `Ctrl+]` / `Ctrl+T` | Jump to the definition / back |
 | `[d` / `]d` / `gO` | Previous / next diagnostic / list the file's symbols |
 | `"+y` / `"+p` | Copy to / paste from the system clipboard (plain `y` stays in Neovim) |
-| `Space g d` | Saved file against the Git index (`:GitDiff`) |
+| `Space g d` | Saved file against the Git index (`:GitDiff`; `q` leaves the pager, then closes the tab) |
 | `:DiffSaved` | Compare unsaved edits with the saved file |
-| `Esc Esc` | Leave terminal mode (then `:q` closes `:GitDiff`) |
+| `Esc Esc` | Leave terminal mode |
 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
 - `Option+←` / `Option+→` jump words everywhere; while typing and on the command line, `Option+Backspace` deletes one and `Cmd+←` / `Cmd+→` reach the line's start / end. In normal mode `Cmd+←` / `Cmd+→` stay Vim's `Ctrl+A` / `Ctrl+E` (add 1 to a number / scroll): use `0` / `$`.

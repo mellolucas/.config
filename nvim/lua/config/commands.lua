@@ -108,7 +108,10 @@ vim.api.nvim_create_user_command("GitDiff", function()
     notify("Git diff: git failed to start", vim.log.levels.WARN)
     return
   end
-  notify("Git diff: q quits pager; Esc Esc then :q closes this tab")
+  -- Once the pager exits, any key closes the tab from terminal mode; q does
+  -- from normal mode too
+  vim.keymap.set("n", "q", "<Cmd>quit<CR>", { buffer = terminal_buf, desc = "Close the diff" })
+  notify("Git diff: q leaves the pager, then closes this tab")
   vim.cmd("startinsert")
 end, {
   desc = "Diff saved working tree file against index in delta",

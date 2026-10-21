@@ -573,15 +573,18 @@ ok, err = pcall(function()
       assert(notifications[1][2] == vim.log.levels.WARN)
     end
     assert(#notifications == (modified and 2 or 1))
-    assert(notifications[#notifications][1]:find("Esc Esc then :q", 1, true))
+    assert(notifications[#notifications][1]:find("q leaves the pager, then closes this tab", 1, true))
     notifications = {}
     local job = vim.b.terminal_job_id
     assert(vim.wait(5000, function() return fn.jobwait({ job }, 0)[1] ~= -1 end))
     drain()
     assert(api.nvim_get_current_buf() == terminal, "successful exit closed pager tab")
     assert(vim.bo.bufhidden == "wipe", "exit changed bufhidden: " .. vim.bo.bufhidden)
+    -- In normal mode the diff's own q closes its tab.
     vim.cmd("stopinsert")
-    vim.cmd("quit")
+    local close = fn.maparg("q", "n", false, true)
+    assert(close.buffer == 1 and close.rhs == "<Cmd>quit<CR>", "diff q: " .. vim.inspect(close))
+    api.nvim_feedkeys("q", "mx", false)
     drain()
     -- Native :q chooses the adjacent tab when other tabs exist.
     api.nvim_set_current_win(source_win)
