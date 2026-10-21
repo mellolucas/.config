@@ -33,9 +33,9 @@ Changes since `v0.0.1`.
   `rgv TEXT` browses ripgrep's matching lines file by file and opens Neovim
   with all of them in the quickfix list; `:grep` and `:find` search like the
   shell's `rg`.
-- **Mac keys in Neovim:** `Cmd+S` saves, `Cmd+O` opens a file by name,
-  `Cmd+C`/`Cmd+X` copy and cut the selection to the clipboard, and `Cmd+/`
-  comments, as in any Mac app.
+- **Mac keys in Neovim:** in Ghostty, `Cmd+S` saves, `Cmd+O` opens a file by
+  name, `Cmd+C`/`Cmd+X` copy and cut the selection to the clipboard, and
+  `Cmd+/` comments, as in any Mac app.
 - **Pickers:** in every fzf picker, `Option+↑`/`Option+↓` scroll the preview
   (`Shift+↑`/`Shift+↓` by a line) and `Option+t` wraps it. `fzfv` picks a file
   with a preview.

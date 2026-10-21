@@ -50,14 +50,14 @@ Ghostty's own Mac keys, as in Terminal and iTerm2. Without Ghostty, a `workspace
 
 ## Editor: Edit in Neovim
 
-Command keys do what they do in every Mac app. `Space` is the leader key, pressed in normal mode, for the rest: the next key picks an area (`c` code, `d` diagnostics, `t` toggles, `b` buffers, `g` Git).
+Command keys do what they do in every Mac app. They reach Neovim through Ghostty on macOS; elsewhere (tmux, VS Code, Linux), the Vim keys in parentheses do the same. `Space` is the leader key, pressed in normal mode, for the rest: the next key picks an area (`c` code, `d` diagnostics, `t` toggles, `b` buffers, `g` Git).
 
 | Press | Result |
 | --- | --- |
-| `Cmd+S` | Save |
-| `Cmd+O` | Open a file by name: type part of it, `Tab` completes, `Enter` opens |
-| `Cmd+C` / `Cmd+X` / `Cmd+V` | Copy / cut the selection to the system clipboard / paste (`"+y` / `"+p` too; plain `y` stays in Neovim) |
-| `Cmd+/` | Comment or uncomment the line or the selection (Vim's `gcc` / `gc`) |
+| `Cmd+S` (`:w`) | Save, also while typing |
+| `Cmd+O` (`:find NAME`) | Open a file by name, also while typing: type part of it, `Tab` completes, `Enter` opens |
+| `Cmd+C` / `Cmd+X` / `Cmd+V` (`"+y` / `"+d` / `"+p`) | Copy / cut the selection to the system clipboard / paste; plain `y` stays in Neovim |
+| `Cmd+/` (`gcc` / `gc`) | Comment or uncomment the line, also while typing, or the selection |
 | `-` | Up to this file in the file tree, where `Esc` comes back (`keys explore`) |
 | `Space b l` / `Ctrl+^` (`Ctrl+6`) | List buffers and pick one (number or name, `Tab` completes) / switch to the previous file |
 | `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
