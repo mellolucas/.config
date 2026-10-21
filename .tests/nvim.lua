@@ -100,16 +100,17 @@ local toggle = fn.maparg(" tm", "n", false, true).callback
 assert(type(toggle) == "function")
 assert(fn.maparg(" tm", "t") == "")
 
--- Pane-edge Option chords navigate in normal mode and stay inert elsewhere.
+-- Pane-edge Cmd+Option+arrows (<D-M-…>) move between windows in normal mode
+-- and do nothing while typing.
 local typing = api.nvim_create_buf(false, true)
 api.nvim_win_set_buf(0, typing)
 vim.o.showmode = false
-api.nvim_feedkeys(api.nvim_replace_termcodes("iabc<M-h><M-j><M-k><M-l>def<Esc>", true, false, true), "xt", false)
-assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "abcdef")
-for _, key in ipairs({ "h", "j", "k", "l" }) do
-  assert(fn.maparg("<M-" .. key .. ">", "n") == "<C-W>" .. key)
+api.nvim_feedkeys(api.nvim_replace_termcodes("iabc<D-M-Left><D-M-Down><D-M-Up><D-M-Right>def<Esc>", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "abcdef", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
+for arrow, key in pairs({ Left = "h", Down = "j", Up = "k", Right = "l" }) do
+  assert(fn.maparg("<D-M-" .. arrow .. ">", "n") == "<C-W>" .. key, "Cmd+Option+" .. arrow)
   for _, mode in ipairs({ "v", "c" }) do
-    assert(fn.maparg("<M-" .. key .. ">", mode) == "<Nop>")
+    assert(fn.maparg("<D-M-" .. arrow .. ">", mode) == "<Nop>")
   end
 end
 

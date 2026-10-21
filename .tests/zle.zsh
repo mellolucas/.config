@@ -260,8 +260,11 @@ for mode in native fzf; do
   snapshot $'\x18\x12abc\e'
   snapshot '0x'
   expect 'native vi command editing' bc vicmd
-  snapshot $'\x18\x12abc\eh\ej\ek\el'
-  expect 'Ghostty Option navigation remains insert-mode no-ops' abc
+  snapshot $'\x18\x12abc\e[1;11D\e[1;11B\e[1;11A\e[1;11C'
+  expect 'pane-edge Cmd+Option+arrows do nothing while typing' abc
+  snapshot $'\x18\x12abc\e'
+  snapshot $'\e[1;11D\e[1;11C'
+  expect 'pane-edge Cmd+Option+arrows do nothing in command mode' abc vicmd
   snapshot $'\x18\x12one two\ebX'
   expect 'Option+Left jumps a word back and keeps typing' 'one Xtwo'
   snapshot $'\x18\x12one two\eb\efX'

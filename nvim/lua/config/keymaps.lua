@@ -201,15 +201,13 @@ end, { desc = "Up to this file's folder" })
 -- Git: <leader>g*
 map("n", "<leader>gd", "<cmd>GitDiff<CR>", { desc = "Diff saved file against index" })
 
--- Windows: <A-hjkl>
--- Inside Ghostty these are the pass-through layer of the performable alt+hjkl split navigation; standalone, plain window nav.
-map("n", "<A-h>", "<C-w>h", { desc = "Go to left window" })
-map("n", "<A-j>", "<C-w>j", { desc = "Go to lower window" })
-map("n", "<A-k>", "<C-w>k", { desc = "Go to upper window" })
-map("n", "<A-l>", "<C-w>l", { desc = "Go to right window" })
--- Unmapped, other modes would read a pane-edge chord as Esc+motion.
-for _, key in ipairs({ "h", "j", "k", "l" }) do
-  map({ "i", "v", "c" }, "<A-" .. key .. ">", "<Nop>", { desc = "Ignore pane-edge Option chord" })
+-- Windows: Cmd+Option+arrows move between Ghostty's panes; at a pane's edge
+-- Ghostty passes them on (as <D-M-…>) and they move between these windows.
+-- Unmapped, insert and command-line modes would read them as arrows.
+for _, move in ipairs({ { "Left", "h", "left" }, { "Down", "j", "lower" }, { "Up", "k", "upper" }, { "Right", "l", "right" } }) do
+  local key = "<D-M-" .. move[1] .. ">"
+  map("n", key, "<C-w>" .. move[2], { desc = "Go to " .. move[3] .. " window" })
+  map({ "i", "v", "c" }, key, "<Nop>", { desc = "Ignore a pane-edge Cmd+Option+arrow" })
 end
 -- Option+Left/Right arrive as <M-b>/<M-f> (Ghostty's macOS word jumps) or as
 -- <M-Left>/<M-Right> (Windows Terminal, tmux); unmapped, they too would read

@@ -6,8 +6,12 @@ auto-update = off
 # Left Option sends Alt; right Option retains native macOS character input.
 macos-option-as-alt = left
 
-config-file = vim.ghostty
-
-# Cmd+C copies the terminal's selection; with none it reaches the program, so
-# Neovim copies its own
+# Ghostty's own Mac keys run panes, tabs, find, and scrollback. Two pass the
+# key on when they can't act: Cmd+Option+arrows at a pane's edge reach
+# Neovim, which moves between its windows, and Cmd+C with nothing selected
+# reaches the program, so Neovim copies its own selection
+keybind = performable:super+alt+arrow_left=goto_split:left
+keybind = performable:super+alt+arrow_down=goto_split:down
+keybind = performable:super+alt+arrow_up=goto_split:up
+keybind = performable:super+alt+arrow_right=goto_split:right
 keybind = performable:super+c=copy_to_clipboard:mixed

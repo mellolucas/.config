@@ -132,13 +132,13 @@ setopt ignoreeof
 setopt complete_in_word # Complete at the cursor, not the end of the word
 
 # ---- Integrations ----
-# Option+h/j/k/l pass through Ghostty at pane edges, over SSH too, where
-# TERM_PROGRAM is not sent; without these no-ops, insert mode would drop into
-# vicmd via the ESC fallback
-bindkey -M viins -s '^[h' ''
-bindkey -M viins -s '^[j' ''
-bindkey -M viins -s '^[k' ''
-bindkey -M viins -s '^[l' ''
+# Cmd+Option+arrows pass through Ghostty at a pane's edge, as ESC [1;11 and the
+# arrow; without these no-ops zsh would read ESC as a mode switch and the rest
+# as commands
+for arrow in A B C D; do
+  bindkey -M viins -s "^[[1;11$arrow" ''
+  bindkey -M vicmd -s "^[[1;11$arrow" ''
+done
 
 # Fuzzy finding (ctrl-r history, ctrl-t files, alt-c dirs); fzf < 0.48 lacks --zsh
 if command -v fzf >/dev/null 2>&1; then
