@@ -35,12 +35,12 @@ local function blank(win)
     and vim.api.nvim_buf_line_count(buf) == 1 and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] == ""
 end
 -- An empty window beside the tree holds a placeholder, not a file: unlisted, so
--- Space b - never returns to it, and wiped once a file replaces it
+-- Ctrl+^ never returns to it, and wiped once a file replaces it
 local function placeholder()
   vim.bo.buflisted = false
   vim.bo.bufhidden = "wipe"
 end
--- A window's previous file, as Space b - (config.keymaps) finds it: the
+-- A window's previous file, as Ctrl+^ (config.keymaps) finds it: the
 -- alternate, when that is a listed buffer other than the one it shows
 local function previous(win)
   local alternate = vim.api.nvim_win_call(win, function()
@@ -62,7 +62,7 @@ end
 
 -- A full-window tree covers the file being edited; a file opened from it keeps
 -- that one as its alternate, and closing the tree gives the covered file's
--- window its own alternate back, so Space b - returns where it would without
+-- window its own alternate back, so Ctrl+^ returns where it would without
 -- the tree
 local covered, before
 local function cover()
@@ -194,9 +194,9 @@ require("nvim-tree").setup({
     end, "Back to the code")
     -- ? opens and closes the list of keys, as g? does
     map("?", api.tree.toggle_help, "Help")
-    -- Space b - switches the code to its previous file, never to the tree:
+    -- Ctrl+^ switches the code to its previous file, never to the tree:
     -- the window beside the tree, or the file a full-window tree covers
-    map("<leader>b-", function()
+    map("<C-^>", function()
       local code = code_window()
       local file
       if code then

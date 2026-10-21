@@ -159,9 +159,13 @@ map("n", "<leader>tm", markdown_preview, { desc = "Toggle markdown preview" })
 
 -- Buffers: <leader>b*
 map("n", "<leader>bl", ":ls<CR>:b ", { desc = "List buffers and pick one" })
--- The previous file is the alternate, when it is a listed buffer other than
--- this one: never the file tree or an empty placeholder, which are unlisted
-map("n", "<leader>b-", function()
+-- Ctrl+^ (Ctrl+6), Vim's previous file, switches to the alternate only when it
+-- is a listed buffer other than this one: never the file tree or an empty
+-- placeholder, which are unlisted. With a count it opens buffer N, as Vim's does
+map("n", "<C-^>", function()
+  if vim.v.count > 0 then
+    return vim.cmd.buffer(vim.v.count)
+  end
   local alternate = vim.fn.bufnr("#")
   if alternate ~= vim.api.nvim_get_current_buf() and vim.fn.buflisted(alternate) == 1 then
     vim.cmd.buffer(alternate)

@@ -43,8 +43,9 @@ dofile("nvim/lua/config/keymaps.lua")
 -- Space b l lists buffers, then waits at :b for a number or name.
 assert(fn.maparg(" bl", "n") == ":ls<CR>:b ", "Space b l: " .. fn.maparg(" bl", "n"))
 assert(fn.maparg(" bl", "n", false, true).silent == 0, "Space b l must show its :b prompt")
--- Space b - switches to the previous file, never to an unlisted buffer such as
--- the file tree or a placeholder; with none, it says so.
+-- Ctrl+^ (Ctrl+6, which Neovim also reads as <C-6>) switches to the previous
+-- file, never to an unlisted buffer such as the file tree or a placeholder;
+-- with none, it says so, and with a count it opens buffer N as Vim's does.
 do
   local one, two, scratch = api.nvim_create_buf(true, false), api.nvim_create_buf(true, false), api.nvim_create_buf(false, true)
   api.nvim_buf_set_name(one, fn.tempname() .. "/one.lua")
@@ -53,13 +54,15 @@ do
   vim.notify = function(message) said = message end
   vim.cmd.buffer(one)
   vim.cmd.buffer(two)
-  fn.maparg(" b-", "n", false, true).callback()
-  assert(api.nvim_get_current_buf() == one and said == nil, "Space b - did not switch to the previous file")
+  api.nvim_feedkeys(vim.keycode("<C-6>"), "mx", false)
+  assert(api.nvim_get_current_buf() == one and said == nil, "Ctrl+^ did not switch to the previous file")
   api.nvim_set_current_buf(scratch)
   vim.cmd.buffer(one)
-  fn.maparg(" b-", "n", false, true).callback()
+  fn.maparg("<C-^>", "n", false, true).callback()
+  assert(api.nvim_get_current_buf() == one and said == "No previous file", "Ctrl+^ to an unlisted buffer: " .. tostring(said))
+  api.nvim_feedkeys(vim.keycode(two .. "<C-^>"), "mx", false)
   vim.notify = real_notify
-  assert(api.nvim_get_current_buf() == one and said == "No previous file", "Space b - to an unlisted buffer: " .. tostring(said))
+  assert(api.nvim_get_current_buf() == two, "Ctrl+^ with a count did not open that buffer")
   vim.cmd.enew()
   for _, buf in ipairs({ one, two, scratch }) do
     api.nvim_buf_delete(buf, { force = true })
@@ -844,7 +847,7 @@ do
   tree_api.get_node_under_cursor = function() return cursor_node end
   api.nvim_win_set_buf(0, shown)
 
-  -- In the tree, Space b - switches the code to its previous file: in the
+  -- In the tree, Ctrl+^ switches the code to its previous file: in the
   -- window beside it, or for the file a full-window tree covers; with none, it
   -- says so and leaves the cursor in the tree.
   do
@@ -865,14 +868,14 @@ do
     fn.maparg("<Esc>", "n", false, true).callback()
     assert(api.nvim_get_current_win() == code_win and said == nil, "Esc from the tree beside the code")
     api.nvim_set_current_win(in_tree)
-    fn.maparg(" b-", "n", false, true).callback()
+    fn.maparg("<C-^>", "n", false, true).callback()
     assert(api.nvim_get_current_win() == code_win and api.nvim_get_current_buf() == one and said == nil,
-      "Space b - from the tree beside the code")
+      "Ctrl+^ from the tree beside the code")
     api.nvim_set_current_buf(scratch)
     vim.cmd.buffer(two) -- its alternate is unlisted, as the tree would be
     api.nvim_set_current_win(in_tree)
-    fn.maparg(" b-", "n", false, true).callback()
-    assert(api.nvim_get_current_win() == in_tree and said == "No previous file", "Space b - from the tree, no previous file")
+    fn.maparg("<C-^>", "n", false, true).callback()
+    assert(api.nvim_get_current_win() == in_tree and said == "No previous file", "Ctrl+^ from the tree, no previous file")
     vim.cmd("silent! only")
     vim.o.columns = 40
     tree_win = nil
@@ -883,14 +886,14 @@ do
     tree_win = api.nvim_get_current_win()
     local closes = count("close")
     said = nil
-    fn.maparg(" b-", "n", false, true).callback()
+    fn.maparg("<C-^>", "n", false, true).callback()
     assert(count("close") == closes + 1 and api.nvim_get_current_buf() == one and said == nil,
-      "Space b - from a full-window tree")
+      "Ctrl+^ from a full-window tree")
     handlers.TreeClose() -- the covered file is consumed with the close
     api.nvim_win_set_buf(0, tree_buf)
     tree_win = api.nvim_get_current_win()
-    fn.maparg(" b-", "n", false, true).callback()
-    assert(api.nvim_get_current_buf() == tree_buf and said == "No previous file", "Space b - from a tree covering nothing")
+    fn.maparg("<C-^>", "n", false, true).callback()
+    assert(api.nvim_get_current_buf() == tree_buf and said == "No previous file", "Ctrl+^ from a tree covering nothing")
     -- From a full-window tree, Esc gives the window back to the file it covers,
     -- and covering nothing says so.
     said = nil

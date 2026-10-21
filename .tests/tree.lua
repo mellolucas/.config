@@ -68,14 +68,14 @@ end
 local function on(name)
   return api.nvim_get_current_line():find(name, 1, true) ~= nil
 end
--- Space b - says when there is no previous file.
+-- Ctrl+^ says when there is no previous file.
 local said
 vim.notify = function(message)
   said = message
 end
 local function no_previous(label)
   said = nil
-  press(" b-")
+  press("<C-^>")
   assert(said == "No previous file", label .. ": " .. tostring(said))
 end
 
@@ -96,10 +96,10 @@ local listing = api.nvim_get_current_buf()
 api.nvim_exec_autocmds("VimEnter", {})
 expect({ "tree" }, "narrow start")
 assert(not api.nvim_buf_is_valid(listing), "narrow start keeps the directory listing")
--- Before any file, Space b - in the tree has nothing to return to, zoomed or
+-- Before any file, Ctrl+^ in the tree has nothing to return to, zoomed or
 -- not; the empty window a zoom leaves beside the tree is no file either.
-no_previous("Space b - at the start")
-expect({ "tree" }, "Space b - at the start")
+no_previous("Ctrl+^ at the start")
+expect({ "tree" }, "Ctrl+^ at the start")
 -- Esc goes back to the code; at the start there is none to go back to.
 said = nil
 press("<Esc>")
@@ -108,8 +108,8 @@ resize(200)
 expect({ "tree", "[empty]" }, "zoom at the start")
 local empty = api.nvim_win_get_buf(api.nvim_tabpage_list_wins(0)[2])
 assert(not vim.bo[empty].buflisted, "the empty window a zoom leaves is listed as a file")
-no_previous("Space b - zoomed at the start")
-expect({ "tree", "[empty]" }, "Space b - zoomed at the start")
+no_previous("Ctrl+^ zoomed at the start")
+expect({ "tree", "[empty]" }, "Ctrl+^ zoomed at the start")
 resize(40)
 expect({ "tree" }, "unzoom at the start")
 
@@ -134,7 +134,7 @@ assert(not help_window(), "? leaves the help open")
 select("a.txt")
 press("<CR>")
 expect({ "a.txt" }, "narrow open")
-no_previous("Space b - on the first file")
+no_previous("Ctrl+^ on the first file")
 assert(vim.wo.statusline ~= " ? keys", "the tree's status line stayed on a.txt")
 press("-")
 expect({ "tree" }, "narrow -")
@@ -143,20 +143,20 @@ select("b.txt")
 press("<Tab>")
 expect({ "b.txt" }, "narrow Tab")
 assert(alternate() == "a.txt", "alternate after narrow open: " .. alternate())
-press(" b-")
-expect({ "a.txt" }, "Space b - after narrow open")
+press("<C-^>")
+expect({ "a.txt" }, "Ctrl+^ after narrow open")
 press("-")
 press("<Esc>")
 expect({ "a.txt" }, "a glance at the tree")
 assert(alternate() == "b.txt", "alternate after a glance at the tree: " .. alternate())
--- From a full-window tree, Space b - switches the file it covers to that
+-- From a full-window tree, Ctrl+^ switches the file it covers to that
 -- file's previous one, handing the window back.
 press("-")
-press(" b-")
-expect({ "b.txt" }, "Space b - from a full-window tree")
-assert(alternate() == "a.txt", "alternate after Space b - from the tree: " .. alternate())
-press(" b-")
-expect({ "a.txt" }, "Space b - back")
+press("<C-^>")
+expect({ "b.txt" }, "Ctrl+^ from a full-window tree")
+assert(alternate() == "a.txt", "alternate after Ctrl+^ from the tree: " .. alternate())
+press("<C-^>")
+expect({ "a.txt" }, "Ctrl+^ back")
 
 -- 110 columns bring the tree beside the code, leaving the cursor in it;
 -- 109 hand the window back to the code, and widening again brings it back.
@@ -216,10 +216,10 @@ expect({ "tree", "a.txt" }, "zoomed open")
 assert(current() == "a.txt" and alternate() == "c.txt", "zoomed open: " .. current() .. ", alternate " .. alternate())
 press("-")
 assert(current() == "tree" and on("a.txt"), "- does not land on the open file")
--- From the sidebar, Space b - switches the code beside it and goes there.
-press(" b-")
-expect({ "tree", "c.txt" }, "Space b - from the sidebar")
-assert(current() == "c.txt", "Space b - from the sidebar left the cursor in the tree")
+-- From the sidebar, Ctrl+^ switches the code beside it and goes there.
+press("<C-^>")
+expect({ "tree", "c.txt" }, "Ctrl+^ from the sidebar")
+assert(current() == "c.txt", "Ctrl+^ from the sidebar left the cursor in the tree")
 -- From the sidebar, Esc goes back to the code beside it.
 press("-")
 assert(current() == "tree" and on("c.txt"), "- from the code beside the sidebar")
@@ -236,8 +236,8 @@ select("c.txt")
 press("<C-v>")
 expect({ "tree", "c.txt" }, "narrow Ctrl+V")
 -- A window split from the tree's own never returns to the tree.
-no_previous("Space b - in a split from the tree")
-expect({ "tree", "c.txt" }, "Space b - in a split from the tree")
+no_previous("Ctrl+^ in a split from the tree")
+expect({ "tree", "c.txt" }, "Ctrl+^ in a split from the tree")
 resize(60)
 expect({ "tree", "c.txt" }, "a resize within the narrow window")
 resize(200)
