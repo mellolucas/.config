@@ -942,6 +942,10 @@ do
   -- folder and leaves the root line alone. l and h stay Vim's own motions.
   api.nvim_buf_call(tree_buf, function()
     assert(fn.maparg("l", "n") == "" and fn.maparg("h", "n") == "", "l or h is mapped in the tree")
+    -- Space previews at once in the tree (the leader elsewhere), in normal mode only
+    local space = fn.maparg("<Space>", "n", false, true)
+    assert(space.buffer == 1 and space.nowait == 1 and fn.maparg("<Space>", "x") == "",
+      "Space in the tree: " .. vim.inspect(space))
     local folder = { name = "src", absolute_path = "/p/src", type = "directory", nodes = {}, open = true, parent = {} }
     cursor_node = folder
     fn.maparg("<Left>", "n", false, true).callback()
