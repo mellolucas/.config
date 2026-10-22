@@ -1,8 +1,9 @@
 -- File tree: nvim-tree, with mini.icons drawing its icons in the colorscheme's
 -- colors. A sidebar when the window has room beside the code; otherwise it
 -- takes the window and hands it to the file you open. Widening or narrowing
--- the window (Option+z) switches between the two. Directory buffers stay
--- Neovim's own (:edit DIR, :Explore); only starting on a directory opens it.
+-- the window (Cmd+Shift+Enter zooms the pane) switches between the two.
+-- Directory buffers stay Neovim's own (:edit DIR, :Explore); only starting on
+-- a directory opens it.
 local ok, err = pcall(vim.pack.add, {
   { src = "https://github.com/nvim-tree/nvim-tree.lua" },
   { src = "https://github.com/nvim-mini/mini.icons" },
@@ -318,10 +319,11 @@ vim.api.nvim_create_autocmd("VimEnter", {
   end,
 })
 
--- Widening (Option+z zooms the editor) turns a full-window tree into the
--- sidebar, or brings the sidebar back; narrowing hands the window back to the
--- code, unless only empty windows sit beside the tree. Each tab page keeps its
--- own width state and catches up on entering, after resizes made elsewhere.
+-- Widening (Cmd+Shift+Enter zooms the editor's pane) turns a full-window tree
+-- into the sidebar, or brings the sidebar back; narrowing hands the window back
+-- to the code, unless only empty windows sit beside the tree. Each tab page
+-- keeps its own width state and catches up on entering, after resizes made
+-- elsewhere.
 vim.t.tree_narrow = narrow()
 vim.api.nvim_create_autocmd({ "VimResized", "TabEnter" }, {
   nested = true, -- the tree's own window and buffer events run too
