@@ -78,6 +78,7 @@ map("n", "<leader>td", function()
   local config = vim.diagnostic.config()
   vim.diagnostic.config({ virtual_text = not config.virtual_text })
 end, { desc = "Toggle inline diagnostics" })
+map("n", "<leader>tu", "<cmd>packadd nvim.undotree | Undotree<CR>", { desc = "Toggle undo tree" })
 -- Markdown preview: swaps the current window between markdown source and a glow
 -- render of the file on disk, shown in a terminal with no process behind it: it
 -- displays glow's ANSI colors, and no "[Process exited]" line follows them.

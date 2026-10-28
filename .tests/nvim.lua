@@ -228,6 +228,21 @@ do
   vim.g.clipboard = real_clipboard
 end
 
+-- Space t u opens the undo tree beside the code, and again closes it.
+do
+  vim.cmd("silent! only")
+  local code = api.nvim_get_current_win()
+  press("<Space>tu")
+  local layout = fn.winlayout()
+  assert(vim.bo.filetype == "nvim-undotree" and layout[1] == "row" and #layout[2] == 2,
+    "Space t u opened " .. vim.inspect(vim.bo.filetype) .. " in " .. vim.inspect(layout))
+  -- Neovim's loop runs between two presses, where the tree places its cursor
+  vim.wait(0)
+  press("<Space>tu")
+  assert(#api.nvim_tabpage_list_wins(0) == 1 and api.nvim_get_current_win() == code,
+    "a second Space t u left " .. vim.inspect(fn.winlayout()))
+end
+
 -- Space t m swaps the window for glow's render of the saved file (here a
 -- stand-in that bolds each line, shown as text rather than escape codes); i
 -- there stays in normal mode, as the render takes no input, and q brings back

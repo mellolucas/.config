@@ -82,6 +82,7 @@ Command keys do what they do in every Mac app. They reach Neovim through Ghostty
 | `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
 | `:q` / `ZZ` / `ZQ` | Quit / save and quit / quit without saving |
 | `Space t w` / `Space t d` | Toggle wrap / inline diagnostics |
+| `Space t u` | Toggle the undo tree beside the code; moving through it brings back each earlier version, even one undone and typed over |
 | `Ctrl+L` | Clear search highlighting until the next search |
 | `Space c f` | Format with the language server |
 | `Space d q` | Diagnostics into the quickfix list |
