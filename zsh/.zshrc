@@ -180,7 +180,7 @@ if command -v glow >/dev/null 2>&1; then
   # its subcommands; zsh reads this whole block before the alias above exists,
   # hence the style spelled out
   mdv() {
-    if [[ $1 == (-h|--help) ]]; then
+    if (( ${argv[(I)(-h|--help)]} )); then
       print -r -- 'usage: mdv FILE...'
       print -r -- "Render Markdown in the pager; glow's options pass through (glow --help lists them)."
       return 0

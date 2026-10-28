@@ -2,7 +2,7 @@
 
 emulate -L zsh
 
-if [[ $1 == (-h|--help) ]]; then
+if (( ${argv[(I)(-h|--help)]} )); then
   print -r -- 'usage: fzfv [FZF_OPTIONS...]'
   print -r -- 'Pick a file below here, each previewed; Enter opens it in your editor.'
   print -r -- "fzf's options pass through (fzf --help lists them)."

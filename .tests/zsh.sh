@@ -594,15 +594,14 @@ expect $'editor\n--clean\n--\n-c quit | touch should-not-run' "$(recorded)" 'edi
   [[ ! -e "$test_root/injected" ]] || fail 'fzfv evaluated editor command substitution'
 )
 
-# fzfv and mdv print their own usage, running neither fzf nor glow.
+# fzfv and mdv print their own usage for -h or --help anywhere among their
+# arguments (help mdv FILE puts it last), running neither fzf nor glow.
 (
   source /dev/stdin <<< "$alias_block"
   /bin/rm -f "$test_root/call"
-  for helper in fzfv mdv; do
-    for flag in -h --help; do
-      output=$($helper "$flag") || fail "$helper $flag status"
-      [[ $output == "usage: $helper "* ]] || fail "$helper $flag: $output"
-    done
+  for helper args in fzfv -h fzfv --help fzfv '-q x --help' mdv -h mdv --help mdv 'notes.md --help'; do
+    output=$($helper ${=args}) || fail "$helper $args status"
+    [[ $output == "usage: $helper "* ]] || fail "$helper $args: $output"
   done
   [[ ! -e $test_root/call ]] || fail "usage ran: $(recorded)"
 )
