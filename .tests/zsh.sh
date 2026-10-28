@@ -293,7 +293,8 @@ STUB
 
 # The card lists the repository's tasks, the worktrees workspace --task opens
 # on task/ branches, by name: as many as fit the card, each cut short with …
-# past 30 columns, and not the one it shows. Without any, there is no row.
+# past 30 columns, and not the one it shows, nor one whose folder is gone.
+# Without any, there is no row.
 (
   for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
   export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null LC_ALL=C.UTF-8
@@ -312,18 +313,41 @@ STUB
     card=$(COLUMNS=$1 git-glance) || fail "git-glance status at $1 columns"
     lines=(${(f)card//$'\e'\[[0-9;]#m})
     for line in $lines; do
-      (( ${#line} <= $1 )) || fail "git-glance line wider than $1 columns: $line"
+      (( ${(m)#line} <= $1 )) || fail "git-glance line wider than $1 columns: $line"
     done
     print -r -- ${(M)lines:#tasks *}
   }
   expect '' "$(tasks_row 80)" 'tasks row without tasks'
   long=a-task-name-long-enough-to-be-cut-short
-  for task in beta alpha $long; do git worktree add -q -b task/$task ../project.worktrees/$task; done
+  for task in beta alpha $long gone; do git worktree add -q -b task/$task ../project.worktrees/$task; done
+  /bin/rm -rf ../project.worktrees/gone
   git branch task/without-worktree
   expect 'tasks     a-task-name-long-enough-to-be… · alpha · beta' "$(tasks_row 80)" 'tasks row'
   expect 'tasks     a-task-name-long-enough-to-be…' "$(tasks_row 40)" 'tasks row at 40 columns'
   builtin cd ../project.worktrees/alpha
   expect 'tasks     a-task-name-long-enough-to-be… · beta' "$(tasks_row 80)" "another task's tasks row"
+)
+
+# Most CJK characters take two cells: at 40 columns, a wide branch name and
+# subject are cut by the cells they take, and no line is wider than the card.
+(
+  for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null LC_ALL=C.UTF-8
+  export GIT_AUTHOR_NAME=Tester GIT_AUTHOR_EMAIL=tester@example.com
+  export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=tester@example.com
+  setopt extendedglob
+  path=("$test_root/git-bin")
+  autoload -Uz git-glance
+  git init -q -b 機能/とても長いブランチの名前です "$HOME/code/owner/wide"
+  builtin cd "$HOME/code/owner/wide"
+  git commit -q --allow-empty -m 'カードの幅より長い日本語の件名がここにあります'
+  card=$(COLUMNS=40 git-glance) || fail 'git-glance status with wide text'
+  lines=(${(f)card//$'\e'\[[0-9;]#m})
+  for line in $lines; do
+    (( ${(m)#line} <= 40 )) || fail "git-glance line wider than 40 columns: $line"
+  done
+  [[ ${(M)lines:#branch *} == 'branch    機能/とても'*'… → no upstream' ]] || fail "wide branch row: ${(F)lines}"
+  [[ ${(M)lines:#$(git log -1 --format=%h) *} == *' カードの'*'… · '* ]] || fail "wide commit line: ${(F)lines}"
 )
 
 (

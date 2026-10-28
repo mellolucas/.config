@@ -85,29 +85,41 @@ local -a stashes others tasks
 stashes=(${(f)"$(git stash list --format='%gs')"})
 others=(${(f)"$(git for-each-ref refs/heads --count=6 --sort=-committerdate --format='%(refname:short)')"})
 others=(${others:#$branch})
-# Tasks with a worktree (workspace --task), but this one
-tasks=(${(f)"$(git for-each-ref --format='%(if)%(worktreepath)%(then)%(refname:strip=3)%(end)' refs/heads/task/)"})
+# Tasks with a worktree (workspace --task), but this one and those whose
+# folder is gone
+for line in ${(f)"$(git for-each-ref --format='%(if)%(worktreepath)%(then)%(refname:strip=3)%09%(worktreepath)%(end)' refs/heads/task/)"}; do
+  [[ ! -d ${line#*$'\t'} ]] || tasks+=("${line%%$'\t'*}")
+done
 [[ $branch != task/* ]] || tasks=(${tasks:#${branch#task/}})
 
 # The card fits the window, 40 to 100 columns wide (80 without one): truncate
 # visible text first, %-escape after, so prompt escapes stay zero-width and no
-# printed line exceeds the width
+# printed line exceeds the width. Text is measured in the cells it takes,
+# two for most CJK characters
 local -i width=${COLUMNS:-0}
 (( width > 0 )) || width=80
 (( width >= 40 )) || width=40
 (( width <= 100 )) || width=100
+# Cuts the text in the variable named $1 to $2 cells, ending it with …
+_git-glance-fit() {
+  local text=${(P)1}
+  (( ${(m)#text} > $2 )) || return 0
+  text=${text[1,$2 - 1]}
+  while (( ${(m)#text} > $2 - 1 )); do text=${text[1,-2]}; done
+  : ${(P)1::=$text…}
+}
 local repo=${toplevel:h:t}/${toplevel:t}
-(( ${#repo} > width - 20 )) && repo="${repo[1,width - 21]}…"
+_git-glance-fit repo $(( width - 20 ))
 
 # The branch row keeps its ↑/↓ counts: the upstream gives way first, down to
 # 8 columns, then the branch
-local -i room=$(( width - 13 - ${#ahead} - ${#behind} ))
-local -i keep=$(( room - ${#branch} ))
+local -i room=$(( width - 13 - ${(m)#ahead} - ${(m)#behind} ))
+local -i keep=$(( room - ${(m)#branch} ))
 (( keep >= 8 )) || keep=8
-(( ${#upstream} <= keep )) || upstream="${upstream[1,keep - 1]}…"
-keep=$(( room - ${#${upstream:-no upstream}} ))
+_git-glance-fit upstream $keep
+keep=$(( room - ${(m)#${upstream:-no upstream}} ))
 (( keep >= 1 )) || keep=1
-(( ${#branch} <= keep )) || branch="${branch[1,keep - 1]}…"
+_git-glance-fit branch $keep
 local track="→ ${${upstream:-no upstream}//\%/%%}"
 [[ -z $ahead ]]  || track+="%F{green}$ahead%f"
 [[ -z $behind ]] || track+="%F{red}$behind%f"
@@ -129,7 +141,7 @@ for item in $wt; do
 done
 
 local stash=${stashes[1]:-} nstash=$#stashes
-(( ${#stash} > width - 13 - $#nstash )) && stash="${stash[1,width - 14 - $#nstash]}…"
+_git-glance-fit stash $(( width - 13 - $#nstash ))
 
 # The branches and tasks rows: names cut to 30 columns, as many as fit
 local list name
@@ -140,15 +152,15 @@ others=($others[1,4])
 for list in others tasks; do
   shown=() used=0
   for name in ${(P)list}; do
-    (( ${#name} > 30 )) && name="${name[1,29]}…"
-    (( used += ${#name} + (used ? 3 : 0) ))
+    _git-glance-fit name 30
+    (( used += ${(m)#name} + (used ? 3 : 0) ))
     (( used > width - 10 )) && break
     shown+=("${name//\%/%%}")
   done
   rows[$list]=${(j: · :)shown}
 done
 
-local -i pad=$(( width - ${#repo} - ${#fetched} ))
+local -i pad=$(( width - ${(m)#repo} - ${#fetched} ))
 # Push earlier output into scrollback; captured cards must not control the terminal.
 if [[ $ZSH_SUBSHELL == 0 && -t 1 ]] && (( ${+commands[tput]} )); then
   local canvas_rows canvas_home
@@ -174,10 +186,10 @@ if git rev-parse -q --verify HEAD >/dev/null 2>&1; then
   git --no-pager log -3 --no-show-signature --format='%h%x1f%s%x1f%ar%x1f%aN' |
     while IFS=$'\x1f' read -r hash subject when who; do
       tail=" · $when by $who"
-      (( ${#hash} + 21 + ${#tail} <= width )) || tail=" · $when"
-      room=$(( width - ${#hash} - 1 - ${#tail} ))
+      (( ${#hash} + 21 + ${(m)#tail} <= width )) || tail=" · $when"
+      room=$(( width - ${#hash} - 1 - ${(m)#tail} ))
       (( room >= 10 )) || { tail=''; room=$(( width - ${#hash} - 1 )) }
-      (( ${#subject} > room )) && subject="${subject[1,room - 1]}…"
+      _git-glance-fit subject $room
       print -rP -- "%F{yellow}$hash%f ${subject//\%/%%}%F{8}${tail//\%/%%}%f"
     done
 fi
