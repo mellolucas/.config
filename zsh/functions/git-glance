@@ -23,8 +23,9 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
   return 1
 }
 
-local gitdir toplevel branch
+local gitdir commondir toplevel branch
 gitdir=$(git rev-parse --absolute-git-dir)
+commondir=$(git rev-parse --path-format=absolute --git-common-dir)
 toplevel=$(git rev-parse --show-toplevel)
 branch=$(git symbolic-ref --short -q HEAD) ||
   branch="detached @ $(git rev-parse --short HEAD 2>/dev/null || print -- unborn)"
@@ -44,7 +45,8 @@ fi
 
 local fetched='never fetched'
 local -a mtime
-if zstat -A mtime +mtime "$gitdir/FETCH_HEAD" 2>/dev/null; then
+# Worktrees share the main repository's fetches
+if zstat -A mtime +mtime "$commondir/FETCH_HEAD" 2>/dev/null; then
   local -i age=$(( EPOCHSECONDS - mtime[1] ))
   if   (( age < 3600 ));  then fetched="fetched $(( age / 60 ))m ago"
   elif (( age < 86400 )); then fetched="fetched $(( age / 3600 ))h ago"

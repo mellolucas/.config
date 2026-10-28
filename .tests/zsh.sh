@@ -192,6 +192,12 @@ STUB
     [[ $line == "$long_hash $shown…$tail" && $long == "$shown"?* ]] ||
       fail "cut commit line at $columns columns: $line"
   done
+  # A linked worktree shares its repository's fetches.
+  : > .git/FETCH_HEAD
+  git worktree add -q ../worktree
+  builtin cd ../worktree
+  card=$(git-glance) || fail 'git-glance status in a linked worktree'
+  [[ $card == *'fetched 0m ago'* ]] || fail "git-glance fetch age in a linked worktree: $card"
 )
 
 (
