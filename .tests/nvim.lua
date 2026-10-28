@@ -357,15 +357,21 @@ load_config(setmetatable({ pack = false }, { __index = vim }))
 assert(not vim.tbl_contains(required, "config.explorer") and not vim.tbl_contains(required, "config.lsp"),
   "older Neovim: " .. vim.inspect(required))
 
--- An offline first launch warns and keeps netrw on -.
+-- An offline first launch warns and keeps netrw on -; the language servers
+-- warn too, rather than fail.
 do
-  local real_pack, real_notify, warned = vim.pack, vim.notify, nil
+  local real_pack, real_notify, said = vim.pack, vim.notify, {}
   vim.pack = { add = function() error("offline") end }
-  vim.notify = function(message) warned = message end
+  vim.notify = function(message, level) said[#said + 1] = { message, level } end
   dofile("nvim/lua/config/explorer.lua")
+  local loaded, err = pcall(dofile, "nvim/lua/config/lsp.lua")
   vim.pack, vim.notify = real_pack, real_notify
-  assert(warned and warned:find("offline", 1, true), "file tree failure warning: " .. tostring(warned))
+  local tree, servers = unpack(said)
+  assert(tree and tree[1]:find("offline", 1, true), "file tree failure warning: " .. vim.inspect(said))
   assert(fn.maparg("-", "n", false, true).desc == "Up to this file's folder", "netrw stays on -")
+  assert(loaded, "language servers offline: " .. tostring(err))
+  assert(servers and servers[1]:find("Language servers unavailable", 1, true) and servers[2] == vim.log.levels.WARN,
+    "language servers failure warning: " .. vim.inspect(said))
 end
 
 -- :grep runs grepprg through the shell: an unmatched zsh glob would silently

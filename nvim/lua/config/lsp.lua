@@ -1,7 +1,11 @@
 -- Source language server configs from nvim-lspconfig
-vim.pack.add({
+local ok, err = pcall(vim.pack.add, {
   { src = "https://github.com/neovim/nvim-lspconfig" }
 })
+if not ok then
+  vim.notify("Language servers unavailable: " .. tostring(err), vim.log.levels.WARN)
+  return
+end
 
 -- Native overrides to extend language server provided configs
 vim.lsp.config("lua_ls", {
