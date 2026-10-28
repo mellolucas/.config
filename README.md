@@ -28,7 +28,7 @@ Open Ghostty, then:
 3. Log in to each agent you use (`opencode`, `claude`, `copilot`, `codex`) through its own flow.
 4. If you use Time Machine, run `tmutil addexclusion ~/.cache` once: it skips `~/Library/Caches` but not `~/.cache`.
 5. Run `dotfiles doctor`: it checks the links, login shell, Homebrew, tools, GitHub login, and Git identity, names a fix for each problem, notes stray files in your home folder, and ends with "no problems found" once everything is in place.
-6. In a project, run `workspace`; run `keys` to see everything else this setup adds.
+6. In a project, run `workspace`; `keys start` shows the essentials in a minute, and `keys` everything else.
 
 ## Daily use
 

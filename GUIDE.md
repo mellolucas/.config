@@ -6,6 +6,25 @@ A field guide to the shortcuts this setup adds. Run `keys` to browse its pages w
 
 Each tool also lists its own keys: `:nmap` in Neovim, `Cmd+Shift+P` in Ghostty, `Ctrl+Option+K` in OpenCode.
 
+## Start: Get going in a minute
+
+The essentials, each a door to the pages that follow.
+
+| Run or press | Result |
+| --- | --- |
+| `workspace` | This project's editor, agent, and shells in one tab |
+| `v FILE` | Edit in Neovim: `Cmd+S` saves, `Cmd+/` comments, `-` shows the file tree |
+| `Cmd+D` / `Cmd+Option+arrows` | Split the pane / move between panes and Neovim's windows |
+| `gg` | This repository at a glance: branch, changes, recent commits |
+| `fzfv` | Find a file by name, with a preview; Enter opens it |
+| `rgv TEXT` | Every matching line, file by file; Enter opens them in Neovim |
+| `cd **` then `Tab` | Fuzzy-pick a directory below here |
+| `keys WORDS` | Search this guide, as in `keys close tab` |
+
+- `Esc` then a key stands in for Alt, since Option types characters: `Esc` then `c` picks a directory with a preview of each, and `Esc` then `.` inserts the last command's last word.
+- `help COMMAND` shows any command's help; for an alias, what it runs comes first.
+- When a week has passed since the last update, the first shell of the day says so: run `dotsup`.
+
 ## Workspace: Start a workspace
 
 Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: editor left, two shells in the middle, agent right; the lean layout gives the editor and the agent half the width each.
