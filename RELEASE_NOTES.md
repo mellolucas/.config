@@ -99,9 +99,10 @@ Changes since `v0.0.1`.
 - In `HOMEBREW_CASK_OPTS`, write `--appdir=/path`; Homebrew ignores
   `--appdir /path`.
 - Agent homes moved to `~/.local/share/copilot`, `codex`, and `claude`. On a
-  machine set up earlier, quit the agents and move `~/.copilot` and `~/.codex`
-  there (first remove the empty `codex` folder `dotfiles link` creates), and
-  `~/.claude` to `claude` with `~/.claude.json` inside it; Claude Code may ask
+  machine set up earlier, quit the agents and replace those folders, which
+  `dotfiles link` creates to hold the shared instructions, with `~/.copilot`,
+  `~/.codex`, and `~/.claude`, moving `~/.claude.json` into `claude`; then run
+  `dotfiles link` to link the instructions inside again. Claude Code may ask
   you to log in again. Links that already point there can simply be removed.
   Move Codex's `*.sqlite*` files to `~/.local/state/codex` while Codex is
   stopped.
