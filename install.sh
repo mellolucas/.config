@@ -700,155 +700,173 @@ version_at_least() {
   [ "$major" -eq "$floor_major" ] && [ "$minor" -ge "$floor_minor" ]
 }
 
-print_version_check() {
-  version=$1
-  floor_major=$2
-  floor_minor=$3
+# Doctor's report: a mark, an aligned label, then the finding and its fix.
+doctor_line() {
+  printf '%s %-18s %s\n' "$1" "$2" "$3"
+}
 
-  if [ -z "$version" ]; then
-    printf 'version unknown (want >= %s.%s)\n' "$floor_major" "$floor_minor"
-    return 0
+doctor_ok() {
+  doctor_line "$mark_ok" "$1" "$2"
+}
+
+doctor_note() {
+  doctor_line "$mark_note" "$1" "$2"
+}
+
+doctor_problem() {
+  doctor_line "$mark_problem" "$1" "$2"
+  problems=$((problems + 1))
+}
+
+# Paths under $HOME, shortened to ~
+tilde() {
+  # shellcheck disable=SC2088 # a literal ~, for display
+  case "$1" in
+    "$HOME"/*) printf '~/%s' "${1#"$HOME"/}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+doctor_link() {
+  if state=$(print_link_state "$2" "$3"); then
+    doctor_ok "$1" "$(tilde "$3")"
+  else
+    doctor_link_problem "$1" "$state"
   fi
+}
 
+doctor_link_problem() {
+  case "$2" in
+    'in place'*) doctor_problem "$1" "$2" ;;
+    *) doctor_problem "$1" "$2; run: dotfiles link" ;;
+  esac
+}
+
+# Arguments: label, version, the oldest supported major and minor, and the fix.
+doctor_version() {
   version_status=0
-  version_at_least "$version" "$floor_major" "$floor_minor" || version_status=$?
-
+  version_at_least "$2" "$3" "$4" || version_status=$?
   case "$version_status" in
-    0) printf '%s (>= %s.%s)\n' "$version" "$floor_major" "$floor_minor" ;;
-    2) printf 'version unparseable (want >= %s.%s)\n' "$floor_major" "$floor_minor" ;;
-    *)
-      printf '%s (< %s.%s; upgrade recommended)\n' "$version" "$floor_major" "$floor_minor"
-      return 1
-      ;;
+    0) doctor_ok "$1" "$2" ;;
+    2) doctor_note "$1" "version unknown (want $3.$4 or newer)" ;;
+    *) doctor_problem "$1" "$2, older than $3.$4; run: $5" ;;
   esac
 }
 
 doctor_dotfiles() {
   problems=0
-  printf 'dotfiles repo: %s\n' "$repo_dir"
-  printf 'XDG_CONFIG_HOME: %s\n' "$xdg_config_home"
-
-  printf 'dotfiles command: '
-  if command -v dotfiles >/dev/null 2>&1; then
-    command -v dotfiles
+  if [ -t 1 ]; then
+    mark_ok=$(printf '\033[32m✓\033[m')
+    mark_problem=$(printf '\033[31m✗\033[m')
+    mark_note=$(printf '\033[33m!\033[m')
   else
-    printf 'missing\n'
-    problems=$((problems + 1))
+    mark_ok='✓' mark_problem='✗' mark_note='!'
+  fi
+  printf 'dotfiles %s, linked into %s\n\n' "$(tilde "$repo_dir")" "$(tilde "$xdg_config_home")"
+
+  if command_path=$(command -v dotfiles); then
+    doctor_ok 'dotfiles command' "$(tilde "$command_path")"
+  else
+    doctor_problem 'dotfiles command' "missing; run: $(tilde "$repo_dir")/install.sh link"
   fi
 
-  printf 'Homebrew: '
-  if brew=$(brew_bin 2>/dev/null); then
-    printf '%s\n' "$brew"
-  else
-    printf 'missing; run: dotfiles install\n'
-    problems=$((problems + 1))
-  fi
-
-  printf 'Brewfile: '
-  brewfile="${HOMEBREW_BUNDLE_FILE_GLOBAL:-$xdg_config_home/homebrew/Brewfile}"
-  if [ -f "$brewfile" ]; then
-    printf '%s\n' "$brewfile"
-  else
-    printf 'missing\n'
-    problems=$((problems + 1))
-  fi
-
-  if npmrc=$(npm_global_config); then
-    printf 'npm global config %s: ' "$npmrc"
-    if [ -e "$npmrc" ] && [ ! -L "$npmrc" ]; then
-      printf 'this machine'\''s own (kept)\n'
+  # Loops run in this shell, not a pipe, so their problems count.
+  links=0
+  for src in "$repo_dir"/*; do
+    [ -d "$src" ] || continue
+    if state=$(print_link_state "$src" "$xdg_config_home/${src##*/}"); then
+      links=$((links + 1))
     else
-      print_link_state "$repo_dir/homebrew/npmrc" "$npmrc" || problems=$((problems + 1))
+      doctor_link_problem "link ${src##*/}" "$state"
     fi
-  fi
+  done
+  for dest in "$xdg_config_home"/*; do
+    is_orphaned_link "$dest" || continue
+    doctor_problem "link ${dest##*/}" 'orphaned; run: dotfiles link'
+  done
+  [ "$links" -eq 0 ] || doctor_ok links "$links in $(tilde "$xdg_config_home")"
 
-  printf 'zsh entrypoint ~/.zshenv: '
-  if [ -f "$repo_dir/zsh/.zshenv" ]; then
-    print_link_state "$repo_dir/zsh/.zshenv" "$HOME/.zshenv" || problems=$((problems + 1))
-  else
-    printf 'no source at %s\n' "$repo_dir/zsh/.zshenv"
-    problems=$((problems + 1))
-  fi
+  doctor_link 'zsh entrypoint' "$repo_dir/zsh/.zshenv" "$HOME/.zshenv"
 
-  printf 'login shell: '
   shell=$(login_shell || true)
   case "$shell" in
-    */zsh) printf '%s\n' "$shell" ;;
-    '') printf 'unknown\n' ;;
+    */zsh) doctor_ok 'login shell' "$shell" ;;
+    '') doctor_note 'login shell' 'unknown' ;;
     *)
-      # shellcheck disable=SC2016 # the hint shows the command to type
-      printf '%s; run: chsh -s "$(command -v zsh)"\n' "$shell"
-      problems=$((problems + 1))
+      # shellcheck disable=SC2016 # the fix shows the command to type
+      doctor_problem 'login shell' "$shell"'; run: chsh -s "$(command -v zsh)"'
       ;;
   esac
 
-  # Loops run in this shell, not a pipe, so their problems count.
-  for src in "$repo_dir"/*; do
-    [ -d "$src" ] || continue
-    name=${src##*/}
-    printf 'link %s: ' "$name"
-    print_link_state "$src" "$xdg_config_home/$name" || problems=$((problems + 1))
-  done
+  # Any command that needs Homebrew's Ruby shows whether it runs; a network
+  # that blocks its downloads can stop it while every host still answers.
+  if ! brew=$(brew_bin 2>/dev/null); then
+    doctor_problem Homebrew 'missing; run: dotfiles install'
+  elif brew_error=$(HOMEBREW_NO_AUTO_UPDATE=1 "$brew" config 2>&1 >/dev/null); then
+    doctor_ok Homebrew "$(tilde "$brew")"
+  else
+    # shellcheck disable=SC2016 # sed's $ is the last line
+    doctor_problem Homebrew "can't run: $(printf '%s\n' "$brew_error" | sed -n '/[^[:space:]]/h; ${x;p;}')"
+    doctor_line ' ' '' 'if a download failed, see Network access in the README'
+  fi
 
-  for dest in "$xdg_config_home"/*; do
-    is_orphaned_link "$dest" || continue
-    printf 'link %s: orphaned; dotfiles link removes it\n' "${dest##*/}"
-    problems=$((problems + 1))
-  done
+  brewfile="${HOMEBREW_BUNDLE_FILE_GLOBAL:-$xdg_config_home/homebrew/Brewfile}"
+  if [ -f "$brewfile" ]; then
+    doctor_ok Brewfile "$(tilde "$brewfile")"
+  else
+    doctor_problem Brewfile "missing at $(tilde "$brewfile")"
+  fi
 
-  printf 'ghostty: '
+  if npmrc=$(npm_global_config); then
+    if [ -e "$npmrc" ] && [ ! -L "$npmrc" ]; then
+      doctor_ok 'npm global config' "$(tilde "$npmrc"), this machine's own"
+    else
+      doctor_link 'npm global config' "$repo_dir/homebrew/npmrc" "$npmrc"
+    fi
+  fi
+
   if command -v ghostty >/dev/null 2>&1; then
-    version=$(ghostty +version 2>/dev/null | awk 'NR == 1 { print $2 }' || true)
-    print_version_check "$version" 1 3 || problems=$((problems + 1))
+    doctor_version ghostty "$(ghostty +version 2>/dev/null | awk 'NR == 1 { print $2 }' || true)" 1 3 'brew upgrade ghostty'
   elif is_darwin; then
-    printf 'not found; run: dotfiles bundle\n'
-    problems=$((problems + 1))
-  else
-    printf 'not found\n'
+    doctor_problem ghostty 'missing; run: dotfiles bundle'
   fi
 
-  printf 'nvim: '
   if command -v nvim >/dev/null 2>&1; then
-    version=$(nvim --version 2>/dev/null | awk 'NR == 1 { sub(/^v/, "", $2); print $2 }' || true)
-    print_version_check "$version" 0 12 || problems=$((problems + 1))
+    doctor_version nvim "$(nvim --version 2>/dev/null | awk 'NR == 1 { sub(/^v/, "", $2); print $2 }' || true)" 0 12 'brew upgrade neovim'
   else
-    printf 'not found; run: dotfiles bundle\n'
-    problems=$((problems + 1))
+    doctor_problem nvim 'missing; run: dotfiles bundle'
   fi
 
-  printf 'tmux: '
   if command -v tmux >/dev/null 2>&1; then
     # Releases carry a letter (3.7c); development builds a prefix (next-3.8).
     # From 3.6, panes get truecolor and light/dark notifications by themselves.
-    version=$(tmux -V 2>/dev/null | awk '{ sub(/^next-/, "", $2); sub(/[a-z]+$/, "", $2); print $2 }' || true)
-    print_version_check "$version" 3 6 || problems=$((problems + 1))
+    doctor_version tmux "$(tmux -V 2>/dev/null | awk '{ sub(/^next-/, "", $2); sub(/[a-z]+$/, "", $2); print $2 }' || true)" 3 6 'brew upgrade tmux'
   else
-    printf 'not found; run: dotfiles bundle\n'
-    problems=$((problems + 1))
+    doctor_problem tmux 'missing; run: dotfiles bundle'
   fi
 
-  printf 'gh: '
-  if command -v gh >/dev/null 2>&1; then
-    command -v gh
-    printf 'gh auth: '
-    if gh auth status >/dev/null 2>&1; then
-      printf 'authenticated\n'
-    else
-      printf 'not authenticated; run: gh auth login\n'
-      problems=$((problems + 1))
-    fi
+  if ! command -v gh >/dev/null 2>&1; then
+    doctor_problem 'GitHub CLI' 'missing; run: dotfiles bundle'
+  elif gh auth status >/dev/null 2>&1; then
+    doctor_ok 'GitHub CLI' 'logged in'
   else
-    printf 'missing; run: dotfiles bundle\n'
-    problems=$((problems + 1))
+    doctor_problem 'GitHub CLI' 'not logged in, or GitHub unreachable; run: gh auth status'
   fi
 
   # Git refuses commits until an identity exists (user.useConfigOnly).
-  printf 'git identity: '
   if git_identity; then
-    printf 'set\n'
+    doctor_ok 'Git identity' 'set'
   else
-    printf 'missing; copy %s to personal (or work) beside it and fill it in\n' "$xdg_config_home/git/config.d/personal.example"
-    problems=$((problems + 1))
+    doctor_problem 'Git identity' "missing; copy $(tilde "$xdg_config_home")/git/config.d/personal.example to personal (or work) beside it and fill it in"
+  fi
+
+  if is_darwin; then
+    if clt=$(xcode-select -p 2>/dev/null); then
+      doctor_ok 'Xcode CLT' "$clt"
+    else
+      doctor_problem 'Xcode CLT' 'missing; run: xcode-select --install'
+    fi
+    is_admin || doctor_note casks "go to $(tilde "$HOME/Applications"), as this user isn't an admin"
   fi
 
   # Hidden entries the layout expects in $HOME: the hidden top level of each
@@ -875,41 +893,21 @@ doctor_dotfiles() {
     outside="$outside $name"
   done
   if [ -n "$outside" ]; then
-    printf 'home: outside the XDG layout:%s\n' "$outside"
-    problems=$((problems + 1))
+    doctor_note home "outside the XDG layout:$outside; move or delete what you don't use"
   else
-    printf 'home: nothing outside the XDG layout\n'
+    doctor_ok home 'nothing outside the XDG layout'
   fi
   for name in .zshrc .zprofile; do
-    if [ -e "$HOME/$name" ]; then
-      printf 'home %s: ignored while this repo sets ZDOTDIR; move wanted lines to %s\n' \
-        "$name" "$xdg_config_home/zsh/local.zsh"
-    fi
+    # shellcheck disable=SC2088 # a literal ~, for display
+    [ ! -e "$HOME/$name" ] ||
+      doctor_note "~/$name" "ignored while this repo sets ZDOTDIR; move wanted lines to $(tilde "$xdg_config_home")/zsh/local.zsh"
   done
-
-  if is_darwin; then
-    printf 'Xcode CLT: '
-    if xcode-select -p >/dev/null 2>&1; then
-      xcode-select -p
-    else
-      printf 'missing; run: xcode-select --install\n'
-      problems=$((problems + 1))
-    fi
-
-    printf 'macOS admin user: '
-    if is_admin; then
-      printf 'yes\n'
-    else
-      printf 'no; Homebrew casks default to %s\n' "$HOME/Applications"
-    fi
-  fi
 
   case "$problems" in
     0) printf '\nno problems found\n'; return 0 ;;
-    1) printf '\n1 problem found' ;;
-    *) printf '\n%s problems found' "$problems" ;;
+    1) printf '\n1 problem found\n' ;;
+    *) printf '\n%s problems found\n' "$problems" ;;
   esac
-  printf '; dotfiles link repairs links, backing up what it replaces\n'
   return 1
 }
 

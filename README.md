@@ -27,7 +27,7 @@ Open Ghostty, then:
 2. Run `gh auth login`; Git uses it for GitHub credentials.
 3. Log in to each agent you use (`opencode`, `claude`, `copilot`, `codex`) through its own flow.
 4. If you use Time Machine, run `tmutil addexclusion ~/.cache` once: it skips `~/Library/Caches` but not `~/.cache`.
-5. Run `dotfiles doctor`: it checks the links, tools, login shell, Git identity, GitHub login, and home folder, names a fix for each problem, and ends with "no problems found" once everything is in place.
+5. Run `dotfiles doctor`: it checks the links, login shell, Homebrew, tools, GitHub login, and Git identity, names a fix for each problem, notes stray files in your home folder, and ends with "no problems found" once everything is in place.
 6. In a project, run `workspace`; run `keys` to see everything else this setup adds.
 
 ## Daily use
@@ -68,7 +68,7 @@ Where Ghostty is absent (GitHub Codespaces, WSL, SSH sessions, other terminals),
 
 Every file sits in the XDG home that matches its nature: configuration in `~/.config`, data in `~/.local/share`, state such as history and logs in `~/.local/state`, caches in `~/.cache`, and your own commands in `~/.local/bin`. `zsh/xdg.sh` points tools without native XDG support there, for shells and the installer alike: agents keep one home each under `~/.local/share` (`copilot`, `codex`, `claude`), Codex keeps its database in `~/.local/state/codex`, and npm, Node, Python, and Go follow the same split.
 
-`$HOME` holds only the `.zshenv` link besides the XDG homes; `dotfiles doctor` lists any other hidden entry there. The exceptions:
+`$HOME` holds only the `.zshenv` link besides the XDG homes; `dotfiles doctor` notes any other hidden entry there. The exceptions:
 
 - The operating system's own files, plus `~/.ssh` (OpenSSH) and the AWS CLI's caches in `~/.aws`, which those tools hardcode.
 - macOS apps keep Apple's `~/Library` layout, and so do command-line tools that default there unless a documented setting moves the whole category to the tool's own Linux location. Homebrew's downloads and logs (kept together, as Homebrew does on Linux) and Go's build cache live in `~/.cache`; Go's settings and telemetry, gopls, Biome, and Copilot's cache stay in `~/Library`.

@@ -607,9 +607,10 @@ done
   git_identity || fail 'git identity missed a configured one'
 )
 
-# doctor lists hidden home entries outside the XDG layout, points ignored
-# zsh startup files to the local override file, calls a link to nothing
-# broken, and exits 1 while anything needs fixing.
+# doctor marks each finding ✓ (fine), ✗ (a problem, with its fix), or ! (a
+# note), and exits 1 while any problem remains. It lists hidden home entries
+# outside the XDG layout, points ignored zsh startup files to the local
+# override file, and calls a link to nothing broken.
 repo_dir="$test_root/repo"
 run_doctor() (
   # Keep diagnostics offline and independent of host binaries.
@@ -620,6 +621,26 @@ run_doctor() (
   login_shell() { printf '/bin/bash\n'; }
   git_identity() { return 1; }
   doctor_dotfiles
+)
+# Whether doctor.log has a line with this mark and label whose finding holds
+# each of the remaining words.
+doctor_says() (
+  mark=$1 label=$2
+  shift 2
+  while IFS= read -r line; do
+    case "$line" in
+      "$mark $label "*) ;;
+      *) continue ;;
+    esac
+    for word do
+      case "$line" in
+        *"$word"*) ;;
+        *) continue 2 ;;
+      esac
+    done
+    exit 0
+  done < "$test_root/doctor.log"
+  exit 1
 )
 : > "$HOME/.zshrc"
 mkdir "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache"
@@ -636,29 +657,43 @@ if (
 ) > "$test_root/doctor.log" 2>&1; then
   fail 'doctor exited 0 with problems'
 fi
-check grep -Fqx 'home: outside the XDG layout: .cache .copilot .dangling .zshrc ..legacy' "$test_root/doctor.log"
-check grep -Fq "home .zshrc: ignored while this repo sets ZDOTDIR; move wanted lines to $XDG_CONFIG_HOME/zsh/local.zsh" "$test_root/doctor.log"
-if grep -Fq 'home .zprofile' "$test_root/doctor.log"; then fail 'doctor reported an absent .zprofile'; fi
-check grep -Fq 'gh auth: not authenticated' "$test_root/doctor.log"
-check grep -Fqx "link zsh: broken symlink -> $test_root/missing" "$test_root/doctor.log"
-check grep -Fqx 'link retired: orphaned; dotfiles link removes it' "$test_root/doctor.log"
-# shellcheck disable=SC2016 # the hint shows the command to type
-check grep -Fqx 'login shell: /bin/bash; run: chsh -s "$(command -v zsh)"' "$test_root/doctor.log"
-check grep -Fqx 'tmux: 3.5 (< 3.6; upgrade recommended)' "$test_root/doctor.log"
-check grep -Fqx "git identity: missing; copy $XDG_CONFIG_HOME/git/config.d/personal.example to personal (or work) beside it and fill it in" "$test_root/doctor.log"
-check grep -Eqx '[0-9]+ problems found; dotfiles link repairs links, backing up what it replaces' "$test_root/doctor.log"
+check doctor_says ! home '.cache .copilot .dangling .zshrc ..legacy'
+# shellcheck disable=SC2088 # the label shows a literal ~
+check doctor_says ! '~/.zshrc' ZDOTDIR zsh/local.zsh
+if grep -Fq .zprofile "$test_root/doctor.log"; then fail 'doctor reported an absent .zprofile'; fi
+check doctor_says ✗ 'GitHub CLI' 'gh auth'
+check doctor_says ✗ 'link zsh' broken "$test_root/missing" 'dotfiles link'
+check doctor_says ✗ 'link retired' orphaned 'dotfiles link'
+check doctor_says ✗ 'login shell' /bin/bash chsh
+check doctor_says ✗ tmux 3.5 3.6 'brew upgrade tmux'
+check doctor_says ✗ 'Git identity' git/config.d/personal.example
+# Every problem marked counts.
+marked=$(grep -c '^✗ ' "$test_root/doctor.log")
+check grep -Fqx "$marked problems found" "$test_root/doctor.log"
 rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.dangling"
 rm "$XDG_CONFIG_HOME/zsh"
 run_doctor > "$test_root/doctor.log" 2>&1 || true
-check grep -Fqx 'home: nothing outside the XDG layout' "$test_root/doctor.log"
+check doctor_says ✓ home
+check doctor_says ✗ 'link zsh' missing 'dotfiles link'
 
 # A complete setup reports no problems and exits 0; linking removes the
 # retired link.
 : > "$test_root/Brewfile"
-(
-  with_layout link_dotfiles > "$test_root/link.log"
-  check test ! -L "$XDG_CONFIG_HOME/retired"
-  check grep -Fqx "removed orphaned link $XDG_CONFIG_HOME/retired" "$test_root/link.log"
+# brew config succeeds, or fails as Homebrew does when it can't download what
+# it runs on.
+cat > "$test_root/brew" <<'EOF'
+#!/bin/sh
+[ "$*" = config ] || exit 1
+printf 'HOMEBREW_VERSION: 4.6.0\n'
+[ -n "${BREW_CONFIG_ERROR-}" ] || exit 0
+printf 'curl: (6) Could not resolve host: ghcr.io\n%s\n \n' "$BREW_CONFIG_ERROR" >&2
+exit 1
+EOF
+chmod +x "$test_root/brew"
+with_layout link_dotfiles > "$test_root/link.log"
+check test ! -L "$XDG_CONFIG_HOME/retired"
+check grep -Fqx "removed orphaned link $XDG_CONFIG_HOME/retired" "$test_root/link.log"
+complete_doctor() (
   PATH="$HOME/.local/bin:$PATH"
   # shellcheck disable=SC2034 # read by the sourced doctor_dotfiles
   HOMEBREW_BUNDLE_FILE_GLOBAL="$test_root/Brewfile"
@@ -671,9 +706,28 @@ check grep -Fqx 'home: nothing outside the XDG layout' "$test_root/doctor.log"
   tmux() { printf 'tmux 3.7c\n'; }
   git_identity() { :; }
   doctor_dotfiles
-) > "$test_root/doctor.log" 2>&1 || fail "doctor found problems in a complete setup: $(cat "$test_root/doctor.log")"
-check grep -Fqx 'no problems found' "$test_root/doctor.log"
-check grep -Fqx 'git identity: set' "$test_root/doctor.log"
+)
+complete_doctor > "$test_root/doctor.log" 2>&1 || fail "doctor found problems in a complete setup: $(cat "$test_root/doctor.log")"
+check test "$(tail -n 1 "$test_root/doctor.log")" = 'no problems found'
+check doctor_says ✓ links '2 in'
+check doctor_says ✓ 'Git identity'
+# Clutter in $HOME alone is a note, not a problem.
+: > "$HOME/.zshrc"
+mkdir "$HOME/.copilot"
+complete_doctor > "$test_root/doctor.log" 2>&1 || fail "doctor counted home clutter as a problem: $(cat "$test_root/doctor.log")"
+check doctor_says ! home .copilot .zshrc
+check test "$(tail -n 1 "$test_root/doctor.log")" = 'no problems found'
+rm -r "$HOME/.zshrc" "$HOME/.copilot"
+# A Homebrew that can't run is a problem, named by its last error line.
+if (
+  export BREW_CONFIG_ERROR='Error: Failed to install Homebrew Portable Ruby'
+  complete_doctor
+) > "$test_root/doctor.log" 2>&1; then
+  fail 'doctor passed a Homebrew that cannot run'
+fi
+check doctor_says ✗ Homebrew "can't run" 'Failed to install Homebrew Portable Ruby'
+check grep -Fq 'Network access' "$test_root/doctor.log"
+check grep -Fqx '1 problem found' "$test_root/doctor.log"
 
 # Codespaces and dev containers install unattended in bash: install switches
 # the login shell to zsh through passwordless sudo, and nowhere else.

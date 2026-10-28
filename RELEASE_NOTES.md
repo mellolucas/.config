@@ -8,8 +8,9 @@ Changes since `v0.0.1`.
 
 - **One setup command:** `dotfiles` installs, links, bundles, updates, and
   uninstalls; a week after the last full update, the first shell of each day
-  reminds you to run `dotsup`. `dotfiles doctor` names a fix for each problem
-  it finds, from a missing Git identity to stray hidden files in `$HOME`.
+  reminds you to run `dotsup`. `dotfiles doctor` marks each check and names a
+  fix for each problem, from a missing Git identity to a Homebrew that can't
+  run, and notes stray hidden files in `$HOME`.
 - **A field guide:** `keys` browses the guide's pages with a preview and
   searches every line as you type; `keys TOPIC` and `keys WORDS` work from the
   prompt, and `help COMMAND` shows any command's help, even through an alias.
