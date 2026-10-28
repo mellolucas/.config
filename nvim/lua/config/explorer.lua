@@ -269,22 +269,16 @@ api.events.subscribe(api.events.Event.TreeOpen, function()
   vim.api.nvim_set_option_value("statusline", " ? keys", { scope = "local", win = api.tree.winid() })
 end)
 -- TreeClose comes before the tree's window closes, with the window that shows
--- the covered file current; that window alone gets its alternate back, once
--- the close is done
+-- the covered file current; that window alone gets its alternate back, then
+-- and there, so files opened right after the close (config.workspace) keep
+-- the one their opening gives it
 api.events.subscribe(api.events.Event.TreeClose, function()
-  local win, buf, alternate = vim.api.nvim_get_current_win(), vim.t.tree_covered, vim.t.tree_before
+  local buf, alternate = vim.t.tree_covered, vim.t.tree_before
   vim.t.tree_covered, vim.t.tree_before = nil, nil
-  if not (buf and alternate) then
-    return
+  if buf and alternate and alternate ~= buf and vim.api.nvim_get_current_buf() == buf
+    and vim.api.nvim_buf_is_valid(alternate) then
+    vim.fn.setreg("#", alternate)
   end
-  vim.schedule(function()
-    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf and alternate ~= buf
-      and vim.api.nvim_buf_is_valid(alternate) then
-      vim.api.nvim_win_call(win, function()
-        vim.fn.setreg("#", alternate)
-      end)
-    end
-  end)
 end)
 
 -- - goes up a level, from a file to it in the tree: beside the code, or in its

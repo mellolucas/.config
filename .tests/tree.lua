@@ -347,16 +347,24 @@ assert(not vim.bo[empty].buflisted, "the empty window beside a wide start is lis
 -- Files other programs open here (edit, rgv: config.workspace) land in the
 -- code, never in the tree: beside the sidebar, or in the place of a tree
 -- that fills its tab page, as a file opened from it does, whether it covers a
--- file or none, keeping the tab page.
+-- file or none, keeping the tab page. Several open as edit opens them, each
+-- with :drop and the first one last, so that it shows.
 vim.env.DOTFILES_EDITOR_SOCKET = nil
 local workspace = dofile(repo .. "/nvim/lua/config/workspace.lua")
-local function open_from_outside(name)
-  fn.writefile({ name }, project .. "/" .. name)
-  local tabs = #api.nvim_list_tabpages()
-  local failed = workspace.open({ "drop " .. fn.fnameescape(project .. "/" .. name) })
+local function open_from_outside(...)
+  local names, drops = { ... }, {}
+  for i = #names, 1, -1 do
+    local path = project .. "/" .. names[i]
+    if fn.filereadable(path) == 0 then
+      fn.writefile({ names[i] }, path)
+    end
+    drops[#drops + 1] = "drop " .. fn.fnameescape(path)
+  end
+  local tabs, name = #api.nvim_list_tabpages(), table.concat(names, " ")
+  local failed = workspace.open(drops)
   settle()
   assert(failed == "" and #api.nvim_list_tabpages() == tabs, "opening " .. name .. " from outside: " .. failed)
-  assert(current() == name, "opening " .. name .. " from outside left the cursor in " .. current())
+  assert(current() == names[1], "opening " .. name .. " from outside left the cursor in " .. current())
 end
 open_from_outside("e.txt")
 expect({ "tree", "e.txt" }, "a file from outside beside the sidebar")
@@ -372,6 +380,20 @@ api.nvim_exec_autocmds("VimEnter", {})
 expect({ "tree" }, "a narrow start covering no file")
 open_from_outside("g.txt")
 expect({ "g.txt" }, "a file from outside at a narrow start")
+-- In a single tab page, where nvim-tree itself keeps the covered file's
+-- window, too; files opened together, the covered one shown, keep the
+-- previous file their opening gives it.
+vim.cmd.tabonly()
+vim.cmd.edit(fn.fnameescape(project .. "/a.txt"))
+press("-")
+expect({ "tree" }, "a full-window tree in a single tab page")
+open_from_outside("h.txt")
+expect({ "h.txt" }, "a file from outside in a single tab page")
+assert(alternate() == "a.txt", "alternate after a file from outside in a single tab page: " .. alternate())
+press("-")
+open_from_outside("h.txt", "b.txt")
+expect({ "h.txt" }, "files from outside, the covered one shown")
+assert(alternate() == "b.txt", "alternate after files from outside, the covered one shown: " .. alternate())
 
 local errors = vim.tbl_filter(function(line)
   return line:match("E%d+:") ~= nil
