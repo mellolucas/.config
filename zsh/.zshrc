@@ -149,14 +149,8 @@ PROMPT='%F{blue}%~%f${vcs_info_msg_0_}
 alias dots='dotfiles'
 alias dotsup='dotfiles update'
 
-if command -v workspace >/dev/null 2>&1; then
-  alias dotscode='workspace'
-fi
 if command -v github-open >/dev/null 2>&1; then
   alias ghopen='github-open'
-fi
-if command -v github-view >/dev/null 2>&1; then
-  alias ghview='github-view'
 fi
 
 # EDITOR is a quoted command/argument list, not a shell expression.
@@ -189,15 +183,8 @@ if command -v eza >/dev/null 2>&1; then
   alias lc='eza --code=both'
 fi
 
-if [[ $OSTYPE == darwin* ]] && command -v caffeinate >/dev/null 2>&1; then
-  alias awake='caffeinate -di'
-fi
-
 alias rg='rg --hidden --follow --smart-case --glob="!.git" --max-columns=120 --max-columns-preview'
 alias rga='rg --no-ignore --glob="!.git"'
-alias rgf='rg --files-with-matches'
-alias rgc='rg --count'
-alias rgw='rg --word-regexp'
 
 alias cmdv='command -v'
 alias cmdvs='where'
@@ -207,10 +194,8 @@ if command -v git-glance >/dev/null 2>&1; then
   alias ggg='git-glance --code'
 fi
 
-alias g='git'
 alias gcl='git clone-smart' # Clone in `~/code/<owner>/<repo>`
 alias gf='git fetch --jobs=4'
-alias gft='gf --tags'
 alias gp='git pull'
 
 alias ga='git add'

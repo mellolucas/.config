@@ -85,12 +85,11 @@ rel=$'nested dir/file #&%\xc3\xa9.md'
 /bin/mkdir -p "$root/${rel:h}" "$test_root/outside" "$XDG_CONFIG_HOME"
 /bin/ln -s "$repo/zsh" "$XDG_CONFIG_HOME/zsh"
 : > "$root/$rel"
-print -r -- 'local README' > "$root/README.md"
 
 autoload -Uz run-help
 autoload +X run-help
 fpath=("$repo/zsh/functions")
-autoload -Uz fzfv github-open github-view help keys rgv
+autoload -Uz fzfv github-open help keys rgv
 # Individual checks opt into isolated executables as needed.
 path=()
 
@@ -420,21 +419,10 @@ git() {
 gh() {
   print -r -l -- "$@" >> "$test_root/gh"
   [[ $gh_state != fail ]] || { print -u2 -- 'gh unavailable'; return 1; }
-  if [[ $1 == api ]]; then
-    [[ $gh_state != convention || $2 != 'repos/{owner}/{repo}/readme' ]] || return 1
-    print -r -- 'remote README'
-  fi
 }
 open() { record browser "$@"; }
 xdg-open() { record browser "$@"; }
-glow() {
-  record glow "$@"
-  if [[ $# == 3 ]]; then
-    local line
-    IFS= read -r line
-    print -r -- "$line" > "$test_root/rendered"
-  fi
-}
+glow() { record glow "$@"; }
 bat() { fail 'unexpected bat invocation'; }
 less() { fail 'unexpected less invocation'; }
 editor() { record editor "$@"; }
@@ -705,16 +693,14 @@ encoded_ref='feature%2F%23%26%25%C3%A9'
 encoded_rel='nested%20dir/file%20%23%26%25%C3%A9.md'
 gh_state=success
 : > "$test_root/gh"
-for helper in github-open github-view; do
-  for flag in -h --help; do
-    output=$($helper "$flag") || fail "$helper $flag status"
-    [[ $output == "usage: $helper "* ]] || fail "$helper $flag usage"
-  done
-  # help COMMAND ARGS puts --help after the arguments.
-  output=$($helper "$root/$rel" --help) || fail "$helper PATH --help status"
-  [[ $output == "usage: $helper "* ]] || fail "$helper PATH --help usage"
+for flag in -h --help; do
+  output=$(github-open "$flag") || fail "github-open $flag status"
+  [[ $output == 'usage: github-open '* ]] || fail "github-open $flag usage"
 done
-[[ ! -s $test_root/gh ]] || fail 'helper usage invoked gh'
+# help COMMAND ARGS puts --help after the arguments.
+output=$(github-open "$root/$rel" --help) || fail 'github-open PATH --help status'
+[[ $output == 'usage: github-open '* ]] || fail 'github-open PATH --help usage'
+[[ ! -s $test_root/gh ]] || fail 'github-open usage invoked gh'
 github-open "$root/$rel"
 expect "browse
 $rel
@@ -732,80 +718,18 @@ github-open "$root"
 expect "browser
 https://github.com/owner/repo/tree/$encoded_ref" "$(recorded)" 'repository branch URL'
 
-style="$XDG_CONFIG_HOME/glow/theme.json"
-gh_state=success
-: > "$test_root/gh"
-github-view --remote "$root/$rel"
-api_args="--method
-GET
--f
-ref=$branch
--H
-Accept: application/vnd.github.raw+json"
-expect "api
-repos/{owner}/{repo}/readme
-$api_args" "$(recorded gh)" 'GET with literal ref field'
-expect 'remote README' "$(recorded rendered)" 'raw README rendering'
-expect "glow
---style
-$style
--p" "$(recorded)" 'remote renderer arguments'
-
-gh_state=convention
-: > "$test_root/gh"
-github-view --remote "$root"
-expect "api
-repos/{owner}/{repo}/readme
-$api_args
-api
-repos/owner/repo/readme
-$api_args" "$(recorded gh)" 'API convention fallback retains ref field'
-
-gh_state=fail
-github-view --remote "$root"
-expect "glow
---style
-$style
--p
-https://raw.githubusercontent.com/owner/repo/$encoded_ref/README.md" "$(recorded)" 'raw README branch URL byte encoding'
-
 git_state=detached
 github-open "$root/$rel"
 expect "browser
 https://github.com/owner/repo/blob/abc1234/$encoded_rel" "$(recorded)" 'detached commit URL'
-github-view --remote "$root"
-expect "glow
---style
-$style
--p
-https://raw.githubusercontent.com/owner/repo/abc1234/README.md" "$(recorded)" 'detached README URL'
 
 git_state=unborn
 github-open "$root/$rel"
 expect $'browser\nhttps://github.com/owner/repo' "$(recorded)" 'unborn repository URL'
-github-view --remote "$root"
-expect "glow
---style
-$style
--p
-https://github.com/owner/repo" "$(recorded)" 'unborn README default branch'
-gh_state=success
-: > "$test_root/gh"
-github-view --remote "$root"
-expect $'api\nrepos/{owner}/{repo}/readme\n--method\nGET\n-H\nAccept: application/vnd.github.raw+json' "$(recorded gh)" 'unborn API omits ref'
 
-github-view "$root/$rel"
-expect "glow
---style
-$style
--p
-$root/README.md" "$(recorded)" 'local nearest README unchanged'
 git_state=outside
 if github-open "$test_root/outside" 2>/dev/null; then
   fail 'outside /code/ must not fabricate a URL'
-fi
-if github-view --remote "$test_root/outside" 2>/dev/null; then
-  fail 'remote view outside a repository or /code/ must fail'
 fi
 if github-open "$test_root/missing" 2>/dev/null; then
   fail 'missing path must fail'

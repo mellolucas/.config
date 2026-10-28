@@ -71,8 +71,11 @@ Changes since `v0.0.1`.
   `ll --sort=age` or `ll --inode` (formerly `lli`). `ls` is the system's own
   again.
 - `rgfa`, `rgca`, `rgwa`, `rgwc`, and `rgwca` are gone: add `rg`'s short flags
-  instead (`rga -l`, `rga -c`, `rga -w`, `rgw -c`). So is `bh`: `help COMMAND`
+  instead (`rga -l`, `rga -c`, `rga -w`, `rg -wc`). So is `bh`: `help COMMAND`
   shows a command's help.
+- `g`, `gft`, `rgf`, `rgc`, `rgw`, `dotscode`, and `ghview` are gone: type
+  `git`, `gf --tags`, `rg -l`, `rg -c`, `rg -w`, and `workspace`; `mdv
+  README.md` renders a README, and `gh repo view` shows one on GitHub.
 - Ghostty's own Mac keys run panes and scrollback (`keys panes`, `keys
   browse`) in place of the `Option+v` key table.
 - OpenCode keeps its own keys: `Ctrl+X` is its leader in place of

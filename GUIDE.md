@@ -155,11 +155,11 @@ Resume a repository, review your changes, and compare before sharing.
 | `glc A...B` | Commits unique to each side |
 | `ga` / `gc` / `gcm MSG` / `gca` | Stage / commit / commit with a message / amend the last commit |
 | `gf` / `gp` | Fetch / pull (fast-forward only) |
-| `ghopen [PATH]` / `ghview` | Open this directory or a file on GitHub at the current branch / read the README |
+| `ghopen [PATH]` | Open this directory or a file on GitHub at the current branch |
 | `gcl owner/repo` | Clone into `~/code/owner/repo` |
 
 - Add `f` after `gd` to list files only (`gdf`, `gdfs`, `gdfo`…); add `t` for tip-to-tip comparisons (`gdot`, `gdit`, `gdmt`).
-- Graphs take `s` for file stats too (`glgs`, `glgsa`); `gft` also fetches tags; `ghview --remote` reads the README on GitHub.
+- Graphs take `s` for file stats too (`glgs`, `glgsa`).
 - Entering another repository prints its card; counts are as fresh as your last fetch.
 - `gcl` also takes GitHub URLs, and `gh:owner/repo` works wherever Git takes a URL.
 - `gp` stops when histories diverge: `gp --rebase` replays your commits on top, setting uncommitted edits aside meanwhile. A new branch's first `git push` sets its upstream.
@@ -208,8 +208,6 @@ List what is here, then find a file by name or by content.
 | `Esc` then `c` | Pick a directory below here (directories only, each previewed) and change to it |
 | `rg TEXT` | Search contents, including hidden files |
 | `rga TEXT` | Also search files that Git ignores |
-| `rgf TEXT` / `rgc TEXT` | Matching files only / matching-line counts per file |
-| `rgw TEXT` | Whole words only |
 | `rgv TEXT` | Browse the matching lines file by file, each file's in the preview; Enter opens Neovim at the first, with all of them in the quickfix list |
 
 In every picker with a preview (`fzfv`, `rgv`, `keys`, `Esc` then `c`): `Option+↓` / `Option+↑` scroll it by half a page and `Shift+↓` / `Shift+↑` by a line, Esc cancels. `fzfv` previews a file's first 500 lines.
@@ -217,9 +215,9 @@ In every picker with a preview (`fzfv`, `rgv`, `keys`, `Esc` then `c`): `Option+
 - Not sure where to look? Narrow down first: `Esc` then `c` to the right directory, then `fzfv` or `Ctrl+T` from there.
 - Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.
 - `rg`, `rgv`, `:grep`, and Neovim's `/` are smart-case: all-lowercase text ignores case.
-- Combine with `rg`'s own short flags: `rga -l` (files), `rga -c` (counts), `rga -w` (whole words), `rgw -c`.
+- `rg` and `rga` take `rg`'s own short flags: `-l` lists the matching files, `-c` counts matching lines per file, `-w` matches whole words.
 - `rgv` takes `rg`'s options and paths: `rgv -w TEXT`, `rgv --no-ignore TEXT src/`, `rgv -C 5 TEXT` for more context. Options that change how `rg` prints (`-l`, `-N`, `--json`) don't fit, and files whose names hold a tab or a newline are left out.
-- Pipe a list into the pickers: `rgf TEXT | fzfv`.
+- Pipe a list into the pickers: `rg -l TEXT | fzfv`.
 
 ## Browse: Read terminal output
 
@@ -273,7 +271,6 @@ Inspect and update this setup deliberately; no update check runs at shell startu
 | `dotfiles link` | Relink configuration without touching packages |
 | `dotfiles status` / `dotfiles doctor` | Repository state / environment health, with fixes |
 | `help COMMAND` | A command's help, even through an alias; its manual when it has no `--help` |
-| `awake [COMMAND]` | Keep macOS awake (until Ctrl+C, or while COMMAND runs) |
 
 - `dots` is short for `dotfiles`; `dotsup` runs `dotfiles update`. Homebrew refreshes its package list once it is a day old; run `brew update` first for the very latest.
 - Personal overrides belong in the ignored `local` files described in the README.
