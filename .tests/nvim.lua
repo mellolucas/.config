@@ -122,17 +122,21 @@ assert(vim.g.ends == "abc")
 api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
 api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-BS>XY<Esc>", true, false, true), "xt", false)
 assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one XY")
--- Typing in a buffer and on the command line, words are made of letters,
--- digits, _, . and non-ASCII characters, as in Mac text fields, and
--- Option+Backspace deletes back to where Option+Left goes. Each case types
--- the text and the keys at once, as a fast typist or a macro does (<Home>
--- goes to the start), and marks where they leave the insertion point with |.
+-- Typing in a buffer and on the command line, words are made of letters and
+-- digits of any script, _ and ., as in Mac text fields and zsh: other
+-- punctuation and spaces split them, an em dash, curly quotes and a no-break
+-- space too, and no character is split, an emoji with its style included.
+-- Option+Backspace deletes back to where Option+Left goes, and
+-- Ctrl+Left/Right (Linux terminals, VS Code) go where Option+Left/Right do.
+-- Each case types the text and the keys at once, as a fast typist or a macro
+-- does (<Home> goes to the start), and marks where they leave the insertion
+-- point with |.
 local function word_keys(mode, text, keys)
   local typed = api.nvim_replace_termcodes(text .. keys .. "|<Esc>", true, false, true)
   if mode == "i" then
     api.nvim_buf_set_lines(typing, 0, -1, false, { "" })
     api.nvim_feedkeys("i" .. typed, "xt", false)
-    return api.nvim_get_current_line()
+    return table.concat(api.nvim_buf_get_lines(typing, 0, -1, false), "\n")
   end
   local line
   api.nvim_create_autocmd("CmdlineLeave", { once = true, callback = function() line = fn.getcmdline() end })
@@ -154,12 +158,36 @@ for _, case in ipairs({
   { "e ~/café_au.lait/été", "<M-b><M-b>", "e ~/|café_au.lait/été" },
   { "e ~/café_au.lait/été", "<Home><M-f><M-f>", "e ~/café_au.lait|/été" },
   { "e ~/café_au.lait/été", "<M-BS><M-BS>", "e ~/|" },
+  { "café—été", "<M-BS>", "café—|" },
+  { "café—été", "<M-b><M-b>", "|café—été" },
+  { "café—été", "<Home><M-f>", "café|—été" },
+  { "“quoted” word", "<Home><M-f>", "“quoted|” word" },
+  { "“quoted” word", "<M-BS><M-BS>", "“|" },
+  { "one\u{a0}two", "<M-BS>", "one\u{a0}|" },
+  { "one\u{a0}two", "<Home><M-f>", "one|\u{a0}two" },
+  { "ok ❤\u{fe0f} x", "<M-b><M-b>", "|ok ❤\u{fe0f} x" },
+  { "cd ~/code/my_file.lua x", "<C-Left><C-Left>", "cd ~/code/|my_file.lua x" },
+  { "cd ~/code/my_file.lua x", "<Home><C-Right><C-Right>", "cd ~/code|/my_file.lua x" },
 }) do
   for _, mode in ipairs({ "i", "c" }) do
     local got = word_keys(mode, case[1], case[2])
     assert(got == case[3], (mode == "i" and "typing " or "on the command line ") .. case[1] .. ", "
       .. case[2] .. " left " .. tostring(got))
   end
+end
+-- Typing in a buffer, they cross lines as in Mac text fields: Option+Left at
+-- a line's start goes on to the word before, Option+Right at its end to the
+-- word after, and Option+Backspace at a line's start joins the line to the one
+-- before, then deletes back to that word's start, along with an indent
+-- autoindent typed and left unused.
+for _, case in ipairs({
+  { "one two<CR>three", "<Home><M-b>", "one |two\nthree" },
+  { "one<CR><CR>two", "<Up><Up><End><M-f>", "one\n\ntwo|" },
+  { "one two<CR>three", "<Home><M-BS>", "one |three" },
+  { "<CR>x<Up>  one two<CR>", "<M-BS>", "  one |\nx" },
+}) do
+  local got = word_keys("i", case[1], case[2])
+  assert(got == case[3], "typing " .. case[1] .. ", " .. case[2] .. " left " .. vim.inspect(got))
 end
 -- No terminal-mode map starts with Esc, so a single Esc reaches the program
 -- (less in :GitDiff) at once instead of waiting for a second key.

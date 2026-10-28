@@ -254,47 +254,95 @@ end
 -- Option+Left/Right arrive as <M-b>/<M-f> (Ghostty's macOS word jumps) or as
 -- <M-Left>/<M-Right> (Windows Terminal, tmux), Option+Backspace as <M-BS>;
 -- unmapped, they too would read as Esc+motion. While typing, in a buffer or on
--- the command line, they step over words as Mac text fields and zsh do:
--- letters, digits, _, . and any non-ASCII character make up words; ← goes to
--- a word's start and → to its end, each past what lies between words, and
--- Option+Backspace deletes back to where ← goes. Normal and visual modes keep
--- Vim's words (b, w).
-local gap_then_word = "^[^%w_.\128-\255]*[%w_.\128-\255]*"
--- Byte offsets in text: where ← and → go from col (← reads the text backward)
-local function word_start(text, col)
-  return col - #text:sub(1, col):reverse():match(gap_then_word)
+-- the command line, they and Ctrl+Left/Right (Linux terminals, VS Code) step
+-- over words as Mac text fields and zsh do: letters and digits of any script,
+-- _ and . make up words; ← goes to a word's start and → to its end, each past
+-- what lies between words, line breaks included, and Option+Backspace deletes
+-- back to where ← goes. Normal and visual modes keep Vim's words (b, w).
+local function word_char(char)
+  if char:byte() < 0x80 then
+    return char:find("^[%w_.]") ~= nil
+  end
+  -- charclass() puts letters and digits in class 2, and kana, CJK and Hangul
+  -- in classes of their own from 0x3040 up
+  local class = vim.fn.charclass(char)
+  return class == 2 or class >= 0x3040
 end
-local function word_end(text, col)
-  return col + #text:match(gap_then_word, col + 1)
+-- A line's characters as the cursor steps over them, an accented letter or an
+-- emoji sequence each one; a NUL passes as the newline Neovim keeps it as
+local function chars(text)
+  return vim.fn.split((text:gsub("%z", "\n")), [[\zs]])
 end
--- In a buffer the keys press arrows and Delete, which undo, . and an open
--- completion menu take as usual; they are counted as the key runs, as an
--- <expr> map can run before the text typed just ahead of it is in. On the
+-- From byte col of row, back (dir -1) or forward (1): past what lies between
+-- words, then through a word to its start or end. line(row) gives a row's
+-- text, nil past the first or last; returns the row and byte column reached,
+-- and the characters passed, a line break counting one: all, and on that row
+local function step_word(line, row, col, dir)
+  local text = line(row)
+  local list = chars(dir < 0 and text:sub(1, col) or text:sub(col + 1))
+  local i, word, passed, on_row = dir < 0 and #list or 1, false, 0, 0
+  while true do
+    local char = list[i]
+    if char then
+      if word_char(char) then
+        word = true
+      elseif word then
+        break
+      end
+      col, i, on_row = col + dir * #char, i + dir, on_row + 1
+    else
+      text = not word and line(row + dir)
+      if not text then
+        break
+      end
+      list, row, on_row = chars(text), row + dir, 0
+      i, col = dir < 0 and #list or 1, dir < 0 and #text or 0
+    end
+    passed = passed + 1
+  end
+  return row, col, passed, on_row
+end
+-- In a buffer the keys press arrows, Ctrl+G k or j for the line above or
+-- below (where arrows would pick completions), and Delete, which undo, . and
+-- an open completion menu take as usual; they are counted as the key runs, as
+-- an <expr> map can run before the text typed just ahead of it is in. On the
 -- command line, where arrows pick completions, they set the line
-local function word_key(go, delete)
+local function word_key(dir, delete)
   return function()
     if vim.fn.mode() == "c" then
       local text, col = vim.fn.getcmdline(), vim.fn.getcmdpos() - 1
-      local to = go(text, col)
+      local _, to = step_word(function(row)
+        return row == 1 and text or nil
+      end, 1, col, dir)
       vim.fn.setcmdline(delete and text:sub(1, to) .. text:sub(col + 1) or text, to + 1)
       return
     end
-    local text, col = vim.api.nvim_get_current_line(), vim.api.nvim_win_get_cursor(0)[2]
-    local to = go(text, col)
-    local count = vim.fn.strchars(to < col and text:sub(to + 1, col) or text:sub(col + 1, to), true)
-    local keys = (to < col and "<Left>" or "<Right>"):rep(count) .. (delete and ("<Del>"):rep(count) or "")
+    local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+    local to, _, passed, on_row = step_word(function(n)
+      return n > 0 and vim.api.nvim_buf_get_lines(0, n - 1, n, false)[1] or nil
+    end, row, col, dir)
+    local keys = ""
+    if to ~= row then
+      -- Along the line to its edge first: leaving it straight away would also
+      -- delete an indent autoindent typed there, which the count includes
+      keys = dir < 0 and "<Home>" .. ("<C-g>k"):rep(row - to) .. "<End>"
+        or "<End>" .. ("<C-g>j"):rep(to - row) .. "<Home>"
+    end
+    keys = keys .. (dir < 0 and "<Left>" or "<Right>"):rep(on_row) .. (delete and ("<Del>"):rep(passed) or "")
     vim.api.nvim_feedkeys(vim.keycode(keys), "ni", false)
   end
 end
 for _, back in ipairs({ "<M-b>", "<M-Left>" }) do
-  map({ "i", "c" }, back, word_key(word_start), { desc = "Word back" })
+  map({ "i", "c" }, back, word_key(-1), { desc = "Word back" })
   map({ "n", "x" }, back, "b", { desc = "Word back" })
 end
 for _, forward in ipairs({ "<M-f>", "<M-Right>" }) do
-  map({ "i", "c" }, forward, word_key(word_end), { desc = "Word forward" })
+  map({ "i", "c" }, forward, word_key(1), { desc = "Word forward" })
   map({ "n", "x" }, forward, "w", { desc = "Word forward" })
 end
-map({ "i", "c" }, "<M-BS>", word_key(word_start, true), { desc = "Delete word back" })
+map({ "i", "c" }, "<C-Left>", word_key(-1), { desc = "Word back" })
+map({ "i", "c" }, "<C-Right>", word_key(1), { desc = "Word forward" })
+map({ "i", "c" }, "<M-BS>", word_key(-1, true), { desc = "Delete word back" })
 -- Cmd+Left/Right arrive as Ctrl+A/E (Ghostty, VS Code on macOS): the line's
 -- start and end, as at the prompt, instead of Vim's increment (a selection
 -- still adds with g Ctrl+A), line scroll, and insert-mode repeats.
