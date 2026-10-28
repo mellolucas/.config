@@ -84,14 +84,19 @@ stashes=(${(f)"$(git stash list --format='%gs')"})
 others=(${(f)"$(git for-each-ref refs/heads --count=6 --sort=-committerdate --format='%(refname:short)')"})
 others=(${others:#$branch})
 
-# 80-column card: truncate visible text first, %-escape after, so prompt
-# escapes stay zero-width and no printed line exceeds the budget
+# The card fits the window, 40 to 100 columns wide (80 without one): truncate
+# visible text first, %-escape after, so prompt escapes stay zero-width and no
+# printed line exceeds the width
+local -i width=${COLUMNS:-0}
+(( width > 0 )) || width=80
+(( width >= 40 )) || width=40
+(( width <= 100 )) || width=100
 local repo=${toplevel:h:t}/${toplevel:t}
-(( ${#repo} > 60 ))   && repo="${repo[1,59]}…"
+(( ${#repo} > width - 20 )) && repo="${repo[1,width - 21]}…"
 (( ${#branch} > 26 )) && branch="${branch[1,25]}…"
 
 local stash=${stashes[1]:-} nstash=$#stashes
-(( ${#stash} > 67 - $#nstash )) && stash="${stash[1,66 - $#nstash]}…"
+(( ${#stash} > width - 13 - $#nstash )) && stash="${stash[1,width - 14 - $#nstash]}…"
 
 local name
 local -a shown
@@ -99,11 +104,11 @@ local -i used=0
 for name in $others[1,4]; do
   (( ${#name} > 30 )) && name="${name[1,29]}…"
   (( used += ${#name} + (used ? 3 : 0) ))
-  (( used > 70 )) && break
+  (( used > width - 10 )) && break
   shown+=("${name//\%/%%}")
 done
 
-local -i pad=$(( 80 - ${#repo} - ${#fetched} ))
+local -i pad=$(( width - ${#repo} - ${#fetched} ))
 # Push earlier output into scrollback; captured cards must not control the terminal.
 if [[ $ZSH_SUBSHELL == 0 && -t 1 ]] && (( ${+commands[tput]} )); then
   local canvas_rows canvas_home
@@ -115,15 +120,26 @@ if [[ $ZSH_SUBSHELL == 0 && -t 1 ]] && (( ${+commands[tput]} )); then
   fi
 fi
 print -P -- "\n%F{blue}${repo//\%/%%}%f${(l:pad:):-}${fetched}"
-print -P -- "%F{8}${(l:80::─:):-}%f"
+print -P -- "%F{8}${(l:width::─:):-}%f"
 [[ -n $op ]] && print -P -- "%F{red}⚠ $op in progress%f"
 print -P -- "branch    %F{cyan}${branch//\%/%%}%f $track"
 print -P -- "worktree  ${(j: · :)wt}"
 (( nstash ))    && print -P -- "stash     $nstash · ${stash//\%/%%}"
 (( $#shown ))   && print -P -- "branches  ${(j: · :)shown}"
+# Recent commits: the subject gives way first, then the author
 if git rev-parse -q --verify HEAD >/dev/null 2>&1; then
   print
-  git --no-pager log -3 --pretty=truncated
+  local hash subject when who tail
+  local -i room
+  git --no-pager log -3 --format='%h%x1f%s%x1f%ar%x1f%aN' |
+    while IFS=$'\x1f' read -r hash subject when who; do
+      tail=" · $when by $who"
+      (( ${#hash} + 21 + ${#tail} <= width )) || tail=" · $when"
+      room=$(( width - ${#hash} - 1 - ${#tail} ))
+      (( room >= 10 )) || room=10
+      (( ${#subject} > room )) && subject="${subject[1,room - 1]}…"
+      print -P -- "%F{yellow}$hash%f ${subject//\%/%%}%F{8}${tail//\%/%%}%f"
+    done
 fi
 print
 

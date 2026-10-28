@@ -154,6 +154,46 @@ STUB
   print -r -- 'ok: isolated git-glance cards, code summary, and arguments'
 )
 
+# In a narrow, a normal, and a wide window, the card spans the window, from 40
+# to 100 columns, and no line is wider; each commit reads HASH SUBJECT · AGE by
+# AUTHOR, the subject cut short with … to fit, the author dropped where even a
+# short subject would not.
+(
+  for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null LC_ALL=C.UTF-8
+  zmodload zsh/datetime
+  export GIT_AUTHOR_NAME='Ann Author' GIT_AUTHOR_EMAIL=ann@example.com
+  export GIT_COMMITTER_NAME='Ann Author' GIT_COMMITTER_EMAIL=ann@example.com
+  export GIT_AUTHOR_DATE="$(( EPOCHSECONDS - 2 * 86400 )) +0000"
+  export GIT_COMMITTER_DATE=$GIT_AUTHOR_DATE
+  setopt extendedglob
+  path=("$test_root/git-bin")
+  autoload -Uz git-glance
+  history_repo=$HOME/code/owner/a-repository-name-long-enough-to-cut
+  git init -q --template= "$history_repo"
+  builtin cd "$history_repo"
+  long='A subject long enough to be cut short even on the widest card, a hundred columns'
+  git commit -q --allow-empty -m 'Short subject'
+  git commit -q --allow-empty -m "$long"
+  long_hash=$(git log -1 --format=%h) short_hash=$(git log -1 --format=%h HEAD~)
+  for columns width in 0 80 40 40 80 80 200 100; do
+    card=$(COLUMNS=$columns git-glance) || fail "git-glance status at $columns columns"
+    lines=(${(f)card//$'\e'\[[0-9;]#m})
+    (( ${lines[(Ie)${(l:width::─:)}]} )) || fail "git-glance rule at $columns columns: ${(F)lines}"
+    for line in $lines; do
+      (( ${#line} <= width )) || fail "git-glance line wider than $width columns: $line"
+    done
+    tail=' · 2 days ago'
+    (( width < 80 )) || tail+=' by Ann Author'
+    line=${(M)lines:#$short_hash *}
+    expect "$short_hash Short subject$tail" "$line" "short commit line at $columns columns"
+    line=${(M)lines:#$long_hash *}
+    shown=${${line#"$long_hash "}%"…$tail"}
+    [[ $line == "$long_hash $shown…$tail" && $long == "$shown"?* ]] ||
+      fail "cut commit line at $columns columns: $line"
+  done
+)
+
 (
   # Every page of the guide, by its "## Topic: Title" heading
   typeset -A titles topic_outputs
