@@ -39,7 +39,8 @@ repo_dir="$test_root/repo"
 installer="$repo_dir/install.sh"
 timestamp() { printf '20000101000000\n'; }
 ensure_homebrew() { :; }
-bundle_dotfiles() { :; }
+# shellcheck disable=SC2034 # read by the sourced install_dotfiles
+bundle_dotfiles() { bundle_skipped=; }
 # In-process lifecycle calls never reach the host's Homebrew prefix.
 brew_bin() { return 1; }
 # The dispatcher loads the tool homes; direct lifecycle calls need them too.
@@ -245,19 +246,33 @@ $npm_update"
   )
 done
 
-# A bundle that fails leaves no stamp.
-(
-  export HOME="$test_root/package-failed" PATH="$test_root/package-bin:$PATH" FAIL_BUNDLE=1
-  export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
-  export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
-  export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
-  unset HOMEBREW_BUNDLE_NO_UPGRADE
-  mkdir "$HOME" "$HOME/prefix"
-  printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
-  if "$installer" bundle > "$HOME/dispatch.log" 2>&1; then fail 'a failed bundle exited 0'; fi
-  check test "$(cat "$HOME/brew.log")" = invoked
-  check test ! -e "$XDG_STATE_HOME/dotfiles/updated"
-)
+# A failed Brewfile step skips only itself: npm still updates, the step is
+# listed as skipped, and nothing stamps the reminder; bundle and install exit
+# 1, install after its closing steps.
+for operation in bundle install; do
+  (
+    export HOME="$test_root/failed-$operation" PATH="$test_root/package-bin:$PATH" FAIL_BUNDLE=1
+    export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+    export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+    export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
+    unset HOMEBREW_BUNDLE_NO_UPGRADE
+    mkdir "$HOME" "$HOME/prefix"
+    printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
+    rc=0
+    "$installer" "$operation" > "$HOME/dispatch.log" 2>&1 || rc=$?
+    check test "$rc" = 1
+    check test "$(cat "$HOME/npm.log")" = "$npm_update"
+    check grep -Fqx 'skipped:' "$HOME/dispatch.log"
+    check grep -q '^  .*Brewfile' "$HOME/dispatch.log"
+    if grep -q '^  .*npm' "$HOME/dispatch.log"; then fail "$operation listed npm's update as skipped"; fi
+    check test ! -e "$XDG_STATE_HOME/dotfiles/updated"
+    if [ "$operation" = install ]; then
+      check grep -q '^done, except' "$HOME/dispatch.log"
+      check grep -Fq 'exec zsh -l' "$HOME/dispatch.log"
+      check grep -Fq 'dotfiles doctor' "$HOME/dispatch.log"
+    fi
+  )
+done
 
 # A machine's own global npm config stays.
 (
@@ -528,7 +543,7 @@ check_update() {
 }
 
 for scenario in equal ahead behind dirty-behind diverged \
-  detached no-upstream discard discard-unignored collision collision-discard; do
+  detached no-upstream fetch-failed discard discard-unignored collision collision-discard; do
   initial=$base_commit incoming=$incoming_commit expected_head=$incoming_commit
   expected_rc=0 diagnostic='fast-forwarding to'
   set --
@@ -539,6 +554,7 @@ for scenario in equal ahead behind dirty-behind diverged \
     diverged) initial=$local_commit expected_rc=1 expected_head=$local_commit diagnostic='histories have diverged' ;;
     detached) expected_rc=1 expected_head=$base_commit diagnostic='detached HEAD' ;;
     no-upstream) expected_rc=1 expected_head=$base_commit diagnostic='no upstream configured' ;;
+    fetch-failed) expected_rc=1 expected_head=$base_commit diagnostic='could not fetch origin' ;;
     discard*)
       initial=$local_commit diagnostic='discarding local repo state'
       if [ "$scenario" = discard-unignored ]; then incoming=$unignored_commit; fi
@@ -568,6 +584,7 @@ for scenario in equal ahead behind dirty-behind diverged \
       ;;
     detached) git -C "$repo_dir" checkout -q --detach ;;
     no-upstream) git -C "$repo_dir" branch --unset-upstream ;;
+    fetch-failed) git -C "$repo_dir" remote set-url origin "$test_root/nonexistent-remote" ;;
   esac
   before_status=$(git -C "$repo_dir" status --porcelain)
   before_tree=$(git -C "$repo_dir" write-tree)

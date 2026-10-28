@@ -269,12 +269,15 @@ ensure_homebrew() {
   }
 
   printf 'installing Homebrew...\n'
-  install_script=$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh) || {
-    printf 'error: failed to download the Homebrew installer\n' >&2
+  installer_url=https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh
+  install_script=$(curl -fsSL "$installer_url") || {
+    printf 'error: failed to download the Homebrew installer from %s\n' "$installer_url" >&2
+    printf 'hint: if the network blocks it, see Network access in the README\n' >&2
     exit 1
   }
   /bin/bash -c "$install_script" || {
     printf 'error: Homebrew installation failed\n' >&2
+    printf 'hint: if a download failed, see Network access in the README\n' >&2
     exit 1
   }
 }
@@ -317,9 +320,14 @@ install_dotfiles() {
   ensure_homebrew
   bundle_dotfiles
 
-  printf '\ndone.\n'
+  if [ -n "$bundle_skipped" ]; then
+    printf '\ndone, except what was skipped above.\n'
+  else
+    printf '\ndone.\n'
+  fi
   printf 'restart your shell or run: exec zsh -l\n'
   printf 'then dotfiles doctor names anything left to set up (such as your Git identity), and keys shows what this setup adds\n'
+  [ -z "$bundle_skipped" ] || exit 1
 }
 
 # Follows `brew bundle --global` Brewfile resolution (HOMEBREW_BUNDLE_FILE_GLOBAL
@@ -343,26 +351,34 @@ bundle_dotfiles() {
   # Fresh installs link before Homebrew exists; Bundle may run npm right away.
   link_npm_global_config
 
+  # A failed step doesn't stop the others; callers exit 1 when bundle_skipped
+  # names any
+  bundle_skipped=
   printf 'running brew bundle --global (%s)\n' "$brewfile"
-  "$brew" bundle --global || {
-    printf 'error: brew bundle failed\n' >&2
-    exit 1
-  }
+  "$brew" bundle --global ||
+    bundle_skipped="$bundle_skipped  Brewfile entries that failed, named in Homebrew's output above
+"
 
   # Bundle installs npm packages but never upgrades them. Mirror its
   # safeguards: no install scripts and a one-day release cooldown.
-  if [ -z "${HOMEBREW_BUNDLE_NO_UPGRADE-}" ]; then
-    npm_packages=$("$brew" bundle list --global --npm) || exit 1
-    if [ -n "$npm_packages" ]; then
-      printf 'updating npm packages from the Brewfile\n'
-      # shellcheck disable=SC2086 # one package name per word
-      npm update --global --ignore-scripts --min-release-age=1 $npm_packages || {
-        printf 'error: npm update failed\n' >&2
-        exit 1
-      }
-    fi
+  if [ -n "${HOMEBREW_BUNDLE_NO_UPGRADE-}" ]; then
+    :
+  elif ! npm_packages=$("$brew" bundle list --global --npm); then
+    bundle_skipped="$bundle_skipped  npm package updates: Homebrew couldn't list them
+"
+  elif [ -n "$npm_packages" ]; then
+    printf 'updating npm packages from the Brewfile\n'
+    # shellcheck disable=SC2086 # one package name per word
+    npm update --global --ignore-scripts --min-release-age=1 $npm_packages ||
+      bundle_skipped="$bundle_skipped  npm package updates, named in npm's output above
+"
   fi
 
+  if [ -n "$bundle_skipped" ]; then
+    printf '\nskipped:\n%s' "$bundle_skipped" >&2
+    printf 'hint: if a download failed, see Network access in the README; then run: dotfiles bundle\n' >&2
+    return 0
+  fi
   # The shell's weekly update reminder counts from the last full bundle
   { mkdir -p "$xdg_state_home/dotfiles" && : >"$xdg_state_home/dotfiles/updated"; } 2>/dev/null || :
 }
@@ -584,7 +600,11 @@ update_dotfiles() {
 
   remote=$(git -C "$repo_dir" config --get "branch.$branch.remote")
   printf 'fetching %s for %s\n' "$remote" "$upstream"
-  git -C "$repo_dir" fetch --prune "$remote"
+  git -C "$repo_dir" fetch --prune "$remote" || {
+    printf 'error: could not fetch %s; nothing was changed\n' "$remote" >&2
+    printf 'hint: if the network blocks it, see Network access in the README; dotfiles bundle updates packages alone\n' >&2
+    exit 1
+  }
 
   local_rev=$(git -C "$repo_dir" rev-parse HEAD)
   upstream_rev=$(git -C "$repo_dir" rev-parse "$upstream")
@@ -990,7 +1010,7 @@ fi
 case "$cmd" in
   install) require_no_args install "$@"; install_dotfiles ;;
   link) require_no_args link "$@"; link_dotfiles; printf '\ndone.\n' ;;
-  bundle) require_no_args bundle "$@"; bundle_dotfiles ;;
+  bundle) require_no_args bundle "$@"; bundle_dotfiles; [ -z "$bundle_skipped" ] || exit 1 ;;
   update) update_dotfiles "$@" ;;
   doctor) require_no_args doctor "$@"; doctor_dotfiles ;;
   uninstall) require_no_args uninstall "$@"; uninstall_dotfiles ;;

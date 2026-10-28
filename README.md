@@ -101,6 +101,18 @@ Notes:
 3. On a machine set up with an earlier version, follow the Migration steps in [RELEASE_NOTES.md](RELEASE_NOTES.md); `dotfiles doctor` lists leftovers.
 4. Check the result: `sh .tests/run` passes; switching the system appearance recolors Ghostty, the prompt, and Neovim (once its pane regains focus); `Cmd+Option+arrows` cross panes and reach Neovim windows at the edges; `keys` opens the guide; each agent starts logged in; and a test commit is signed (`git log --show-signature -1`).
 
+## Network access
+
+On a managed network, these are the hosts to ask for:
+
+| When | Hosts |
+| --- | --- |
+| Install | `raw.githubusercontent.com` (Homebrew's installer), `github.com` (this repository, Homebrew, Neovim's plugins), and on macOS `swscan.apple.com` and `swcdn.apple.com` (the Command Line Tools) |
+| Install and update | `formulae.brew.sh` and `api.github.com` (Homebrew's package lists), `ghcr.io` and `pkg-containers.githubusercontent.com` (Homebrew's packages and its own Ruby), `registry.npmjs.org` (Copilot CLI, Codex), `release.files.ghostty.org` (Ghostty), `downloads.claude.ai` (Claude Code), `release-assets.githubusercontent.com` (Obsidian) |
+| Daily | Each agent's own service (its documentation lists the hosts), `www.schemastore.org` and `json.schemastore.org` (YAML schemas), `proxy.golang.org` and `sum.golang.org` (Go modules) |
+
+A network that inspects downloads can answer from a host yet cut or hold back a file, and some release a file once they have analyzed it, so a later retry can pass. Homebrew, npm, and Git name the URL that failed; `install`, `update`, and `bundle` carry on past failed packages and list what they skipped; `dotfiles doctor` reports a Homebrew that can't run. Where a network decrypts traffic with its own certificate authority, add it to the system's trusted certificates; Bun also needs `export NODE_USE_SYSTEM_CA=1` in `zsh/local.zsh`, and npm settings for Brewfile entries go in Homebrew's npm config (see [Where files live](#where-files-live)).
+
 ## Development
 
 `sh .tests/run` runs every isolated check without provisioning anything; CI runs it on macOS and Ubuntu. Rules for contributors, human or agent, live in [AGENTS.md](AGENTS.md).
