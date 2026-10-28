@@ -85,20 +85,21 @@ for _, arrow in ipairs({ "Left", "Down", "Up", "Right" }) do
   assert(vim.g.edge == "aXb", "Cmd+Option+" .. arrow .. " on the command line: " .. vim.inspect(vim.g.edge))
 end
 
--- Option+Left/Right (<M-b>/<M-f>) jump to word starts without leaving the mode.
+-- Option+Left/Right (<M-b>/<M-f>) move by words without leaving the mode:
+-- typing, back to a word's start and on to its end; in normal mode and on a
+-- selection, as Vim's b and w.
 api.nvim_buf_set_lines(typing, 0, -1, false, { "one two three" })
 api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-b>X<Esc>0i<M-f>Y<Esc>", true, false, true), "xt", false)
-assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one Ytwo Xthree")
-api.nvim_feedkeys(api.nvim_replace_termcodes("0<M-f>x", true, false, true), "xt", false)
-assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one two Xthree")
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "oneY two Xthree", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
+api.nvim_buf_set_lines(typing, 0, -1, false, { "one two three" })
 api.nvim_feedkeys(api.nvim_replace_termcodes("0v<M-f>y", true, false, true), "xt", false)
 assert(fn.getreg('"') == "one t")
-api.nvim_feedkeys(api.nvim_replace_termcodes(":let g:jump = 'ab'<C-b><M-f><M-f><M-f>'x'..<CR>", true, false, true), "xt", false)
-assert(vim.g.jump == "xab")
+api.nvim_feedkeys(api.nvim_replace_termcodes("$<M-b>x0<M-f>x", true, false, true), "xt", false)
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one wo hree", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
 -- The xterm forms (<M-Left>/<M-Right>) from Windows Terminal and tmux land alike.
 api.nvim_buf_set_lines(typing, 0, -1, false, { "one two three" })
 api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-Left>X<Esc>0i<M-Right>Y<Esc>", true, false, true), "xt", false)
-assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one Ytwo Xthree")
+assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "oneY two Xthree", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
 -- Cmd+Left/Right (<C-a>/<C-e>) reach the line's start and end.
 api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
 api.nvim_feedkeys(api.nvim_replace_termcodes("A<C-a>X<C-e>Y<Esc>", true, false, true), "xt", false)
@@ -113,12 +114,51 @@ api.nvim_feedkeys(api.nvim_replace_termcodes("05lv<C-e>d", true, false, true), "
 assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "Xitem", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
 api.nvim_feedkeys(api.nvim_replace_termcodes("$v<C-a>d", true, false, true), "xt", false)
 assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "", api.nvim_buf_get_lines(typing, 0, -1, false)[1])
-api.nvim_feedkeys(api.nvim_replace_termcodes(":let g:ends = 'b'<C-a><M-f><M-f><M-f>'a'..<C-e>..'c'<CR>", true, false, true), "xt", false)
+api.nvim_feedkeys(api.nvim_replace_termcodes(":'b'<C-a>let g:ends = 'a'..<C-e>..'c'<CR>", true, false, true), "xt", false)
 assert(vim.g.ends == "abc")
 -- Option+Backspace deletes a word.
 api.nvim_buf_set_lines(typing, 0, -1, false, { "one two" })
 api.nvim_feedkeys(api.nvim_replace_termcodes("A<M-BS>XY<Esc>", true, false, true), "xt", false)
 assert(api.nvim_buf_get_lines(typing, 0, -1, false)[1] == "one XY")
+-- Typing in a buffer and on the command line, words are made of letters,
+-- digits, _, . and non-ASCII characters, as in Mac text fields, and
+-- Option+Backspace deletes back to where Option+Left goes. Each case types
+-- the text and the keys at once, as a fast typist or a macro does (<Home>
+-- goes to the start), and marks where they leave the insertion point with |.
+local function word_keys(mode, text, keys)
+  local typed = api.nvim_replace_termcodes(text .. keys .. "|<Esc>", true, false, true)
+  if mode == "i" then
+    api.nvim_buf_set_lines(typing, 0, -1, false, { "" })
+    api.nvim_feedkeys("i" .. typed, "xt", false)
+    return api.nvim_get_current_line()
+  end
+  local line
+  api.nvim_create_autocmd("CmdlineLeave", { once = true, callback = function() line = fn.getcmdline() end })
+  -- Esc, typed, leaves the command line without running it
+  api.nvim_feedkeys(":" .. typed, "xt", false)
+  return line
+end
+for _, case in ipairs({
+  { "cd ~/code/my_file.lua x", "<M-b>", "cd ~/code/my_file.lua |x" },
+  { "cd ~/code/my_file.lua x", "<M-b><M-b>", "cd ~/code/|my_file.lua x" },
+  { "cd ~/code/my_file.lua x", "<M-Left><M-Left><M-Left>", "cd ~/|code/my_file.lua x" },
+  { "cd ~/code/my_file.lua x", "<Home><M-f>", "cd| ~/code/my_file.lua x" },
+  { "cd ~/code/my_file.lua x", "<Home><M-Right><M-Right><M-Right>", "cd ~/code/my_file.lua| x" },
+  { "cd ~/code/my_file.lua x", "<Home><M-f><M-f><M-f><M-BS>", "cd ~/code/| x" },
+  { "e ~/code/my_project/foo.lua", "<M-b>", "e ~/code/my_project/|foo.lua" },
+  { "e ~/code/my_project/foo.lua", "<M-BS>", "e ~/code/my_project/|" },
+  { "e ~/code/my_project/foo.lua", "<M-BS><M-BS>", "e ~/code/|" },
+  { "e ~/café_au.lait/été", "<M-b>", "e ~/café_au.lait/|été" },
+  { "e ~/café_au.lait/été", "<M-b><M-b>", "e ~/|café_au.lait/été" },
+  { "e ~/café_au.lait/été", "<Home><M-f><M-f>", "e ~/café_au.lait|/été" },
+  { "e ~/café_au.lait/été", "<M-BS><M-BS>", "e ~/|" },
+}) do
+  for _, mode in ipairs({ "i", "c" }) do
+    local got = word_keys(mode, case[1], case[2])
+    assert(got == case[3], (mode == "i" and "typing " or "on the command line ") .. case[1] .. ", "
+      .. case[2] .. " left " .. tostring(got))
+  end
+end
 -- No terminal-mode map starts with Esc, so a single Esc reaches the program
 -- (less in :GitDiff) at once instead of waiting for a second key.
 assert(fn.mapcheck("<Esc>", "t") == "", "a terminal-mode map starts with Esc: " .. fn.mapcheck("<Esc>", "t"))

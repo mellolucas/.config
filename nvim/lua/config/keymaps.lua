@@ -251,20 +251,51 @@ for _, move in ipairs({ { "Left", "h", "left" }, { "Down", "j", "lower" }, { "Up
   map({ "i", "v", "o", "c" }, key, "<Nop>", { desc = "Ignore a pane-edge Cmd+Option+arrow" })
 end
 -- Option+Left/Right arrive as <M-b>/<M-f> (Ghostty's macOS word jumps) or as
--- <M-Left>/<M-Right> (Windows Terminal, tmux); unmapped, they too would read
--- as Esc+motion.
+-- <M-Left>/<M-Right> (Windows Terminal, tmux), Option+Backspace as <M-BS>;
+-- unmapped, they too would read as Esc+motion. While typing, in a buffer or on
+-- the command line, they step over words as Mac text fields and zsh do:
+-- letters, digits, _, . and any non-ASCII character make up words; ← goes to
+-- a word's start and → to its end, each past what lies between words, and
+-- Option+Backspace deletes back to where ← goes. Normal and visual modes keep
+-- Vim's words (b, w).
+local gap_then_word = "^[^%w_.\128-\255]*[%w_.\128-\255]*"
+-- Byte offsets in text: where ← and → go from col (← reads the text backward)
+local function word_start(text, col)
+  return col - #text:sub(1, col):reverse():match(gap_then_word)
+end
+local function word_end(text, col)
+  return col + #text:match(gap_then_word, col + 1)
+end
+-- In a buffer the keys press arrows and Delete, which undo, . and an open
+-- completion menu take as usual; they are counted as the key runs, as an
+-- <expr> map can run before the text typed just ahead of it is in. On the
+-- command line, where arrows pick completions, they set the line
+local function word_key(go, delete)
+  return function()
+    if vim.fn.mode() == "c" then
+      local text, col = vim.fn.getcmdline(), vim.fn.getcmdpos() - 1
+      local to = go(text, col)
+      vim.fn.setcmdline(delete and text:sub(1, to) .. text:sub(col + 1) or text, to + 1)
+      return
+    end
+    local text, col = vim.api.nvim_get_current_line(), vim.api.nvim_win_get_cursor(0)[2]
+    local to = go(text, col)
+    local count = vim.fn.strchars(to < col and text:sub(to + 1, col) or text:sub(col + 1, to), true)
+    local keys = (to < col and "<Left>" or "<Right>"):rep(count) .. (delete and ("<Del>"):rep(count) or "")
+    vim.api.nvim_feedkeys(vim.keycode(keys), "ni", false)
+  end
+end
 for _, back in ipairs({ "<M-b>", "<M-Left>" }) do
-  map({ "i", "c" }, back, "<S-Left>", { desc = "Word back" })
+  map({ "i", "c" }, back, word_key(word_start), { desc = "Word back" })
   map({ "n", "x" }, back, "b", { desc = "Word back" })
 end
 for _, forward in ipairs({ "<M-f>", "<M-Right>" }) do
-  map({ "i", "c" }, forward, "<S-Right>", { desc = "Word forward" })
+  map({ "i", "c" }, forward, word_key(word_end), { desc = "Word forward" })
   map({ "n", "x" }, forward, "w", { desc = "Word forward" })
 end
+map({ "i", "c" }, "<M-BS>", word_key(word_start, true), { desc = "Delete word back" })
 -- Cmd+Left/Right arrive as Ctrl+A/E (Ghostty, VS Code on macOS): the line's
 -- start and end, as at the prompt, instead of Vim's increment (a selection
 -- still adds with g Ctrl+A), line scroll, and insert-mode repeats.
 map({ "n", "x", "i", "c" }, "<C-a>", "<Home>", { desc = "Line start" })
 map({ "n", "x", "i" }, "<C-e>", "<End>", { desc = "Line end" })
--- Option+Backspace arrives as <M-BS>; delete a word as at the prompt.
-map({ "i", "c" }, "<M-BS>", "<C-w>", { desc = "Delete word back" })
