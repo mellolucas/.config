@@ -25,6 +25,12 @@ jobs:
             eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
             echo "$HOMEBREW_PREFIX/bin" >> "$GITHUB_PATH"
           fi
-          brew install zsh neovim shellcheck fzf eza ripgrep biome tmux
+          brew install zsh neovim shellcheck fzf eza ripgrep biome tmux glow
+      - name: Install the locked Neovim plugins
+        run: |
+          XDG_CONFIG_HOME="$PWD" nvim --headless -l /dev/stdin <<'EOF'
+          vim.pack.add({}, { confirm = false })
+          vim.pack.get({ "nvim-tree.lua", "mini.icons" }, { info = false })
+          EOF
       - name: Run isolated checks
         run: sh .tests/run
