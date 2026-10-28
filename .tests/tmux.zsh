@@ -1,9 +1,10 @@
 #!/usr/bin/env zsh
 # Real tmux on a private server. Where Ghostty is absent, tmux.conf keeps
 # tmux's own keys behind its Ctrl+B prefix, with splits in the pane's directory
-# and no Esc delay, checked through attached clients; workspace lays out its
-# panes. It all runs in a fixture home whose panes start zsh without user
-# configuration, so nothing reaches real history, caches, or applications.
+# and no Esc delay, and passes agents' notifications on, checked through
+# attached clients; workspace lays out its panes. It all runs in a fixture home
+# whose panes start zsh without user configuration, so nothing reaches real
+# history, caches, or applications.
 emulate -LR zsh
 setopt errexit pipefail
 
@@ -54,8 +55,9 @@ print -r -- 'ok: tmux takes no key outside its prefix'
 # own size, and name themselves through XTVERSION, which tmux keeps as
 # client_termtype. While a query goes unanswered, tmux holds a lone Esc for
 # 500 ms: up to 5 seconds after attaching, or for good when a terminal that
-# reports no pixel size leaves CSI 14 t unanswered.
-local -A version size pending replies=(
+# reports no pixel size leaves CSI 14 t unanswered. Everything a terminal
+# receives stays in received.
+local -A version size pending received replies=(
   $'\e[c' $'\e[?62;22;52c'
   $'\e[>c' $'\e[>1;10;0c'
   $'\e]10;?' $'\e]10;rgb:cdcd/d6d6/f4f4\e\\'
@@ -70,6 +72,7 @@ answer() {
     out=$pending[$client]
     while zpty -r -t $client chunk 2>/dev/null; do
       out+=$chunk
+      received[$client]+=$chunk
       heard=1
     done
     rows=${size[$client]% *} cols=${size[$client]#* }
@@ -155,6 +158,14 @@ wait_for 'the pane below does not run zsh' '[[ $(state "#{pane_current_command}"
 [[ $(state '#{pane_current_path}') == $HOME/inner ]] || fail "the split below opened in $(state '#{pane_current_path}')"
 (( $(state '#{pane_top}') > 0 )) || fail 'Ctrl+B then " did not split below'
 print -r -- 'ok: keys reach programs through attached clients, and Ctrl+B splits in place'
+
+# Agents wrap their notifications (OSC 9) in tmux's passthrough, which hands
+# them to the terminal even from a pane out of sight, in another window.
+tmux new-window -d -t test 'printf "\033Ptmux;\033\033]9;agent done\007\033\\\\"; exec cat'
+notification=$'\e]9;agent done\a'
+wait_for 'a notification from a pane out of sight did not reach the terminal' \
+  '[[ $received[fixture] == *$notification* ]]'
+print -r -- 'ok: agent notifications reach the terminal through tmux, also from panes out of sight'
 
 # workspace: a session per directory, reattached on rerun, with its commands
 # run in the right panes (harmless ones: never an editor or an agent).

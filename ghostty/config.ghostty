@@ -3,6 +3,14 @@ theme = dark:Catppuccin Mocha,light:Catppuccin Latte
 window-save-state = always
 auto-update = off
 
+# A command of 10 s or more that finishes in a pane you aren't in notifies and
+# rings the bell, which marks the pane with a border besides the default dock
+# bounce and title bell. Agents send their own notifications
+notify-on-command-finish = unfocused
+notify-on-command-finish-action = bell,notify
+notify-on-command-finish-after = 10s
+bell-features = border
+
 # Option types characters with either key (ç, é), as in every Mac app; on US
 # layouts Ghostty would make it Alt. The word keys stay: Ghostty's own
 # Option+arrows jump words, and Option+Backspace deletes one

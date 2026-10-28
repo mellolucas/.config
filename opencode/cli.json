@@ -18,5 +18,8 @@
     "scrollbar": true,
     "thinking": "show"
   },
-  "animations": true
+  "animations": true,
+  "attention": {
+    "notifications": true
+  }
 }

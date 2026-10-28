@@ -534,16 +534,20 @@ RUBY
 # pane's edge Cmd+Option+arrows reach the program, where Neovim moves between
 # windows and zsh ignores them; Option types characters, and Option+Backspace
 # still sends ESC DEL, a word delete in zsh and Neovim (both checked by
-# behavior, in .tests/zle.zsh and .tests/nvim.lua).
+# behavior, in .tests/zle.zsh and .tests/nvim.lua). Its notifications, which no
+# test can raise either: commands of 10 s or more that finish in a pane you
+# aren't in notify and ring the bell, which marks the pane with a border.
 (
-  # Whole active lines only (indentation stripped), so commented-out binds fail.
+  # Whole active lines only (indentation stripped), so commented-out lines fail.
   setopt extendedglob
   ghostty_lines=(${${(f)"$(<"$repo/ghostty/config.ghostty")"}##[[:space:]]#})
   for line in 'macos-option-as-alt = false' 'keybind = alt+backspace=text:\x1b\x7f' \
     'keybind = performable:super+alt+arrow_left=goto_split:left' \
     'keybind = performable:super+alt+arrow_down=goto_split:down' \
     'keybind = performable:super+alt+arrow_up=goto_split:up' \
-    'keybind = performable:super+alt+arrow_right=goto_split:right'; do
+    'keybind = performable:super+alt+arrow_right=goto_split:right' \
+    'notify-on-command-finish = unfocused' 'notify-on-command-finish-action = bell,notify' \
+    'notify-on-command-finish-after = 10s' 'bell-features = border'; do
     (( ${ghostty_lines[(Ie)$line]} )) || fail "ghostty lacks: $line"
   done
 )

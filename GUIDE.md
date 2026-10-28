@@ -153,6 +153,7 @@ Agents run full screen and keep their own history; each scrolls, searches, and c
 - `Home` / `End` are `Fn+←` / `Fn+→` on Mac keyboards.
 
 - Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
+- When an agent finishes or needs you while you're in another pane or app, macOS notifies you (allow Ghostty's notifications when it first asks); Copilot CLI's start off, and the README shows how to turn them on. A shell command that ran 10 s or more notifies the same way when it finishes, and its bell marks the pane with a border until you return.
 - In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C`.
 - Repository guidance lives in `AGENTS.md`; Claude Code reads it directly.
 - Set a different default in `zsh/local.zsh`: `export DOTFILES_WORKSPACE_AGENT_CMD='claude'`.
