@@ -54,6 +54,9 @@ while (( ${+aliases[$cmd[1]]} )); do
   [[ $cmd[1] != $previous ]] || break
 done
 
+# An alias shows what it runs first
+(( ! ${+aliases[$1]} )) || print -r -- "$1 → ${(j: :)${(@q-)cmd}}"
+
 if (( ${+builtins[$cmd[1]]} )); then
   if [[ ! -o interactive ]]; then
     man zshbuiltins

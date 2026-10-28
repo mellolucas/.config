@@ -417,17 +417,22 @@ editor() { record editor "$@"; }
 (
   unfunction bat
   alias help-first='help-second --first' help-second='editor --second'
-  help help-first 'user argument'
+  help help-first 'user argument' >/dev/null
   expect $'editor\n--second\n--first\nuser argument\n--help' "$(recorded)" 'plain alias chain'
+  # An alias shows what it runs, through every alias, then that command's help.
+  helped() { print -r -- 'usage: helped'; }
+  alias help-outer='help-inner --outer' help-inner='helped --inner'
+  output=$(help help-outer)
+  expect $'help-outer → helped --inner --outer\nusage: helped' "$output" "help shows an alias's expansion first"
   # Git's @{...} revisions pass (gdo, gdi).
   alias help-upstream='editor HEAD...@{upstream}'
-  help help-upstream
+  help help-upstream >/dev/null
   expect $'editor\nHEAD...@{upstream}\n--help' "$(recorded)" 'alias with a Git upstream revision'
   # Real Git answers `git diff REV --help` with a usage error (exit 129), so
   # help asks for the subcommand's manual without the words in between.
   git() { record git "$@"; }
   alias help-gdo='git diff @{upstream}...@'
-  help help-gdo
+  help help-gdo >/dev/null
   expect $'git\ndiff\n--help' "$(recorded)" 'git alias with a revision'
 
   source /dev/stdin <<< "$alias_block"
@@ -445,7 +450,7 @@ editor() { record editor "$@"; }
   expect $'man\nzshbuiltins' "$(recorded)" 'exit uses builtin documentation without exiting caller'
 
   EDITOR='editor --clean'
-  help vi
+  help vi >/dev/null
   expect $'editor\n--clean\n--help' "$(recorded)" 'deferred multiword editor'
 
   editor_name='editor with spaces'
@@ -456,24 +461,24 @@ editor() { record editor "$@"; }
     [[ $name != view ]] || expected+=$'\n-R\n-M'
     eval "$name"' "file name"'
     expect "$expected"$'\nfile name' "$(recorded)" "$name uses the same editor tokenization"
-    help "$name"
+    help "$name" >/dev/null
     expect "$expected"$'\n--help' "$(recorded)" "help $name matches the editor alias"
   done
 
   EDITOR='editor "$HOME" "$(print injected > $test_root/injected)" ; literal'
   eval 'vi "file name"'
   expect $'editor\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\nfile name' "$(recorded)" 'editor tokens are literal, not shell expressions'
-  help vi
+  help vi >/dev/null
   expect $'editor\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\n--help' "$(recorded)" 'help editor tokens remain literal'
   [[ ! -e "$test_root/injected" ]] || fail 'editor command substitution executed'
 
   eza() { record eza "$@"; }
   source /dev/stdin <<< "$alias_block"
-  help ll 'directory name'
+  help ll 'directory name' >/dev/null
   expect $'eza\n--all\n--group-directories-first\n--icons=auto\n--git\n--hyperlink=auto\n--long\n--binary\n--time-style=relative\ndirectory name\n--help' "$(recorded)" 'help listing alias chain'
   alias gs='git status --ignored'
   git() { record git "$@"; }
-  help gs
+  help gs >/dev/null
   expect $'git\nstatus\n--help' "$(recorded)" 'help git subcommand alias'
 
   for expression in 'editor | fail unexpected' 'editor $(print injected > $test_root/injected)'; do
@@ -509,6 +514,19 @@ expect $'editor\n--clean\n--\n-c quit | touch should-not-run' "$(recorded)" 'edi
   fzfv
   expect $'editor with spaces\n--clean\nprofile name\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\n--\n-c quit | touch should-not-run' "$(recorded)" 'fzfv literal quoted editor tokens'
   [[ ! -e "$test_root/injected" ]] || fail 'fzfv evaluated editor command substitution'
+)
+
+# fzfv and mdv print their own usage, running neither fzf nor glow.
+(
+  source /dev/stdin <<< "$alias_block"
+  /bin/rm -f "$test_root/call"
+  for helper in fzfv mdv; do
+    for flag in -h --help; do
+      output=$($helper "$flag") || fail "$helper $flag status"
+      [[ $output == "usage: $helper "* ]] || fail "$helper $flag: $output"
+    done
+  done
+  [[ ! -e $test_root/call ]] || fail "usage ran: $(recorded)"
 )
 
 # Each preview as fzf runs it: Markdown through glow, other files through bat,

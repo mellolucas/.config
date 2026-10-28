@@ -2,6 +2,13 @@
 
 emulate -L zsh
 
+if [[ $1 == (-h|--help) ]]; then
+  print -r -- 'usage: fzfv [FZF_OPTIONS...]'
+  print -r -- 'Pick a file below here, each previewed; Enter opens it in your editor.'
+  print -r -- "fzf's options pass through (fzf --help lists them)."
+  return 0
+fi
+
 command -v fzf >/dev/null 2>&1 || {
   print -u2 -- "fzfv: fzf not found"
   return 1

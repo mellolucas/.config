@@ -179,7 +179,14 @@ if command -v glow >/dev/null 2>&1; then
   # A function, so Tab offers Markdown files where glow's own completion lists
   # its subcommands; zsh reads this whole block before the alias above exists,
   # hence the style spelled out
-  mdv() { \glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" -p -w 0 "$@" }
+  mdv() {
+    if [[ $1 == (-h|--help) ]]; then
+      print -r -- 'usage: mdv FILE...'
+      print -r -- "Render Markdown in the pager; glow's options pass through (glow --help lists them)."
+      return 0
+    fi
+    \glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" -p -w 0 "$@"
+  }
   (( ! $+functions[compdef] )) || compdef '_files -g "*.(md|markdown|mdown|mkd|mdx)(-.)"' mdv
 fi
 

@@ -269,7 +269,7 @@ Update this setup when the shell reminds you: a week after the last full update,
 | `dotfiles bundle` | Apply the Brewfile and `local.Brewfile`, then update their npm packages |
 | `dotfiles link` | Relink configuration without touching packages |
 | `dotfiles doctor` | Environment health, with a fix for each problem |
-| `help COMMAND` | A command's help, even through an alias; its manual when it has no `--help` |
+| `help COMMAND` | A command's help, even through an alias, whose expansion comes first; its manual when it has no `--help` |
 
 - `dots` is short for `dotfiles`; `dotsup` runs `dotfiles update`. Homebrew refreshes its package list once it is a day old; run `brew update` first for the very latest.
 - Personal overrides belong in the ignored `local` files described in the README.
