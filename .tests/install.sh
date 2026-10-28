@@ -19,6 +19,8 @@ unset GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR
 unset GIT_CONFIG_COUNT GIT_CONFIG_PARAMETERS GIT_TEMPLATE_DIR
 # Never the Codespaces or dev container path by accident: it runs sudo chsh.
 unset CODESPACES REMOTE_CONTAINERS
+# Each check selects its own Brewfile, never the caller's.
+unset HOMEBREW_BUNDLE_FILE_GLOBAL
 # Tool homes follow each test's XDG homes, never the caller's environment.
 xdg_vars=$(sed -n 's/^export \([A-Z_][A-Z0-9_]*\)=.*/\1/p' "$repo/zsh/xdg.sh")
 # shellcheck disable=SC2086 # one variable name per word
@@ -127,6 +129,41 @@ check grep -Fxq 'bootstrap NONINTERACTIVE=unset' "$test_root/bootstrap.log"
 check grep -Fxq 'bootstrap NONINTERACTIVE=1' "$test_root/bootstrap.log"
 check grep -Fxq 'bootstrap NONINTERACTIVE=0' "$test_root/bootstrap.log"
 
+# A failed Homebrew bootstrap skips Homebrew and the Brewfile: install says
+# what failed, lists both as skipped, prints its closing steps, and exits 1.
+for failure in download installer; do
+  set +e
+  (
+    set -e
+    export HOME="$test_root/bootstrap-$failure"
+    export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+    export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+    # shellcheck source=/dev/null
+    . "$test_root/library.sh"
+    repo_dir="$test_root/repo" installer="$test_root/repo/install.sh"
+    brew_bin() { return 1; }
+    if [ "$failure" = download ]; then
+      curl() { return 22; }
+    else
+      curl() { printf 'exit 1\n'; }
+    fi
+    with_layout install_dotfiles
+  ) > "$test_root/bootstrap-$failure.log" 2>&1
+  rc=$?
+  set -e
+  log="$test_root/bootstrap-$failure.log"
+  [ "$rc" = 1 ] || fail "install after a failed Homebrew $failure exited $rc: $(cat "$log")"
+  check grep -q '^error: .*Homebrew' "$log"
+  if [ "$failure" = download ]; then check grep -q '^error: .*https://' "$log"; fi
+  check grep -Fqx 'skipped:' "$log"
+  check grep -q '^  Homebrew' "$log"
+  check grep -q '^  .*Brewfile' "$log"
+  check grep -Fq 'Network access' "$log"
+  check grep -q '^done, except' "$log"
+  check grep -Fq 'exec zsh -l' "$log"
+  check grep -Fq 'dotfiles doctor' "$log"
+done
+
 with_layout install_dotfiles > "$test_root/install.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
@@ -180,7 +217,10 @@ case "$*" in
     printf 'invoked\n' >> "$HOME/brew.log"
     [ -z "${FAIL_BUNDLE-}" ] || exit 1
     ;;
-  'bundle list --global --npm') printf '@scope/tool\nplain-tool\n' ;;
+  'bundle list --global --npm')
+    [ -z "${FAIL_NPM_LIST-}" ] || exit 1
+    printf '@scope/tool\nplain-tool\n'
+    ;;
   --prefix) printf '%s\n' "$HOME/prefix" ;;
   *) exit 1 ;;
 esac
@@ -189,6 +229,7 @@ cat > "$test_root/package-bin/npm" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >> "$HOME/npm.log"
 printf '%s\n' "${NPM_CONFIG_CACHE-unset}" >> "$HOME/npm-cache.log"
+[ -z "${FAIL_NPM_UPDATE-}" ] || exit 1
 EOF
 printf '#!/bin/sh\nprintf "Linux\\n"\n' > "$test_root/package-bin/uname"
 chmod +x "$test_root/package-bin/brew" "$test_root/package-bin/npm" "$test_root/package-bin/uname" "$installer"
@@ -273,6 +314,81 @@ for operation in bundle install; do
     fi
   )
 done
+
+# npm's updates are listed as skipped, and bundle exits 1, when Homebrew can't
+# list them, when npm fails, or, without running npm, when it is neither beside
+# brew nor on PATH (a bundle that failed before Node arrived).
+mkdir "$test_root/no-npm-bin"
+ln -s "$test_root/package-bin/brew" "$test_root/no-npm-bin/brew"
+for failure in list update missing; do
+  (
+    export HOME="$test_root/npm-$failure" PATH="$test_root/package-bin:$PATH"
+    export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+    export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+    export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
+    unset HOMEBREW_BUNDLE_NO_UPGRADE
+    mkdir "$HOME" "$HOME/prefix"
+    printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
+    case "$failure" in
+      list) export FAIL_NPM_LIST=1 ;;
+      update) export FAIL_NPM_UPDATE=1 ;;
+      missing)
+        PATH="$test_root/no-npm-bin:/usr/bin:/bin"
+        if command -v npm >/dev/null 2>&1; then
+          printf 'SKIP: bundle without npm (the system has %s)\n' "$(command -v npm)"
+          exit 0
+        fi
+        ;;
+    esac
+    rc=0
+    "$installer" bundle > "$HOME/dispatch.log" 2>&1 || rc=$?
+    check test "$rc" = 1
+    check grep -Fqx 'skipped:' "$HOME/dispatch.log"
+    check grep -q '^  npm package updates' "$HOME/dispatch.log"
+    check test ! -e "$XDG_STATE_HOME/dotfiles/updated"
+    if [ "$failure" = missing ]; then
+      check grep -q '^  npm.*not installed' "$HOME/dispatch.log"
+      if grep -q 'not found' "$HOME/dispatch.log"; then fail 'bundle ran npm where none is installed'; fi
+    fi
+  )
+done
+
+# A bundle that can't record its time names the folder in one line and
+# finishes in any POSIX sh: bundle exits 0, and install prints its closing
+# steps.
+if [ "$(id -u)" -eq 0 ]; then
+  printf 'SKIP: an unwritable state folder (root writes anywhere)\n'
+else
+  for shell in sh dash; do
+    if ! command -v "$shell" >/dev/null 2>&1; then
+      printf 'SKIP: an unwritable state folder under %s, which is not installed\n' "$shell"
+      continue
+    fi
+    for operation in bundle install; do
+      (
+        export HOME="$test_root/stamp-$shell-$operation" PATH="$test_root/package-bin:$PATH"
+        export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+        export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+        export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
+        unset HOMEBREW_BUNDLE_NO_UPGRADE
+        mkdir -p "$HOME/prefix" "$XDG_STATE_HOME/dotfiles"
+        printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
+        chmod a-w "$XDG_STATE_HOME/dotfiles"
+        rc=0
+        "$shell" "$installer" "$operation" > "$HOME/dispatch.log" 2>&1 || rc=$?
+        # Writable again before any check can fail, so the test root can be removed.
+        chmod u+w "$XDG_STATE_HOME/dotfiles"
+        [ "$rc" = 0 ] || fail "$operation under $shell with an unwritable state folder exited $rc: $(cat "$HOME/dispatch.log")"
+        check test "$(grep -Fc "$XDG_STATE_HOME/dotfiles" "$HOME/dispatch.log")" = 1
+        if [ "$operation" = install ]; then
+          check grep -Fqx 'done.' "$HOME/dispatch.log"
+          check grep -Fq 'exec zsh -l' "$HOME/dispatch.log"
+          check grep -Fq 'dotfiles doctor' "$HOME/dispatch.log"
+        fi
+      )
+    done
+  done
+fi
 
 # A machine's own global npm config stays; another account's Homebrew, which
 # this user can't write, gets none, and linking still succeeds.

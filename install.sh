@@ -260,25 +260,23 @@ ensure_homebrew() {
 
   command -v curl >/dev/null 2>&1 || {
     printf 'error: curl is required to install Homebrew\n' >&2
-    exit 1
+    return 1
   }
 
   command -v bash >/dev/null 2>&1 || {
     printf 'error: bash is required to install Homebrew\n' >&2
-    exit 1
+    return 1
   }
 
   printf 'installing Homebrew...\n'
   installer_url=https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh
   install_script=$(curl -fsSL "$installer_url") || {
     printf 'error: failed to download the Homebrew installer from %s\n' "$installer_url" >&2
-    printf 'hint: if the network blocks it, see Network access in the README\n' >&2
-    exit 1
+    return 1
   }
   /bin/bash -c "$install_script" || {
     printf 'error: Homebrew installation failed\n' >&2
-    printf 'hint: if a download failed, see Network access in the README\n' >&2
-    exit 1
+    return 1
   }
 }
 
@@ -317,8 +315,14 @@ link_dotfiles() {
 install_dotfiles() {
   link_dotfiles
   use_zsh_login_shell
-  ensure_homebrew
-  bundle_dotfiles
+  if ensure_homebrew; then
+    bundle_dotfiles
+  else
+    bundle_skipped='  Homebrew, which could not be installed
+  the Brewfile, which needs Homebrew
+'
+    print_skipped install
+  fi
 
   if [ -n "$bundle_skipped" ]; then
     printf '\ndone, except what was skipped above.\n'
@@ -328,6 +332,12 @@ install_dotfiles() {
   printf 'restart your shell or run: exec zsh -l\n'
   printf 'then dotfiles doctor names anything left to set up (such as your Git identity), and keys shows what this setup adds\n'
   [ -z "$bundle_skipped" ] || exit 1
+}
+
+# Lists what bundle_skipped names, then the command that retries it.
+print_skipped() {
+  printf '\nskipped:\n%s' "$bundle_skipped" >&2
+  printf 'hint: if a download failed, see Network access in the README; then run: dotfiles %s\n' "$1" >&2
 }
 
 # Follows `brew bundle --global` Brewfile resolution (HOMEBREW_BUNDLE_FILE_GLOBAL
@@ -366,7 +376,12 @@ bundle_dotfiles() {
   elif ! npm_packages=$("$brew" bundle list --global --npm); then
     bundle_skipped="$bundle_skipped  npm package updates: Homebrew couldn't list them
 "
-  elif [ -n "$npm_packages" ]; then
+  elif [ -z "$npm_packages" ]; then
+    :
+  elif ! command -v npm >/dev/null 2>&1; then
+    bundle_skipped="$bundle_skipped  npm package updates: npm is not installed
+"
+  else
     printf 'updating npm packages from the Brewfile\n'
     # shellcheck disable=SC2086 # one package name per word
     npm update --global --ignore-scripts --min-release-age=1 $npm_packages ||
@@ -375,12 +390,12 @@ bundle_dotfiles() {
   fi
 
   if [ -n "$bundle_skipped" ]; then
-    printf '\nskipped:\n%s' "$bundle_skipped" >&2
-    printf 'hint: if a download failed, see Network access in the README; then run: dotfiles bundle\n' >&2
+    print_skipped bundle
     return 0
   fi
   # The shell's weekly update reminder counts from the last full bundle
-  { mkdir -p "$xdg_state_home/dotfiles" && : >"$xdg_state_home/dotfiles/updated"; } 2>/dev/null || :
+  { mkdir -p "$xdg_state_home/dotfiles" && touch "$xdg_state_home/dotfiles/updated"; } 2>/dev/null ||
+    printf 'note: could not record this update in %s for the weekly update reminder\n' "$xdg_state_home/dotfiles" >&2
 }
 
 # repo_dir must be its own work-tree top level: rev-parse alone also succeeds
