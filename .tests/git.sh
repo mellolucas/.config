@@ -82,16 +82,21 @@ for kind in pager filter; do
   done
 done
 
-run_clone() (
-  export PATH="$test_root/no-executables"
-  # shellcheck disable=SC2329
-  gh() { printf '%s\n' gh "$#" "$@" >> "$test_root/calls"; }
-  # shellcheck disable=SC2329
-  git() { printf '%s\n' git "$#" "$@" >> "$test_root/calls"; }
-  if [ "$available" = no ]; then unset -f gh; fi
-  # Git appends the alias arguments to the configured shell command.
-  eval "${clone#\!}"' "$@"'
-)
+# Git runs the alias itself; stand-ins record the gh or git clone it starts.
+# Git puts its exec-path first on the alias's PATH, so the stand-ins live there.
+for available in yes no; do
+  mkdir -p "$test_root/bin-$available"
+  for tool in gh git; do
+    [ "$available$tool" != nogh ] || continue
+    printf '#!/bin/sh\nprintf "%%s\\n" %s "$#" "$@" >> "%s/calls"\n' "$tool" "$test_root" > "$test_root/bin-$available/$tool"
+    chmod +x "$test_root/bin-$available/$tool"
+  done
+done
+run_clone() {
+  env -i PATH="$test_root/bin-$available" GIT_EXEC_PATH="$test_root/bin-$available" HOME="$HOME" \
+    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_GLOBAL=/dev/null \
+    "$git_cmd" -c alias.clone-smart="$clone" clone-smart "$@"
+}
 
 for available in yes no; do
   if [ "$available" = yes ]; then
