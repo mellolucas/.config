@@ -16,3 +16,8 @@
 # cask "discord" if OS.mac?
 # cask "steam" if OS.mac?
 # cask "battle-net" if OS.mac?
+
+# Desktop apps for the agents: they update themselves, and may keep files in
+# ~/.claude and ~/.codex rather than the agents' XDG homes
+# cask "claude" if OS.mac?
+# cask "chatgpt" if OS.mac?
