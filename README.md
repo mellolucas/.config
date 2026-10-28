@@ -26,10 +26,9 @@ Open Ghostty, then:
 1. Copy `~/.config/git/config.d/personal.example` (or `work.example`) to `personal` (or `work`) beside it and fill in your identity and signing key (the template's comments show how to create one); Git refuses to commit until an identity exists.
 2. Run `gh auth login`; Git uses it for GitHub credentials.
 3. Log in to each agent you use (`opencode`, `claude`, `copilot`, `codex`) through its own flow.
-4. On macOS, turn off Obsidian's automatic updates in its settings.
-5. If you use Time Machine, run `tmutil addexclusion ~/.cache` once: it skips `~/Library/Caches` but not `~/.cache`.
-6. Run `dotfiles doctor`: it checks the links, tools, login shell, Git identity, GitHub login, and home folder, names a fix for each problem, and ends with "no problems found" once everything is in place.
-7. In a project, run `workspace`; run `keys` to see everything else this setup adds.
+4. If you use Time Machine, run `tmutil addexclusion ~/.cache` once: it skips `~/Library/Caches` but not `~/.cache`.
+5. Run `dotfiles doctor`: it checks the links, tools, login shell, Git identity, GitHub login, and home folder, names a fix for each problem, and ends with "no problems found" once everything is in place.
+6. In a project, run `workspace`; run `keys` to see everything else this setup adds.
 
 ## Daily use
 
@@ -47,7 +46,7 @@ dotfiles doctor        # Environment health; names fixes and exits 1 on problems
 dotfiles uninstall     # Remove owned links; packages, backups, and data stay
 ```
 
-Homebrew owns package installs and upgrades: Ghostty's updater is off and OpenCode only notifies; turn off Obsidian's own updater (see [First run](#first-run)). No update check runs at shell startup; `check-updates` and `update` are explicit. `check-updates` never refreshes Homebrew's package list, while `update` and `bundle` let Homebrew refresh it once it is a day old, as any `brew install` does; `brew update` refreshes it right away. Incoming updates need a clean checkout that can fast-forward; `update --discard` is the explicit destructive alternative.
+Homebrew owns package installs and upgrades: Ghostty's updater is off, OpenCode only notifies, and Obsidian's own updater can be turned off in its settings. No update check runs at shell startup; `check-updates` and `update` are explicit. `check-updates` never refreshes Homebrew's package list, while `update` and `bundle` let Homebrew refresh it once it is a day old, as any `brew install` does; `brew update` refreshes it right away. Incoming updates need a clean checkout that can fast-forward; `update --discard` is the explicit destructive alternative.
 
 Neovim plugins are the one thing Homebrew does not update: run `:lua vim.pack.update()` in Neovim, read the pending changes, `:write` to apply them (or `:quit` to skip), then commit the changed `nvim/nvim-pack-lock.json`.
 
