@@ -192,12 +192,101 @@ STUB
     [[ $line == "$long_hash $shown…$tail" && $long == "$shown"?* ]] ||
       fail "cut commit line at $columns columns: $line"
   done
-  # A linked worktree shares its repository's fetches.
-  : > .git/FETCH_HEAD
+  # Repository text prints as it is, backslashes and percent signs included.
+  subject='Literal \n, \c and 100%'
+  git commit -q --allow-empty -m "$subject"
+  hash=$(git log -1 --format=%h)
+  card=$(COLUMNS=80 git-glance) || fail 'git-glance status with a literal subject'
+  lines=(${(f)card//$'\e'\[[0-9;]#m})
+  line=${(M)lines:#$hash *}
+  expect "$hash $subject · 2 days ago by Ann Author" "$line" 'subject printed as it is'
+  # Git keeps each worktree's fetches apart, here from a local origin; the
+  # card counts the newest, wherever it was made.
+  git clone -q --bare . "$test_root/glance-origin.git"
+  git remote add origin "$test_root/glance-origin.git"
   git worktree add -q ../worktree
-  builtin cd ../worktree
-  card=$(git-glance) || fail 'git-glance status in a linked worktree'
-  [[ $card == *'fetched 0m ago'* ]] || fail "git-glance fetch age in a linked worktree: $card"
+  git fetch -q origin
+  /usr/bin/touch -t "$(strftime '%Y%m%d%H%M.%S' $(( EPOCHSECONDS - 2 * 86400 )))" .git/FETCH_HEAD
+  card=$(builtin cd ../worktree && git-glance) || fail 'git-glance status in a linked worktree'
+  [[ $card == *'fetched 2d ago'* ]] || fail "the main checkout's fetch, seen from a linked worktree: $card"
+  git -C ../worktree fetch -q origin
+  card=$(git-glance) || fail 'git-glance status after a fetch in a linked worktree'
+  [[ $card == *'fetched 0m ago'* ]] || fail "a linked worktree's fetch, seen from the main checkout: $card"
+)
+
+# A busy repository at 40 columns: a long branch tracking a long upstream with
+# commits both ways, a merge stopped at a conflict beside staged, modified and
+# untracked files, and log.showSignature on over a signed commit. No line is
+# wider than the card, and all of it shows: both names cut short with … beside
+# the counts, every worktree count, and each commit, its age dropped where the
+# subject would have too little room.
+(
+  for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null LC_ALL=C.UTF-8
+  zmodload zsh/datetime
+  export GIT_AUTHOR_NAME='Ann Author' GIT_AUTHOR_EMAIL=ann@example.com
+  export GIT_COMMITTER_NAME='Ann Author' GIT_COMMITTER_EMAIL=ann@example.com
+  setopt extendedglob
+  path=("$test_root/git-bin")
+  autoload -Uz git-glance
+  origin=$test_root/busy-origin busy=$HOME/code/owner/busy
+  branch=feature/a-tracking-branch-name-long-enough-to-cut
+  # The first commit is two years and eleven months old, the others two days
+  export GIT_AUTHOR_DATE="$(( EPOCHSECONDS - 1065 * 86400 )) +0000"
+  export GIT_COMMITTER_DATE=$GIT_AUTHOR_DATE
+  git init -q --template= "$origin"
+  print -r -- base > "$origin/a.txt"
+  print -r -- kept > "$origin/c.txt"
+  git -C "$origin" add a.txt c.txt
+  git -C "$origin" commit -q -m 'Base files to start from'
+  git -C "$origin" checkout -q -b "$branch"
+  git clone -q -b "$branch" "$origin" "$busy"
+  export GIT_AUTHOR_DATE="$(( EPOCHSECONDS - 2 * 86400 )) +0000"
+  export GIT_COMMITTER_DATE=$GIT_AUTHOR_DATE
+  git -C "$origin" commit -q --allow-empty -m 'Upstream moves on'
+  builtin cd "$busy"
+  git fetch -q
+  git branch side
+  print -r -- mine > a.txt
+  git commit -q -am 'Change a line'
+  # A signed commit (with a stand-in signature), which log.showSignature
+  # checks, printing lines of its own
+  signed=$(print -rl -- "tree $(git rev-parse 'HEAD^{tree}')" "parent $(git rev-parse HEAD)" \
+    "author Ann Author <ann@example.com> $GIT_AUTHOR_DATE" \
+    "committer Ann Author <ann@example.com> $GIT_COMMITTER_DATE" \
+    'gpgsig -----BEGIN SSH SIGNATURE-----' ' U1NIU0lH' ' -----END SSH SIGNATURE-----' '' \
+    'Sign the change' | git hash-object -t commit -w --stdin)
+  git merge -q --ff-only "$signed"
+  git config log.showSignature true
+  git checkout -q side
+  print -r -- theirs > a.txt
+  print -r -- new > b.txt
+  git add a.txt b.txt
+  git commit -q -m 'Change the same line'
+  git checkout -q "$branch"
+  git merge -q side > /dev/null 2>&1 || :
+  print -r -- changed > c.txt
+  print -r -- loose > d.txt
+  card=$(COLUMNS=40 git-glance 2>&1) || fail 'git-glance status in a busy repository'
+  lines=("${(@f)card//$'\e'\[[0-9;]#m}")
+  for line in $lines; do
+    (( ${#line} <= 40 )) || fail "busy card line wider than 40 columns: $line"
+  done
+  [[ $lines[2] == 'owner/busy '*' fetched 0m ago' ]] || fail "busy repository row: $lines[2]"
+  (( ${lines[(Ie)⚠ merge in progress]} )) || fail "busy card lacks the merge: ${(F)lines}"
+  line=${(M)lines:#branch *}
+  [[ $line == "branch    feature/"*"… → origin/"*"… ↑2 ↓1" ]] || fail "busy branch row: $line"
+  index=${lines[(i)worktree *]}
+  expect $'worktree  1 conflicted · 1 staged\n          1 modified · 1 untracked' "${(F)lines[index,index + 1]}" \
+    'busy worktree rows'
+  hashes=(${(f)"$(git log -3 --no-show-signature --format=%h)"})
+  expect $'\n'"$hashes[1] Sign the change · 2 days ago"$'\n'"$hashes[2] Change a line · 2 days ago"$'\n'"$hashes[3] Base files to start from" \
+    "${(F)lines[-4,-1]}" 'busy commits'
+  # Wider, the upstream gives way first, and the branch shows whole
+  card=$(COLUMNS=80 git-glance 2>&1) || fail 'git-glance status in a busy repository at 80 columns'
+  lines=("${(@f)card//$'\e'\[[0-9;]#m}")
+  line=${(M)lines:#branch *}
+  [[ $line == "branch    $branch → origin/"*"… ↑2 ↓1" && ${#line} -le 80 ]] || fail "busy branch row at 80 columns: $line"
 )
 
 (

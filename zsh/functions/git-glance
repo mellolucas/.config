@@ -31,23 +31,23 @@ branch=$(git symbolic-ref --short -q HEAD) ||
   branch="detached @ $(git rev-parse --short HEAD 2>/dev/null || print -- unborn)"
 
 # Sync with upstream (counts only as fresh as the last fetch)
-local track upstream
+local upstream ahead='' behind=''
 local -a lr
 if upstream=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null); then
   lr=($(git rev-list --left-right --count '@{upstream}...@' 2>/dev/null))
-  (( ${#upstream} > 26 )) && upstream="${upstream[1,25]}…"
-  track="→ ${upstream//\%/%%}"
-  (( ${lr[2]:-0} )) && track+=" %F{green}↑${lr[2]}%f" # Outgoing commits
-  (( ${lr[1]:-0} )) && track+=" %F{red}↓${lr[1]}%f"   # Incoming commits
+  (( ${lr[2]:-0} )) && ahead=" ↑${lr[2]}"  # Outgoing commits
+  (( ${lr[1]:-0} )) && behind=" ↓${lr[1]}" # Incoming commits
 else
-  track='→ no upstream'
+  upstream=''
 fi
 
 local fetched='never fetched'
-local -a mtime
-# Worktrees share the main repository's fetches
-if zstat -A mtime +mtime "$commondir/FETCH_HEAD" 2>/dev/null; then
-  local -i age=$(( EPOCHSECONDS - mtime[1] ))
+local -a heads mtimes
+# Each worktree keeps the FETCH_HEAD of its own fetches; the newest counts
+heads=($commondir/FETCH_HEAD(N.) $commondir/worktrees/*/FETCH_HEAD(N.))
+if (( $#heads )) && zstat -A mtimes +mtime -- $heads 2>/dev/null; then
+  mtimes=(${(On)mtimes})
+  local -i age=$(( EPOCHSECONDS - mtimes[1] ))
   if   (( age < 3600 ));  then fetched="fetched $(( age / 60 ))m ago"
   elif (( age < 86400 )); then fetched="fetched $(( age / 3600 ))h ago"
   else                         fetched="fetched $(( age / 86400 ))d ago"
@@ -95,7 +95,35 @@ local -i width=${COLUMNS:-0}
 (( width <= 100 )) || width=100
 local repo=${toplevel:h:t}/${toplevel:t}
 (( ${#repo} > width - 20 )) && repo="${repo[1,width - 21]}…"
-(( ${#branch} > 26 )) && branch="${branch[1,25]}…"
+
+# The branch row keeps its ↑/↓ counts: the upstream gives way first, down to
+# 8 columns, then the branch
+local -i room=$(( width - 13 - ${#ahead} - ${#behind} ))
+local -i keep=$(( room - ${#branch} ))
+(( keep >= 8 )) || keep=8
+(( ${#upstream} <= keep )) || upstream="${upstream[1,keep - 1]}…"
+keep=$(( room - ${#${upstream:-no upstream}} ))
+(( keep >= 1 )) || keep=1
+(( ${#branch} <= keep )) || branch="${branch[1,keep - 1]}…"
+local track="→ ${${upstream:-no upstream}//\%/%%}"
+[[ -z $ahead ]]  || track+="%F{green}$ahead%f"
+[[ -z $behind ]] || track+="%F{red}$behind%f"
+
+# The worktree row wraps under its values rather than running past the width
+local worktree='' item plain
+local -i column=0
+for item in $wt; do
+  plain=${${item#\%F\{*\}}%\%f}
+  if (( column && 10 + column + 3 + ${#plain} > width )); then
+    worktree+=$'\n'${(l:10:):-}
+    column=0
+  elif (( column )); then
+    worktree+=' · '
+    (( column += 3 ))
+  fi
+  worktree+=$item
+  (( column += ${#plain} ))
+done
 
 local stash=${stashes[1]:-} nstash=$#stashes
 (( ${#stash} > width - 13 - $#nstash )) && stash="${stash[1,width - 14 - $#nstash]}…"
@@ -121,26 +149,25 @@ if [[ $ZSH_SUBSHELL == 0 && -t 1 ]] && (( ${+commands[tput]} )); then
     print -rn -- "$canvas_home"
   fi
 fi
-print -P -- "\n%F{blue}${repo//\%/%%}%f${(l:pad:):-}${fetched}"
-print -P -- "%F{8}${(l:width::─:):-}%f"
-[[ -n $op ]] && print -P -- "%F{red}⚠ $op in progress%f"
-print -P -- "branch    %F{cyan}${branch//\%/%%}%f $track"
-print -P -- "worktree  ${(j: · :)wt}"
-(( nstash ))    && print -P -- "stash     $nstash · ${stash//\%/%%}"
-(( $#shown ))   && print -P -- "branches  ${(j: · :)shown}"
-# Recent commits: the subject gives way first, then the author
+print -rP -- $'\n'"%F{blue}${repo//\%/%%}%f${(l:pad:):-}${fetched}"
+print -rP -- "%F{8}${(l:width::─:):-}%f"
+[[ -n $op ]] && print -rP -- "%F{red}⚠ $op in progress%f"
+print -rP -- "branch    %F{cyan}${branch//\%/%%}%f $track"
+print -rP -- "worktree  $worktree"
+(( nstash ))    && print -rP -- "stash     $nstash · ${stash//\%/%%}"
+(( $#shown ))   && print -rP -- "branches  ${(j: · :)shown}"
+# Recent commits: the subject gives way first, then the author, then the age
 if git rev-parse -q --verify HEAD >/dev/null 2>&1; then
   print
   local hash subject when who tail
-  local -i room
-  git --no-pager log -3 --format='%h%x1f%s%x1f%ar%x1f%aN' |
+  git --no-pager log -3 --no-show-signature --format='%h%x1f%s%x1f%ar%x1f%aN' |
     while IFS=$'\x1f' read -r hash subject when who; do
       tail=" · $when by $who"
       (( ${#hash} + 21 + ${#tail} <= width )) || tail=" · $when"
       room=$(( width - ${#hash} - 1 - ${#tail} ))
-      (( room >= 10 )) || room=10
+      (( room >= 10 )) || { tail=''; room=$(( width - ${#hash} - 1 )) }
       (( ${#subject} > room )) && subject="${subject[1,room - 1]}…"
-      print -P -- "%F{yellow}$hash%f ${subject//\%/%%}%F{8}${tail//\%/%%}%f"
+      print -rP -- "%F{yellow}$hash%f ${subject//\%/%%}%F{8}${tail//\%/%%}%f"
     done
 fi
 print
