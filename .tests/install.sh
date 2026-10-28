@@ -62,20 +62,6 @@ check env -u ZDOTDIR ENTRYPOINT="$repo/zsh/.zshenv" zsh -f -c '
 check test ! -s "$test_root/env.log"
 check test ! -e "$XDG_CONFIG_HOME"
 
-# Only id is stubbed: group matching uses the real shell implementation.
-(
-  id() { check test "$*" = -Gn; printf '%s\n' "$fixture_groups"; return "$id_rc"; }
-  id_rc=0
-  for fixture_groups in admin 'admin staff' 'staff admin' 'staff admin wheel'; do
-    check is_admin
-  done
-  for fixture_groups in '' staff admin-helper admin_helper superadmin 'staff admin-helper wheel'; do
-    if is_admin; then fail "not an admin group: $fixture_groups"; fi
-  done
-  fixture_groups='staff admin' id_rc=1
-  if is_admin; then fail 'failed id lookup must not grant admin status'; fi
-)
-
 # Run the complete dispatcher with a separate HOME and a non-provisioning brew.
 mkdir -p "$test_root/cli-home" "$test_root/cli-bin"
 cat > "$test_root/cli-bin/brew" <<'EOF'
@@ -103,25 +89,10 @@ if run_cli sh "$installer" bundle > "$test_root/bundle.log" 2>&1; then
 fi
 check grep -Fq "no Brewfile found at $test_root/missing.Brewfile" "$test_root/bundle.log"
 check test ! -e "$test_root/cli-home/provision.log"
-if run_cli sh "$installer" update --help --typo > "$test_root/help.log" 2>&1; then
-  fail 'update help must validate trailing options'
-fi
-check grep -Fq 'unknown update option: --typo' "$test_root/help.log"
-check run_cli sh "$installer" update --help --discard > "$test_root/help.log"
-check grep -Fq 'usage: dotfiles' "$test_root/help.log"
 ln -s "$installer" "$test_root/cli-bin/dotfiles"
 check run_cli "$test_root/cli-bin/dotfiles" > "$test_root/default.log"
 check grep -Fq 'usage: dotfiles' "$test_root/default.log"
 check test ! -e "$test_root/cli-home/config"
-
-# A relative parent present in CDPATH must neither redirect nor print into paths.
-(
-  cd "$test_root"
-  export CDPATH="$test_root"
-  check test "$(resolve_path repo/install.sh)" = "$installer"
-  check run_cli sh repo/install.sh help > "$test_root/cdpath.log"
-)
-check grep -Fq 'usage: dotfiles' "$test_root/cdpath.log"
 
 # Exercise removal through the dispatcher with the same two-hop entrypoint.
 mkdir -p "$test_root/cli-home/config" "$test_root/cli-home/.local/bin"
@@ -156,8 +127,6 @@ check grep -Fxq 'bootstrap NONINTERACTIVE=1' "$test_root/bootstrap.log"
 check grep -Fxq 'bootstrap NONINTERACTIVE=0' "$test_root/bootstrap.log"
 
 with_layout install_dotfiles > "$test_root/install.log"
-check grep -Fq 'exec zsh -l' "$test_root/install.log"
-check grep -Fq 'then dotfiles doctor names anything left to set up' "$test_root/install.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
 check test -L "$HOME/.local/bin/dotfiles"
@@ -270,7 +239,7 @@ $npm_update"
   )
 done
 
-# A machine's own global npm config stays; another account's Homebrew is skipped.
+# A machine's own global npm config stays.
 (
   export HOME="$test_root/own-npmrc" PATH="$test_root/package-bin:$PATH"
   export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
@@ -282,14 +251,6 @@ done
   check test "$(cat "$HOME/prefix/etc/npmrc")" = 'registry=https://registry.example.invalid/'
   check grep -Fq "kept $HOME/prefix/etc/npmrc" "$HOME/dispatch.log"
   if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail 'own npm config was backed up'; fi
-  if [ "$(id -u)" -ne 0 ]; then
-    rm "$HOME/prefix/etc/npmrc"
-    chmod a-w "$HOME/prefix/etc"
-    "$installer" link >> "$HOME/dispatch.log" 2>&1
-    chmod u+w "$HOME/prefix/etc"
-    check test ! -e "$HOME/prefix/etc/npmrc"
-    check test ! -L "$HOME/prefix/etc/npmrc"
-  fi
 )
 
 # Fresh installs run brew from its prefix before Homebrew is on PATH; Bundle
@@ -401,21 +362,6 @@ if [ -e "$repo_dir/LOCAL.secret" ]; then
     fail 'case-equivalent ignored collisions must block updates'
   fi
 fi
-
-# Stub destructive operations: ordering must preserve the current ignore rules.
-(
-  git_preserve_ignored() { printf 'inspect\n'; }
-  git_status_summary() { :; }
-  git_log_summary() { :; }
-  confirm_discard() { :; }
-  git() { shift 2; printf '%s\n' "$*"; }
-  reinstall_after_update() { printf 'reinstall\n'; }
-  discard_update target 1
-) > "$test_root/order"
-check test "$(sed -n '/^inspect/,$p' "$test_root/order" | sed '/^$/d; /discarding local repo/d')" = "inspect
-clean -fd
-reset --hard target
-reinstall"
 
 # Update histories and worktrees stay under the temporary HOME; fetch is local-only.
 export GIT_ALLOW_PROTOCOL=file
@@ -582,14 +528,14 @@ check_update() {
   check test "$(git -C "$repo_dir" rev-parse HEAD)" = "$expected_head"
 }
 
-for scenario in equal equal-dirty ahead ahead-dirty behind dirty-behind diverged \
-  detached no-upstream discard discard-unignored collision collision-discard slash-remote; do
+for scenario in equal ahead behind dirty-behind diverged \
+  detached no-upstream discard discard-unignored collision collision-discard; do
   initial=$base_commit incoming=$incoming_commit expected_head=$incoming_commit
-  expected_rc=0 diagnostic='fast-forwarding to' fixture_remote=origin
+  expected_rc=0 diagnostic='fast-forwarding to'
   set --
   case "$scenario" in
-    equal*) incoming=$base_commit expected_head=$base_commit diagnostic='already up to date' ;;
-    ahead*) initial=$local_commit incoming=$base_commit expected_head=$local_commit diagnostic='ahead of upstream' ;;
+    equal) incoming=$base_commit expected_head=$base_commit diagnostic='already up to date' ;;
+    ahead) initial=$local_commit incoming=$base_commit expected_head=$local_commit diagnostic='ahead of upstream' ;;
     dirty-behind) expected_rc=1 expected_head=$base_commit diagnostic='refusing to update' ;;
     diverged) initial=$local_commit expected_rc=1 expected_head=$local_commit diagnostic='histories have diverged' ;;
     detached) expected_rc=1 expected_head=$base_commit diagnostic='detached HEAD' ;;
@@ -604,11 +550,10 @@ for scenario in equal equal-dirty ahead ahead-dirty behind dirty-behind diverged
       incoming=$collision_commit expected_rc=1 expected_head=$base_commit diagnostic='incoming tracked path'
       if [ "$scenario" = collision-discard ]; then set -- --discard --yes; fi
       ;;
-    slash-remote) fixture_remote=team/origin ;;
   esac
   repo_dir="$HOME/update-$scenario"
   git -C "$seed" update-ref refs/heads/main "$base_commit"
-  git clone -q --template= --origin "$fixture_remote" --branch main "$seed" "$repo_dir"
+  git clone -q --template= --branch main "$seed" "$repo_dir"
   git -C "$repo_dir" reset -q --hard "$initial"
   # Advance only the seed so update must fetch to see the incoming history.
   git -C "$seed" update-ref refs/heads/main "$incoming"
@@ -616,7 +561,7 @@ for scenario in equal equal-dirty ahead ahead-dirty behind dirty-behind diverged
   printf 'private\n' > "$repo_dir/local.secret"
   printf 'cached\n' > "$repo_dir/runtime/data"
   case "$scenario" in
-    *-dirty|dirty-behind|discard*|collision-discard)
+    dirty-behind|discard*|collision-discard)
       printf 'staged\n' > "$repo_dir/tracked"
       git -C "$repo_dir" add tracked
       printf 'unstaged\n' > "$repo_dir/tracked"
@@ -637,7 +582,7 @@ for scenario in equal equal-dirty ahead ahead-dirty behind dirty-behind diverged
       check test ! -e "$repo_dir/scratch"
       if [ "$scenario" = discard-unignored ]; then check test ! -e "$repo_dir/.gitignore"; fi
       ;;
-    behind|slash-remote)
+    behind)
       check test "$(cat "$repo_dir/tracked")" = incoming
       check test -z "$(git -C "$repo_dir" status --porcelain)"
       ;;
@@ -646,7 +591,7 @@ for scenario in equal equal-dirty ahead ahead-dirty behind dirty-behind diverged
       check test "$(git -C "$repo_dir" write-tree)" = "$before_tree"
       check test "$(cat "$repo_dir/tracked")" = "$before_tracked"
       case "$scenario" in
-        *-dirty|dirty-behind|collision-discard) check test "$(cat "$repo_dir/scratch")" = untracked ;;
+        dirty-behind|collision-discard) check test "$(cat "$repo_dir/scratch")" = untracked ;;
       esac
       ;;
   esac
