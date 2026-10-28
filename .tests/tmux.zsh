@@ -280,13 +280,16 @@ wait_for 'a new window moved the shell' "ran $solo STAYED"
 print -r -- 'ok: workspace builds around a shell alone in its window, else opens one'
 
 # keys through the real fzf, with tmux as the screen: at 120 columns every page
-# sits beside the preview; once results are listed, and only then, the wrap
-# key shows by the count and Ctrl+/ toggles them, one press each way.
+# sits beside the preview, whatever FZF_DEFAULT_OPTS holds, and Enter reads the
+# page under the cursor.
 if (( $+commands[fzf] )); then
-  local -a page_rows leftovers
+  local -a page_rows save_keys leftovers
   for line in ${(f)"$(<"$repo/GUIDE.md")"}; do
     [[ $line != '## '*': '* ]] || page_rows+=("${(L)${${line#'## '}%%:*}}"$'\t'"${line#*: }")
+    # The rows for Cmd+S itself, by their first cell as the picker lists it
+    [[ $line != '| `Cmd+S` '* ]] || save_keys+=("${${${line#'| '}%% | *}//\`/}")
   done
+  (( $#save_keys )) || fail 'GUIDE.md has no Cmd+S row to search for'
   screen() { tmux capture-pane -p -t '=keys:'; }
   settled() { local first=$(screen); sleep 0.2; REPLY=$(screen); [[ $REPLY == "$first" ]]; }
   # Each page's topic and title on one row of the screen
@@ -300,10 +303,9 @@ if (( $+commands[fzf] )); then
   }
   mkdir -p "$HOME/tmp"
   tmux new-session -d -s keys -x 120 -y 24 -c "$repo" \
-    "TMPDIR=${(q)HOME}/tmp zsh -fc 'fpath=(zsh/functions \$fpath); autoload -Uz keys; keys'"
+    "TMPDIR=${(q)HOME}/tmp FZF_DEFAULT_OPTS=--height=5 zsh -fc 'fpath=(zsh/functions \$fpath); autoload -Uz keys; keys'"
   tmux resize-window -t '=keys:' -x 120 -y 24
-  wait_for "keys at 120 columns did not list all ${#page_rows} pages" listed
-  [[ $(screen) != *'Ctrl+/'* ]] || fail 'keys shows the wrap key before any results'
+  wait_for "keys at 120 columns, with FZF_DEFAULT_OPTS=--height=5, did not list all ${#page_rows} pages" listed
   # fzf/fzfrc's preview keys reach the picker: Option+Down scrolls the page
   # down by half a screen, Option+Up back to its top. The preview's first row
   # ends with its position, N/TOTAL, before the border.
@@ -316,19 +318,45 @@ if (( $+commands[fzf] )); then
   wait_for 'Option+Down did not scroll the keys preview' '(( $(preview_top) > 1 ))'
   tmux send-keys -t '=keys:' M-Up
   wait_for 'Option+Up did not scroll the keys preview back' '[[ $(preview_top) == 1 ]]'
-  tmux send-keys -t '=keys:' -l split
-  wait_for 'keys did not show the wrap key with its results' '[[ $(screen) == *"Ctrl+/ toggles wrapping"* ]]'
-  wait_for 'keys did not settle on its results' settled
-  wrapped=$REPLY
-  tmux send-keys -t '=keys:' -H 1f
-  wait_for 'Ctrl+/ did not unwrap the results' 'settled && [[ $REPLY != "$wrapped" ]]'
-  tmux send-keys -t '=keys:' -H 1f
-  wait_for 'a second Ctrl+/ did not wrap the results again' 'settled && [[ $REPLY == "$wrapped" ]]'
+  # The search is smart-case: a lowercase query also finds capitalized lines,
+  # the Cmd+S rows among them, and a capital letter keeps to its case, finding
+  # fewer. The row below the query starts with the count of results; the list
+  # ends where the preview's border starts.
+  search() {
+    local first_row="Find a task > $1"
+    tmux send-keys -t '=keys:' C-u
+    tmux send-keys -t '=keys:' -l -- "$1"
+    wait_for "keys did not count its results for $1" \
+      '[[ $(screen) == "$first_row"* ]] && settled && [[ ${${(f)REPLY}[2]} =~ "^ *([0-9]+)/" ]]'
+    results=$match[1]
+  }
+  search cmd+s
+  for key in $save_keys; do
+    [[ ${(F)${${(f)REPLY}%%│*}} == *"$key"* ]] || fail "cmd+s did not find the $key row"
+  done
+  integer lower=$results
+  search Cmd+S
+  (( results && results < lower )) || fail "Cmd+S found $results lines, and cmd+s $lower"
   tmux send-keys -t '=keys:' Escape
   wait_for 'Esc did not close keys' '! tmux has-session -t "=keys" 2>/dev/null'
+  if (( $+commands[glow] && $+commands[less] )); then
+    # Enter on the last page, however many there are, opens the reader on its title.
+    tmux new-session -d -s keys -x 120 -y 24 -c "$repo" \
+      "TMPDIR=${(q)HOME}/tmp zsh -fc 'fpath=(zsh/functions \$fpath); autoload -Uz keys; keys'"
+    tmux resize-window -t '=keys:' -x 120 -y 24
+    wait_for "keys did not list all ${#page_rows} pages" listed
+    repeat $(( $#page_rows - 1 )) tmux send-keys -t '=keys:' Down
+    tmux send-keys -t '=keys:' Enter
+    title=${page_rows[-1]#*$'\t'}
+    wait_for "Enter did not read the page $title" '[[ ${${(f)"$(screen)"}[1]} == *"$title"* ]]'
+    tmux send-keys -t '=keys:' q
+    wait_for 'q did not leave the page' '! tmux has-session -t "=keys" 2>/dev/null'
+  else
+    print -r -- 'SKIP: keys reading the page picked (glow or less missing)'
+  fi
   leftovers=("$HOME"/tmp/*(DN))
   (( ! $#leftovers )) || fail "keys left temporary files: ${leftovers:t}"
-  print -r -- 'ok: keys lists every page beside its preview, scrolls it, and toggles wrapping in results'
+  print -r -- 'ok: keys lists every page beside its preview, scrolls it, searches smart-case, and reads the page picked'
 else
   print -r -- 'SKIP: keys picker through real fzf (fzf missing)'
 fi
