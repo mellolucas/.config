@@ -1,4 +1,11 @@
 #compdef help
 
-# A command, then its own arguments; zsh's SCCS completion claims help otherwise
-_precommand
+# First a command, whatever kind (alias, function, builtin, or program), then
+# that command's own arguments; zsh's SCCS completion claims help otherwise
+if (( CURRENT == 2 )); then
+  _command_names
+else
+  words=("${(@)words[2,-1]}")
+  (( CURRENT-- ))
+  _normal
+fi

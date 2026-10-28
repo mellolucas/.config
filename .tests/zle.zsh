@@ -314,8 +314,9 @@ complete 'workspace flags after directory' 'workspace dirs/visible --edi' 'works
 complete 'workspace directory after command' "workspace --agent 'zle-test-command arg' dirs/sec" "workspace --agent 'zle-test-command arg' dirs/.xxsecretxx/"
 complete 'workspace command argument' "workspace --editor 'mv prefix/al" "workspace --editor 'mv prefix/alpha"
 complete 'workspace option-like directory after terminator' 'workspace -- --pro' 'workspace -- --project/'
-# help completes commands, not zsh's SCCS subcommands
+# help completes commands of every kind, not zsh's SCCS subcommands
 complete 'help command' 'help mv' 'help mv '
+complete 'help function' 'help zle-test-co' 'help zle-test-command '
 # mdv offers Markdown files from the first Tab, never the other files beside them
 complete 'mdv Markdown file' 'mdv md/' 'mdv md/only.md '
 zpty -w -n shell $'\x18\x12builtin cd md\r'
