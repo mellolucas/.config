@@ -304,19 +304,43 @@ assert(api.nvim_win_get_cursor(0)[1] == 1, "← on a top entry does not reach th
 local root = api.nvim_get_current_line()
 press("<Right>")
 assert(api.nvim_win_get_cursor(0)[1] == 1 and api.nvim_get_current_line() == root, "→ moved the root line")
--- ← on the root line steps out of the root itself: the parent becomes the root,
--- with the project open under the cursor, and Ctrl+] makes it the root again.
+-- ← on the root line steps out of the root itself, as - does from any line:
+-- the parent becomes the root, with the project open and the cursor on the
+-- entry it was on (from the root line, the project), and Ctrl+] makes the
+-- project the root again.
 local tree_api = require("nvim-tree.api").tree
-press("<Left>")
-local left = tree_api.get_node_under_cursor()
-assert(left and left.absolute_path == project and left.open,
-  "← on the root line: " .. api.nvim_get_current_line() .. " " .. vim.inspect(left and left.absolute_path))
-assert(api.nvim_buf_get_lines(0, 0, 1, false)[1] ~= root, "← on the root line kept the root")
-press("<C-]>")
-assert(api.nvim_buf_get_lines(0, 0, 1, false)[1] == root, "Ctrl+] did not make the project the root again")
+local function up_to_parent(key, label, path)
+  press(key)
+  local node = tree_api.get_node_under_cursor()
+  assert(api.nvim_buf_get_lines(0, 0, 1, false)[1] == fn.fnamemodify(project, ":h:t"),
+    label .. " did not make the parent the root")
+  assert(node and node.absolute_path == path and (not node.nodes or node.open),
+    label .. ": " .. api.nvim_get_current_line() .. " " .. vim.inspect(node and node.absolute_path))
+  press("<C-]>")
+  assert(api.nvim_buf_get_lines(0, 0, 1, false)[1] == root, "Ctrl+] did not make the project the root again")
+end
+up_to_parent("<Left>", "← on the root line", project)
+api.nvim_win_set_cursor(0, { 1, 0 })
+up_to_parent("-", "- on the root line", project)
+select("a.txt")
+up_to_parent("-", "- on a.txt", project .. "/a.txt")
 select("a.txt")
 press("<Right>")
 assert(current() == "a.txt", "→ on a file does not open it")
+
+-- With room for the tree (a zoomed pane, a full terminal), `nvim DIR` opens it
+-- beside an empty window, with the cursor in the tree; the start runs again
+-- here, in a tab page of its own.
+resize(110)
+vim.cmd.tabnew()
+vim.cmd("args " .. fn.fnameescape(project))
+listing = api.nvim_get_current_buf()
+api.nvim_exec_autocmds("VimEnter", {})
+expect({ "tree", "[empty]" }, "wide start")
+assert(current() == "tree", "wide start left the cursor in " .. current())
+assert(not api.nvim_buf_is_valid(listing), "wide start keeps the directory listing")
+empty = api.nvim_win_get_buf(api.nvim_tabpage_list_wins(0)[2])
+assert(not vim.bo[empty].buflisted, "the empty window beside a wide start is listed as a file")
 
 local errors = vim.tbl_filter(function(line)
   return line:match("E%d+:") ~= nil
@@ -324,4 +348,4 @@ end, vim.split(fn.execute("messages"), "\n"))
 assert(#errors == 0, "messages: " .. table.concat(errors, " | "))
 vim.cmd.cd(fn.fnameescape(repo))
 fn.delete(project, "rf")
-print("ok: file tree with the real plugins (narrow, zoom at 110 columns, tab pages, Tab and Space, → and ←, the root, alternate file)")
+print("ok: file tree with the real plugins (narrow and wide starts, zoom at 110 columns, tab pages, Tab and Space, → and ←, - and the root, alternate file)")
