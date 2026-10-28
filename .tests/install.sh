@@ -175,7 +175,10 @@ cat > "$test_root/package-bin/brew" <<'EOF'
 #!/bin/sh
 set -eu
 case "$*" in
-  'bundle --global') printf 'invoked\n' >> "$HOME/brew.log" ;;
+  'bundle --global')
+    printf 'invoked\n' >> "$HOME/brew.log"
+    [ -z "${FAIL_BUNDLE-}" ] || exit 1
+    ;;
   'bundle list --global --npm') printf '@scope/tool\nplain-tool\n' ;;
   --prefix) printf '%s\n' "$HOME/prefix" ;;
   *) exit 1 ;;
@@ -206,11 +209,14 @@ for operation in bundle install link no-upgrade; do
     "$installer" "$operation" >> "$HOME/dispatch.log" 2>&1
     check test "$(readlink "$HOME/prefix/etc/npmrc")" = "$repo_dir/homebrew/npmrc"
     if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail "repeated $operation made backups"; fi
+    # A bundle stamps the time the shell's weekly update reminder counts from.
     if [ "$operation" = link ]; then
       check test ! -e "$HOME/brew.log"
+      check test ! -e "$XDG_STATE_HOME/dotfiles/updated"
     else
       check test "$(cat "$HOME/brew.log")" = "invoked
 invoked"
+      check test -f "$XDG_STATE_HOME/dotfiles/updated"
     fi
     # npm upgrades follow Bundle runs unless upgrades are disabled.
     if [ "$operation" = link ] || [ -n "${HOMEBREW_BUNDLE_NO_UPGRADE-}" ]; then
@@ -238,6 +244,20 @@ $npm_update"
     fi
   )
 done
+
+# A bundle that fails leaves no stamp.
+(
+  export HOME="$test_root/package-failed" PATH="$test_root/package-bin:$PATH" FAIL_BUNDLE=1
+  export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+  export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+  export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
+  unset HOMEBREW_BUNDLE_NO_UPGRADE
+  mkdir "$HOME" "$HOME/prefix"
+  printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
+  if "$installer" bundle > "$HOME/dispatch.log" 2>&1; then fail 'a failed bundle exited 0'; fi
+  check test "$(cat "$HOME/brew.log")" = invoked
+  check test ! -e "$XDG_STATE_HOME/dotfiles/updated"
+)
 
 # A machine's own global npm config stays.
 (
@@ -414,25 +434,6 @@ if [ "${FAIL_GIT_STATUS:-0}" = 1 ] && [ "$3" = status ]; then
   printf 'fixture: git status failed\n' >&2
   exit 1
 fi
-if [ "${CHECK_UPDATES:-0}" = 1 ]; then
-  case "$3" in
-    status)
-      [ "$*" = "-C $2 status --porcelain --untracked-files=all" ] || exit 91
-      [ "${GIT_OPTIONAL_LOCKS:-}" = 0 ] || exit 92
-      ;;
-    fetch)
-      [ "$*" = "-C $2 fetch --quiet ${CHECK_REMOTE:-origin}" ] || exit 93
-      [ "${GIT_TERMINAL_PROMPT:-}" = 0 ] || exit 94
-      printf 'fetch\n' >> "$HOME/check-git.log"
-      ;;
-    rev-list)
-      [ -f "$HOME/check-git.log" ] || exit 95
-      printf 'rev-list\n' >> "$HOME/check-git.log"
-      ;;
-    rev-parse|symbolic-ref|config|merge-base) ;;
-    *) printf 'unexpected check-updates Git command: %s\n' "$*" >&2; exit 96 ;;
-  esac
-fi
 exec "$REAL_GIT" "$@"
 EOF
 chmod +x "$test_root/cli-bin/git"
@@ -481,13 +482,9 @@ for config_path in "$cli_repo" "$test_root/config-alias" "$test_root/CLI-REPO"; 
   done
 done
 
-for selector in GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR \
-  GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES; do
-  check run_cli env "$selector=$test_root/invalid-git-path" \
-    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=status.showUntrackedFiles GIT_CONFIG_VALUE_0=no \
-    sh "$cli_repo/install.sh" status > "$test_root/$selector.log" 2>&1
-  check grep -Fq '?? dispatcher-marker' "$test_root/$selector.log"
-done
+# Unsafe updates fail and change nothing, ignoring the repository selectors a
+# calling Git exports.
+elsewhere="$test_root/invalid-git-path"
 git -C "$seed" update-ref refs/heads/main "$incoming_commit"
 for failure in hidden-untracked failed-status; do
   fail_status=0
@@ -496,8 +493,10 @@ for failure in hidden-untracked failed-status; do
     fail_status=1
     diagnostic='cannot inspect git working tree:'
   fi
-  if run_cli env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=status.showUntrackedFiles \
-    GIT_CONFIG_VALUE_0=no FAIL_GIT_STATUS="$fail_status" \
+  if run_cli env GIT_DIR="$elsewhere" GIT_WORK_TREE="$elsewhere" GIT_INDEX_FILE="$elsewhere" \
+    GIT_COMMON_DIR="$elsewhere" GIT_OBJECT_DIRECTORY="$elsewhere" \
+    GIT_ALTERNATE_OBJECT_DIRECTORIES="$elsewhere" GIT_CONFIG_COUNT=1 \
+    GIT_CONFIG_KEY_0=status.showUntrackedFiles GIT_CONFIG_VALUE_0=no FAIL_GIT_STATUS="$fail_status" \
     sh "$cli_repo/install.sh" update > "$test_root/$failure.log" 2>&1; then
     fail "$failure: unsafe update must fail"
   fi
@@ -596,153 +595,6 @@ for scenario in equal ahead behind dirty-behind diverged \
       ;;
   esac
 done
-
-# Update inspection uses the real dispatcher, local fetches, and native Brew args.
-cat > "$test_root/cli-bin/brew" <<'EOF'
-#!/bin/sh
-set -eu
-[ "$#" = 4 ] && [ "$*" = 'bundle check --global --verbose' ] || exit 98
-[ "${HOMEBREW_NO_AUTO_UPDATE:-}" = 1 ] || exit 99
-[ "${HOMEBREW_BUNDLE_NO_UPGRADE+x}" != x ] || exit 100
-[ "${HOMEBREW_FORCE_API_AUTO_UPDATE+x}${HOMEBREW_BUNDLE_INSTALL+x}${HOMEBREW_BUNDLE_CHECK_ALREADY_OUTPUT_FORMULAE_ERRORS+x}" = '' ] || exit 101
-printf 'bundle check\n' >> "$HOME/check-brew.log"
-printf 'fixture: native Brew output\n'
-exit "${BREW_CHECK_RC:-0}"
-EOF
-unrelated_commit=$(fixture_commit unrelated)
-printf '# selected fixture\n' > "$test_root/check.Brewfile"
-for scenario in equal dirty ahead behind diverged no-common detached unborn no-upstream \
-  fetch-failed missing-upstream fresh-tracking dot-remote slash-remote status-failed \
-  brew-unmet brew-error missing-brewfile xdg-brewfile not-repo ancestor-repo extra-arg; do
-  check_repo="$test_root/check-$scenario"
-  initial=$base_commit incoming=$base_commit expected_rc=0
-  diagnostic='dotfiles: equal' expected_incoming=0 expected_local=0
-  fixture_remote=origin brew_rc=0 fail_status=0 fetch_expected=1
-  selected_brewfile="$test_root/check.Brewfile"
-  set --
-  case "$scenario" in
-    ahead) initial=$local_commit expected_local=1 diagnostic='dotfiles: ahead' ;;
-    behind|fresh-tracking)
-      incoming=$incoming_commit expected_incoming=1 diagnostic='dotfiles: behind' ;;
-    diverged) initial=$local_commit incoming=$incoming_commit expected_local=1 expected_incoming=1 diagnostic='dotfiles: diverged' ;;
-    no-common) incoming=$unrelated_commit expected_local=1 expected_incoming=1 diagnostic='dotfiles: no-common-history' ;;
-    detached|unborn|no-upstream|status-failed|not-repo|ancestor-repo)
-      expected_rc=1 fetch_expected=0 diagnostic='dotfiles: unknown' ;;
-    fetch-failed|missing-upstream) expected_rc=1 diagnostic='dotfiles: unknown' ;;
-    dot-remote) fixture_remote=. ;;
-    slash-remote) fixture_remote=team/origin ;;
-    brew-unmet) brew_rc=1 expected_rc=1 diagnostic='Brewfile unmet or check failed' ;;
-    brew-error) brew_rc=2 expected_rc=1 diagnostic='Brewfile unmet or check failed' ;;
-    missing-brewfile) selected_brewfile="$test_root/absent.Brewfile" expected_rc=1 diagnostic='no Brewfile found at' ;;
-    xdg-brewfile) selected_brewfile= ;;
-    extra-arg) set -- --install; expected_rc=1 fetch_expected=0 diagnostic='check-updates takes no arguments' ;;
-  esac
-  git -C "$seed" update-ref refs/heads/main "$base_commit"
-  git clone -q --template= --branch main "$seed" "$check_repo"
-  git -C "$check_repo" reset -q --hard "$initial"
-  cp "$repo/install.sh" "$check_repo/install.sh"
-  mkdir -p "$check_repo/zsh" "$check_repo/.git/info"
-  cp "$repo/zsh/xdg.sh" "$repo/zsh/homebrew.sh" "$check_repo/zsh/"
-  printf 'install.sh\nzsh/xdg.sh\nzsh/homebrew.sh\n' >> "$check_repo/.git/info/exclude"
-  git -C "$check_repo" tag local-only "$base_commit"
-  git -C "$check_repo" update-ref refs/remotes/origin/keep "$base_commit"
-  git -C "$check_repo" config fetch.prune true
-  git -C "$check_repo" config remote.origin.prune true
-  git -C "$seed" update-ref refs/heads/main "$incoming"
-  case "$scenario" in
-    dirty)
-      printf 'staged\n' > "$check_repo/tracked"
-      git -C "$check_repo" add tracked
-      printf 'unstaged\n' > "$check_repo/tracked"
-      mkdir "$check_repo/untracked"
-      printf 'untracked\n' > "$check_repo/untracked/file"
-      ;;
-    detached) git -C "$check_repo" checkout -q --detach ;;
-    unborn) git -C "$check_repo" symbolic-ref HEAD refs/heads/unborn ;;
-    no-upstream) git -C "$check_repo" branch --unset-upstream ;;
-    fetch-failed) git -C "$check_repo" remote set-url origin "$test_root/nonexistent-remote" ;;
-    missing-upstream) git -C "$seed" update-ref -d refs/heads/main ;;
-    fresh-tracking) git -C "$check_repo" update-ref -d refs/remotes/origin/main ;;
-    dot-remote)
-      git -C "$check_repo" branch local-upstream "$incoming_commit"
-      git -C "$check_repo" branch --set-upstream-to=local-upstream main > /dev/null
-      expected_incoming=1 diagnostic='dotfiles: behind'
-      ;;
-    slash-remote) git -C "$check_repo" remote rename origin "$fixture_remote" ;;
-    status-failed) fail_status=1 ;;
-    xdg-brewfile)
-      mkdir -p "$test_root/cli-home/config/homebrew"
-      cp "$test_root/check.Brewfile" "$test_root/cli-home/config/homebrew/Brewfile"
-      ;;
-  esac
-  printf 'ignored\n' > "$check_repo/local.secret"
-  before_refs=$(git -C "$check_repo" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags)
-  before_status=$(git -C "$check_repo" status --porcelain --untracked-files=all)
-  cp "$check_repo/.git/index" "$test_root/check.index"
-  cp "$check_repo/.git/HEAD" "$test_root/check.HEAD"
-  cp "$check_repo/tracked" "$test_root/check.tracked"
-  if [ "$scenario" = not-repo ] || [ "$scenario" = ancestor-repo ]; then
-    mv "$check_repo/.git" "$test_root/saved-$scenario.git"
-    if [ "$scenario" = ancestor-repo ]; then git init -q --template= "$test_root"; fi
-  fi
-  rm -f "$test_root/cli-home/check-brew.log" "$test_root/cli-home/check-git.log"
-  check_rc=0
-  run_cli env GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=status.showUntrackedFiles \
-    GIT_CONFIG_VALUE_0=no CHECK_UPDATES=1 CHECK_REMOTE="$fixture_remote" \
-    FAIL_GIT_STATUS="$fail_status" BREW_CHECK_RC="$brew_rc" HOMEBREW_BUNDLE_NO_UPGRADE=1 \
-    HOMEBREW_FORCE_API_AUTO_UPDATE=1 HOMEBREW_BUNDLE_INSTALL=1 HOMEBREW_BUNDLE_CHECK_ALREADY_OUTPUT_FORMULAE_ERRORS=fixture \
-    HOMEBREW_BUNDLE_FILE_GLOBAL="$selected_brewfile" \
-    sh "$check_repo/install.sh" check-updates "$@" > "$test_root/check.log" 2>&1 || check_rc=$?
-  if [ "$check_rc" != "$expected_rc" ]; then
-    cat "$test_root/check.log" >&2
-    fail "$scenario: expected $expected_rc, got $check_rc"
-  fi
-  check grep -Fq "$diagnostic" "$test_root/check.log"
-  case "$scenario" in
-    missing-brewfile|extra-arg) check test ! -e "$test_root/cli-home/check-brew.log" ;;
-    *) check test "$(cat "$test_root/cli-home/check-brew.log")" = 'bundle check' ;;
-  esac
-  if [ "$fetch_expected" = 0 ]; then
-    check test ! -e "$test_root/cli-home/check-git.log"
-  else
-    check grep -Fxq fetch "$test_root/cli-home/check-git.log"
-  fi
-  case "$diagnostic" in
-    'dotfiles: unknown'|'check-updates takes no arguments')
-      if grep -Eq 'incoming commits:|local-only commits:|dotfiles: equal' "$test_root/check.log"; then
-        fail "$scenario: incomplete inspection must not report cached counts"
-      fi
-      if [ -f "$test_root/cli-home/check-git.log" ] && grep -Fxq rev-list "$test_root/cli-home/check-git.log"; then
-        fail "$scenario: incomplete fetch must not count cached commits"
-      fi
-      ;;
-    *)
-      check grep -Fq "incoming commits: $expected_incoming" "$test_root/check.log"
-      check grep -Fq "local-only commits: $expected_local" "$test_root/check.log"
-      check grep -Eq 'dotfiles fetched at: [0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z' "$test_root/check.log"
-      ;;
-  esac
-  if [ "$scenario" = dirty ]; then
-    check grep -Fq 'local changes exist and were left untouched' "$test_root/check.log"
-    check test "$(cat "$check_repo/untracked/file")" = untracked
-  elif [ "$scenario" = status-failed ]; then
-    if grep -Fq 'working tree: clean' "$test_root/check.log"; then fail 'failed status reported clean'; fi
-  elif [ "$scenario" = equal ]; then
-    check grep -Fq 'working tree: clean' "$test_root/check.log"
-  fi
-  if [ "$scenario" = not-repo ] || [ "$scenario" = ancestor-repo ]; then
-    mv "$test_root/saved-$scenario.git" "$check_repo/.git"
-  fi
-  check cmp "$test_root/check.index" "$check_repo/.git/index"
-  check cmp "$test_root/check.HEAD" "$check_repo/.git/HEAD"
-  check cmp "$test_root/check.tracked" "$check_repo/tracked"
-  check test "$(cat "$check_repo/local.secret")" = ignored
-  check test "$(git -C "$check_repo" status --porcelain --untracked-files=all)" = "$before_status"
-  # With default fetch settings, tracking refs may move; local branches and tags stay.
-  after_refs=$(git -C "$check_repo" for-each-ref --format='%(refname) %(objectname)' refs/heads refs/tags)
-  check test "$after_refs" = "$before_refs"
-done
-check test ! -e "$test_root/cli-home/provision.log"
 
 # git_identity follows Git's own rules: under useConfigOnly, nothing configured
 # fails and a name with an email succeeds.

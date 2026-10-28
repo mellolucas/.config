@@ -6,10 +6,10 @@ Changes since `v0.0.1`.
 
 ### Changes
 
-- **One setup command:** `dotfiles` installs, links, bundles, updates, checks
-  for updates, reports status, and uninstalls. `dotfiles doctor` names a fix
-  for each problem it finds, from a missing Git identity to stray hidden
-  files in `$HOME`.
+- **One setup command:** `dotfiles` installs, links, bundles, updates, and
+  uninstalls; a week after the last full update, the first shell of each day
+  reminds you to run `dotsup`. `dotfiles doctor` names a fix for each problem
+  it finds, from a missing Git identity to stray hidden files in `$HOME`.
 - **A field guide:** `keys` browses the guide's pages with a preview and
   searches every line as you type; `keys TOPIC` and `keys WORDS` work from the
   prompt, and `help COMMAND` shows any command's help, even through an alias.
@@ -65,6 +65,7 @@ Changes since `v0.0.1`.
   rather than moving the directory.
 - `dotfiles install` now links and installs packages, replacing `bootstrap`;
   `dotfiles link` is the former link-only `install`.
+- `dotfiles status` is gone: `gg` in the checkout shows its state.
 - Use `workspace` instead of `dotfiles workspace`, `dotfiles code`, or the
   `dotsws` alias.
 - `l`, `ll`, and `lll` are the listings; add eza flags such as

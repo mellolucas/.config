@@ -3,11 +3,9 @@
 if (( CURRENT == 2 )); then
   local -a subcommands=(
     'install:Link configs, ensure Homebrew, and apply the Brewfile'
-    'check-updates:Fetch and compare dotfiles, check the Brewfile; applies nothing'
     'update:Fast-forward the repository, relink, and apply the Brewfile'
     'bundle:Apply the Brewfile, then update its npm packages'
     'link:Relink configs without touching packages'
-    'status:Show the repository state'
     'doctor:Check the setup and name fixes'
     'uninstall:Remove the symlinks this repository owns'
     'help:Show help'

@@ -37,20 +37,18 @@ Start a project with **`workspace`**: the editor, two shells, and an agent in on
 ## Maintain the setup
 
 ```sh
-dotfiles check-updates # Fetch the repository and check the Brewfile; applies nothing
-dotfiles update        # Update the repository, relink, apply the Brewfile, update its npm packages
-dotfiles bundle        # Apply the Brewfile and local.Brewfile, then update their npm packages
-dotfiles link          # Relink configuration without touching packages
-dotfiles status        # Repository state
-dotfiles doctor        # Environment health; names fixes and exits 1 on problems
-dotfiles uninstall     # Remove owned links; packages, backups, and data stay
+dotfiles update    # Update the repository, relink, apply the Brewfile, update its npm packages
+dotfiles bundle    # Apply the Brewfile and local.Brewfile, then update their npm packages
+dotfiles link      # Relink configuration without touching packages
+dotfiles doctor    # Environment health; names fixes and exits 1 on problems
+dotfiles uninstall # Remove owned links; packages, backups, and data stay
 ```
 
-Homebrew owns package installs and upgrades: Ghostty's updater is off, OpenCode only notifies, and Obsidian's own updater can be turned off in its settings. No update check runs at shell startup; `check-updates` and `update` are explicit. `check-updates` never refreshes Homebrew's package list, while `update` and `bundle` let Homebrew refresh it once it is a day old, as any `brew install` does; `brew update` refreshes it right away. Incoming updates need a clean checkout that can fast-forward; `update --discard` is the explicit destructive alternative.
+Homebrew owns package installs and upgrades: Ghostty's updater is off, OpenCode only notifies, and Obsidian's own updater can be turned off in its settings. Nothing checks for updates in the background: a week after `update`, `bundle`, or `install` last finished, the first shell of each day reminds you to run `dotsup`. `update` and `bundle` let Homebrew refresh its package list once it is a day old, as any `brew install` does; `brew update` refreshes it right away. Incoming updates need a clean checkout that can fast-forward; `update --discard` is the explicit destructive alternative.
 
 Neovim plugins are the one thing Homebrew does not update: run `:lua vim.pack.update()` in Neovim, read the pending changes, `:write` to apply them (or `:quit` to skip), then commit the changed `nvim/nvim-pack-lock.json`.
 
-Two package sets share one lifecycle. `homebrew/core.Brewfile` holds the essentials on every platform: Git, Neovim, the shell tools, tmux, gh, and OpenCode. `homebrew/Brewfile` adds the workstation: the language servers, the Go, Node, Bun, and Python runtimes, the other agents, the App Store CLI (when signed in to an Apple Account) and Obsidian on macOS, and Apple's Container on Apple silicon with macOS 26+. Containers bring their own toolchains (GitHub Codespaces, dev containers, and Docker or Podman containers), so there Homebrew installs only the core set; anywhere else, export `HOMEBREW_BUNDLE_FILE_GLOBAL="$XDG_CONFIG_HOME/homebrew/core.Brewfile"` (in `zsh/local.zsh`, and before the first install) to choose it. Brewfile `npm` entries install tools published on npm; Homebrew Bundle never upgrades them, so `update` and `bundle` do, without install scripts and only to releases at least a day old, as Bundle installs them. `check-updates` only confirms they are installed.
+Two package sets share one lifecycle. `homebrew/core.Brewfile` holds the essentials on every platform: Git, Neovim, the shell tools, tmux, gh, and OpenCode. `homebrew/Brewfile` adds the workstation: the language servers, the Go, Node, Bun, and Python runtimes, the other agents, the App Store CLI (when signed in to an Apple Account) and Obsidian on macOS, and Apple's Container on Apple silicon with macOS 26+. Containers bring their own toolchains (GitHub Codespaces, dev containers, and Docker or Podman containers), so there Homebrew installs only the core set; anywhere else, export `HOMEBREW_BUNDLE_FILE_GLOBAL="$XDG_CONFIG_HOME/homebrew/core.Brewfile"` (in `zsh/local.zsh`, and before the first install) to choose it. Brewfile `npm` entries install tools published on npm; Homebrew Bundle never upgrades them, so `update` and `bundle` do, without install scripts and only to releases at least a day old, as Bundle installs them.
 
 Agents: OpenCode (the workspace default) and Claude Code are installed through Homebrew; Claude Code reads `AGENTS.md` directly. Copilot CLI and Codex come from npm through Brewfile entries, because their Homebrew casks are unnotarized and macOS blocks them; `gh copilot` runs the same `copilot`. Each agent keeps its home under `~/.local/share` (see [Where files live](#where-files-live)).
 

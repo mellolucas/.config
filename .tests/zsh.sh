@@ -31,10 +31,10 @@ if [[ ${1:-} == --glance-child ]]; then
   git-glance() { (( $# == 0 )) || fail 'automatic card must stay plain'; print CARD; }
   builtin cd "$test_root/outside"
   config=$(<"$repo/zsh/.zshrc")
-  [[ $config == *$'\n# Auto git-glance '*$'\n# ---- Prompt ----\n'* ]] || fail 'hook block boundaries'
+  [[ $config == *$'\n# Auto git-glance '*$'\nfi\n'* ]] || fail 'hook block boundaries'
   config=${config#*$'\n# Auto git-glance '}
   config=${config#*$'\n'}
-  eval "${config%%$'\n# ---- Prompt ----\n'*}"
+  eval "${config%%$'\nfi\n'*}"$'\nfi'
   [[ ${chpwd_functions[(Ie)_git-glance-chpwd]} != 0 ]] || fail 'native chpwd registration'
   print BEGIN
   output=$(builtin cd "$root"; print -r -- pure)
@@ -720,14 +720,21 @@ fi
 
 # Full startup without a terminal, as agents and editors start interactive
 # shells: .zshenv, .zprofile, and .zshrc from tracked files only, in a
-# throwaway home, print nothing to stderr. zsh -n accepts a misspelled
-# setopt; startup does not.
+# throwaway home, print nothing but the command's output, though the last full
+# update is over a week old. zsh -n accepts a misspelled setopt; startup does
+# not.
 startup_home=$test_root/startup-home
 for file in ${(0)"$($git_bin -C "$repo" ls-files -z -- zsh)"}; do
   /bin/mkdir -p "$startup_home/.config/${file:h}"
   /bin/cp "$repo/$file" "$startup_home/.config/$file"
 done
 /bin/ln -s "$startup_home/.config/zsh/.zshenv" "$startup_home/.zshenv"
+zmodload zsh/datetime
+# Dates FILE (creating it) DAYS ago
+age() { /usr/bin/touch -t "$(strftime '%Y%m%d%H%M.%S' $(( EPOCHSECONDS - $2 * 86400 )))" "$1"; }
+reminder_state=$startup_home/.local/state/dotfiles
+/bin/mkdir -p "$reminder_state"
+age "$reminder_state/updated" 8
 startup_out=$(cd "$startup_home" && /usr/bin/env -i HOME="$startup_home" TERM=xterm-256color SHELL=/bin/bash \
   PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" -lic 'print -r -- "$ZDOTDIR ${+aliases[gs]} ${SHELL:t}"' \
   2> "$test_root/startup-errors" < /dev/null)
@@ -735,6 +742,47 @@ startup_errors=$(<"$test_root/startup-errors")
 [[ -z $startup_errors ]] || fail "startup wrote to stderr: $startup_errors"
 # An image that exports SHELL=/bin/bash (Codespaces) still gets zsh tmux panes
 expect "$startup_home/.config/zsh 1 zsh" "$startup_out" 'full startup loads .zshrc'
+# On a terminal, a week after the last full update, the first shell of each
+# day says so in one line before the command's output; startup prints nothing
+# else.
+zmodload zsh/zpty zsh/zselect
+on_terminal() {
+  local chunk deadline=$(( SECONDS + 10 ))
+  local -a shell=(/usr/bin/env -i HOME="$startup_home" TERM=xterm-256color \
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" -lic 'print -r -- READY')
+  zpty -b startup "builtin cd ${(q)startup_home} && ${(@q)shell}"
+  terminal_out=''
+  while (( SECONDS < deadline )); do
+    if zpty -r startup chunk; then
+      terminal_out+=$chunk
+    elif ! zpty -t startup; then
+      break
+    else
+      zselect -t 1 || true
+    fi
+  done
+  zpty -d startup
+  (( SECONDS < deadline )) || fail "startup on a terminal timed out: ${(qqqq)terminal_out}"
+  terminal_out=${${terminal_out//$'\r'/}%$'\n'}
+}
+expect_reminder() {
+  [[ $terminal_out == *'8 days ago'*dotsup*$'\nREADY' && $terminal_out != *$'\n'*$'\n'* ]] ||
+    fail "$1: ${(qqqq)terminal_out}"
+}
+on_terminal
+expect_reminder 'reminder on a terminal'
+on_terminal
+expect READY "$terminal_out" 'one reminder a day'
+age "$reminder_state/reminded" 1
+on_terminal
+expect_reminder 'reminder the next day'
+/usr/bin/touch "$reminder_state/updated"
+/bin/rm -f "$reminder_state/reminded"
+on_terminal
+expect READY "$terminal_out" 'no reminder after a recent update'
+/bin/rm -f "$reminder_state/updated"
+on_terminal
+expect READY "$terminal_out" 'no reminder before a first full update'
 # In a container (here Codespaces), login and other interactive shells alike
 # get the lean Brewfile.
 for flags in -lic -ic; do

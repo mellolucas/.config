@@ -351,15 +351,20 @@ bundle_dotfiles() {
 
   # Bundle installs npm packages but never upgrades them. Mirror its
   # safeguards: no install scripts and a one-day release cooldown.
-  [ -z "${HOMEBREW_BUNDLE_NO_UPGRADE-}" ] || return 0
-  npm_packages=$("$brew" bundle list --global --npm) || exit 1
-  [ -n "$npm_packages" ] || return 0
-  printf 'updating npm packages from the Brewfile\n'
-  # shellcheck disable=SC2086 # one package name per word
-  npm update --global --ignore-scripts --min-release-age=1 $npm_packages || {
-    printf 'error: npm update failed\n' >&2
-    exit 1
-  }
+  if [ -z "${HOMEBREW_BUNDLE_NO_UPGRADE-}" ]; then
+    npm_packages=$("$brew" bundle list --global --npm) || exit 1
+    if [ -n "$npm_packages" ]; then
+      printf 'updating npm packages from the Brewfile\n'
+      # shellcheck disable=SC2086 # one package name per word
+      npm update --global --ignore-scripts --min-release-age=1 $npm_packages || {
+        printf 'error: npm update failed\n' >&2
+        exit 1
+      }
+    fi
+  fi
+
+  # The shell's weekly update reminder counts from the last full bundle
+  { mkdir -p "$xdg_state_home/dotfiles" && : >"$xdg_state_home/dotfiles/updated"; } 2>/dev/null || :
 }
 
 # repo_dir must be its own work-tree top level: rev-parse alone also succeeds
@@ -433,7 +438,7 @@ print_update_hints() {
     printf '    Same, without prompting.\n'
     printf '  git -C "%s" stash push -u && dotfiles update && git -C "%s" stash pop\n' "$repo_dir" "$repo_dir"
     printf '    Preserve local edits around the update yourself.\n'
-    printf '  dotfiles status\n'
+    printf '  cd "%s" && gg\n' "$repo_dir"
     printf '    Inspect the current repo state.\n'
     printf '\n'
   } >&2
@@ -600,7 +605,7 @@ update_dotfiles() {
 
     if git_is_dirty; then
       printf 'note: local changes exist and were left untouched\n'
-      printf 'hint: inspect them with: dotfiles status\n'
+      printf 'hint: inspect them with: cd "%s" && gg\n' "$repo_dir"
     fi
 
     reinstall_after_update
@@ -637,99 +642,6 @@ update_dotfiles() {
     fi
 
     fast_forward_update "$upstream"
-  fi
-}
-
-check_git_updates() (
-  # Keep exiting guards local to this section; status must not refresh the index.
-  export GIT_OPTIONAL_LOCKS=0
-  git_require_repo
-  if git_is_dirty; then
-    printf 'note: local changes exist and were left untouched\n'
-  else
-    printf 'working tree: clean\n'
-  fi
-
-  branch=$(git -C "$repo_dir" symbolic-ref --quiet --short HEAD) || {
-    printf 'dotfiles: detached HEAD\n'
-    return 1
-  }
-  remote=$(git -C "$repo_dir" config --get "branch.$branch.remote") || {
-    printf 'dotfiles: no upstream configured\n'
-    return 1
-  }
-  # Like git fetch: tracking refs update and the repository's fetch settings apply.
-  GIT_TERMINAL_PROMPT=0 git -C "$repo_dir" fetch --quiet "$remote" || return 1
-  printf 'dotfiles fetched at: %s (UTC)\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  upstream=$(git -C "$repo_dir" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null) || return 1
-  incoming_count=$(git -C "$repo_dir" rev-list --count "HEAD..$upstream") || return 1
-  local_count=$(git -C "$repo_dir" rev-list --count "$upstream..HEAD") || return 1
-  if [ "$local_count" -eq 0 ] && [ "$incoming_count" -eq 0 ]; then
-    state=equal
-  elif [ "$incoming_count" -eq 0 ]; then
-    state=ahead
-  elif [ "$local_count" -eq 0 ]; then
-    state=behind
-  elif git -C "$repo_dir" merge-base HEAD "$upstream" >/dev/null; then
-    state=diverged
-  else
-    state=no-common-history
-  fi
-  printf 'dotfiles: %s (%s)\n' "$state" "$upstream"
-  printf '  incoming commits: %s\n  local-only commits: %s\n' "$incoming_count" "$local_count"
-)
-
-check_updates() {
-  check_result=0
-  printf 'dotfiles repo: %s\n' "$repo_dir"
-  if ! check_git_updates; then
-    printf 'dotfiles: unknown (inspection incomplete)\n'
-    check_result=1
-  fi
-
-  brewfile="${HOMEBREW_BUNDLE_FILE_GLOBAL:-$xdg_config_home/homebrew/Brewfile}"
-  printf '\nHomebrew Brewfile: %s\n' "$brewfile"
-  if [ ! -f "$brewfile" ]; then
-    printf 'error: no Brewfile found at %s\n' "$brewfile" >&2
-    check_result=1
-  elif ! brew=$(brew_bin); then
-    printf 'error: Homebrew is not installed\n' >&2
-    check_result=1
-  elif (
-    PATH="${brew%/*}:$PATH"
-    unset HOMEBREW_BUNDLE_NO_UPGRADE HOMEBREW_BUNDLE_INSTALL
-    unset HOMEBREW_FORCE_API_AUTO_UPDATE HOMEBREW_BUNDLE_CHECK_ALREADY_OUTPUT_FORMULAE_ERRORS
-    HOMEBREW_NO_AUTO_UPDATE=1 "$brew" bundle check --global --verbose
-  ); then
-    printf 'Homebrew: Brewfile satisfied by current checks\n'
-  else
-    printf 'Homebrew: Brewfile unmet or check failed; see native output above\n'
-    check_result=1
-  fi
-  printf '\nNext: dotfiles update applies repository and package updates; brew update first refreshes package metadata.\n'
-  return "$check_result"
-}
-
-status_dotfiles() {
-  printf 'dotfiles repo: %s\n' "$repo_dir"
-
-  if ! command -v git >/dev/null 2>&1; then
-    printf 'git is not available\n'
-    return 0
-  fi
-
-  if ! git_repo_dir_is_toplevel; then
-    printf 'not a git repo\n'
-    return 0
-  fi
-
-  printf '\n'
-  git -C "$repo_dir" status --short --branch --untracked-files=all
-
-  stashes=$(git -C "$repo_dir" stash list 2>/dev/null | sed -n '1,5p' || true)
-  if [ -n "$stashes" ]; then
-    printf '\nstashes:\n'
-    printf '%s\n' "$stashes" | sed 's/^/  /'
   fi
 }
 
@@ -1027,12 +939,10 @@ usage: dotfiles COMMAND
 commands:
   install        link configs, ensure Homebrew, and apply the Brewfile; in
                  Codespaces and dev containers, make zsh the login shell too
-  check-updates  fetch and compare dotfiles, check the Brewfile; applies nothing
   update         fetch upstream, fast-forward when clean, then relink and
                  apply the Brewfile
   bundle         apply the Brewfile, then update its npm packages
   link           relink configs into XDG_CONFIG_HOME without touching packages
-  status         show the dotfiles repository's state
   doctor         check the setup and name fixes; exits 1 on problems
   uninstall      remove the symlinks this repository owns
   help           show this help
@@ -1040,10 +950,6 @@ commands:
 update options:
   --discard      review and discard local repo changes, then reset to upstream
   -y, --yes      skip the --discard confirmation prompt
-
-check-updates exit codes:
-  0              inspection completed and the Brewfile is satisfied
-  1              inspection incomplete, or the Brewfile is unmet
 
 default command:
   install        when run directly as install.sh
@@ -1088,8 +994,6 @@ case "$cmd" in
   link) require_no_args link "$@"; link_dotfiles; printf '\ndone.\n' ;;
   bundle) require_no_args bundle "$@"; bundle_dotfiles ;;
   update) update_dotfiles "$@" ;;
-  check-updates) require_no_args check-updates "$@"; check_updates ;;
-  status) require_no_args status "$@"; status_dotfiles ;;
   doctor) require_no_args doctor "$@"; doctor_dotfiles ;;
   uninstall) require_no_args uninstall "$@"; uninstall_dotfiles ;;
   -h|--help|help|--usage|usage) require_no_args help "$@"; usage ;;

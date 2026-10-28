@@ -325,7 +325,7 @@ zpty -w -n shell $'\x18\x12builtin cd ..\r'
 wait_for 'ZLE-READY'
 # rgv completes as rg does
 [[ -z $rg_completion ]] || complete 'rgv rg option' 'rgv --word-reg' 'rgv --word-regexp '
-for subcommand in install link bundle update check-updates status doctor uninstall help; do
+for subcommand in install link bundle update doctor uninstall help; do
   complete "dotfiles $subcommand" "dotfiles ${subcommand[1,-2]}" "dotfiles $subcommand "
 done
 complete 'dotfiles update discard' 'dotfiles update --dis' 'dotfiles update --discard '

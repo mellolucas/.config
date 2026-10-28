@@ -261,15 +261,14 @@ Render Markdown and read long text comfortably.
 
 ## Maintain: Maintain the setup
 
-Inspect and update this setup deliberately; no update check runs at shell startup.
+Update this setup when the shell reminds you: a week after the last full update, the first shell of each day says so.
 
 | Run | Result |
 | --- | --- |
-| `dotfiles check-updates` | Fetch the repository and check the Brewfile; applies nothing |
 | `dotfiles update` | Update the repository, relink, apply the Brewfile, and update its npm packages |
 | `dotfiles bundle` | Apply the Brewfile and `local.Brewfile`, then update their npm packages |
 | `dotfiles link` | Relink configuration without touching packages |
-| `dotfiles status` / `dotfiles doctor` | Repository state / environment health, with fixes |
+| `dotfiles doctor` | Environment health, with a fix for each problem |
 | `help COMMAND` | A command's help, even through an alias; its manual when it has no `--help` |
 
 - `dots` is short for `dotfiles`; `dotsup` runs `dotfiles update`. Homebrew refreshes its package list once it is a day old; run `brew update` first for the very latest.
