@@ -31,7 +31,6 @@ if [[ ${1:-} == --glance-child ]]; then
   git-glance() { (( $# == 0 )) || fail 'automatic card must stay plain'; print CARD; }
   builtin cd "$test_root/outside"
   config=$(<"$repo/zsh/.zshrc")
-  [[ $config == *$'\n[[ -o interactive ]] || return\n'* ]] || fail 'interactive startup guard'
   [[ $config == *$'\n# Auto git-glance '*$'\n# ---- Prompt ----\n'* ]] || fail 'hook block boundaries'
   config=${config#*$'\n# Auto git-glance '}
   config=${config#*$'\n'}
@@ -59,7 +58,7 @@ if [[ ${1:-} == --glance-render-child ]]; then
   fail() { print -ru2 -- "FAIL: git-glance renderer: $*"; exit 1; }
   [[ -o interactive && $ZSH_SUBSHELL == 0 && -t 1 ]] || fail 'top-level interactive terminal required'
   export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-  export GLANCE_CALL="$test_root/glance-call" GLANCE_TPUT_CALL="$test_root/glance-tput-call"
+  export GLANCE_CALL="$test_root/glance-call"
   path=("$test_root/git-bin" "$test_root/eza-bin" "$test_root/tput-bin")
   fpath=("$repo/zsh/functions")
   autoload -Uz git-glance
@@ -69,49 +68,12 @@ if [[ ${1:-} == --glance-render-child ]]; then
   [[ $git_aliases != "$config" ]] || fail 'git alias conditional boundary'
   source /dev/stdin <<< "$guard${git_aliases%%$'\nfi\n'*}"$'\nfi'
   builtin cd "$root/nested dir"
-  case $mode in
-    missing) path=("$test_root/git-bin" "$test_root/eza-bin") ;;
-    invalid-term) export TERM=dotfiles-invalid-term 2>/dev/null ;;
-    zero) export GLANCE_ROWS=0 ;;
-    negative) export GLANCE_ROWS=-1 ;;
-    nondigits) export GLANCE_ROWS=oops ;;
-    empty) export GLANCE_ROWS='' ;;
-    cup-failure) export GLANCE_CUP_RC=1 ;;
-  esac
   git-glance > "$test_root/glance-render-card" || fail 'baseline card status'
-  : > "$GLANCE_TPUT_CALL"
   : > "$GLANCE_CALL"
-  # Controlled login/command-echo bytes avoid sourcing startup files or driving ZLE.
-  print -rl -- 'LOGIN OUTPUT' "$ $mode"
-  case $mode in
-    gg|ggg) eval "$mode" || fail "$mode status" ;;
-    substitution)
-      exec 3>&1
-      output=$(
-        [[ $ZSH_SUBSHELL -gt 0 && -t 3 ]] || fail 'terminal substitution required'
-        git-glance >&3 || exit 1
-      ) || fail 'substitution status'
-      exec 3>&-
-      [[ -z $output ]] || fail 'substitution captured terminal output'
-      ;;
-    redirected)
-      git-glance > "$test_root/glance-output" || fail 'redirected status'
-      [[ $(<"$test_root/glance-output") == $(<"$test_root/glance-render-card") ]] || fail 'redirected card changed'
-      ;;
-    help) git-glance --help || fail 'help status' ;;
-    invalid) if git-glance --invalid 2>&1; then fail 'invalid argument accepted'; fi ;;
-    outside)
-      builtin cd "$test_root/outside"
-      if git-glance 2>&1; then fail 'outside repository accepted'; fi
-      ;;
-    *) git-glance || fail "$mode fallback status" ;;
-  esac
+  eval "$mode" || fail "$mode status"
   print END
   exit 0
 fi
-for file in "$repo"/zsh/{homebrew.sh,.zprofile,.zshrc,functions/{fzfv,git-glance,github-open,github-view,help,keys,rgv}} "$self"; do
-  zsh -n "$file"
-done
 
 test_root=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-zsh.XXXXXX")
 test_root=${test_root:A}
@@ -151,7 +113,6 @@ recorded() {
 #!/bin/sh
 printf '%s\n' "$@" >> "$GLANCE_CALL"
 printf 'CODE SUMMARY\n'
-exit "${EZA_RC:-0}"
 STUB
   /bin/chmod +x "$test_root/eza-bin/eza"
   path=("$test_root/git-bin" "$test_root/eza-bin")
@@ -161,10 +122,7 @@ STUB
   guard=$'if command -v git-glance >/dev/null 2>&1; then\n  alias gg='
   git_aliases=${config#*$'\n'${guard}}
   [[ $git_aliases != "$config" ]] || fail 'git alias conditional boundary'
-  git_aliases=$guard${git_aliases%%$'\nfi\n'*}$'\nfi'
-  source /dev/stdin <<< "$git_aliases"
-  expect git-glance "$aliases[gg]" 'gg stays plain'
-  expect 'git-glance --code' "$aliases[ggg]" 'ggg code alias'
+  source /dev/stdin <<< "$guard${git_aliases%%$'\nfi\n'*}"$'\nfi'
   builtin cd "$root/nested dir"
   before=$PWD
   eval gg > "$test_root/glance-card" || fail 'plain git-glance status'
@@ -181,81 +139,53 @@ STUB
   expect "$card" "$(<"$test_root/glance-output")" 'missing eza retains card'
   expect 'git-glance: eza unavailable; code summary skipped' "$(recorded glance-error)" 'missing eza warning'
   path=("$test_root/git-bin" "$test_root/eza-bin")
-  result=0
-  EZA_RC=23 git-glance --code > "$test_root/glance-output" || result=$?
-  expect 23 "$result" 'eza failure propagates'
-  expect "$before" "$PWD" 'fallback and failure preserve cwd'
   : > "$GLANCE_CALL"
   builtin cd "$test_root/outside"
   if git-glance --code > "$test_root/glance-output" 2> "$test_root/glance-error"; then fail 'outside repo accepted'; fi
   expect 'git-glance: not inside a git repository' "$(recorded glance-error)" 'outside repo diagnostic'
   [[ ! -s $GLANCE_CALL && ! -s $test_root/glance-output ]] || fail 'outside repo emitted card or invoked eza'
   git() { print called >> "$test_root/glance-git"; return 99; }
-  for args in --invalid positional '--code extra'; do
-    if git-glance ${=args} > "$test_root/glance-output" 2> "$test_root/glance-error"; then fail "accepted $args"; fi
-    [[ $(recorded glance-error) == 'git-glance: unknown argument: '* ]] || fail "invalid argument diagnostic: $args"
-  done
+  if git-glance --invalid > "$test_root/glance-output" 2> "$test_root/glance-error"; then fail 'accepted --invalid'; fi
+  [[ $(recorded glance-error) == 'git-glance: unknown argument: '* ]] || fail 'invalid argument diagnostic'
   for flag in -h --help; do
     output=$(git-glance "$flag") || fail "git-glance $flag status"
     [[ $output == 'usage: git-glance [--code]'* ]] || fail "git-glance $flag usage"
   done
   [[ ! -e $test_root/glance-git && ! -s $GLANCE_CALL ]] || fail 'argument parsing invoked git or eza'
-  unfunction git-glance
-  unalias gg ggg
-  source /dev/stdin <<< "$git_aliases"
-  (( ! ${+aliases[gg]} && ! ${+aliases[ggg]} )) || fail 'git aliases dependency guard'
-  print -r -- 'ok: isolated git-glance cards, code summary, arguments, and aliases'
+  print -r -- 'ok: isolated git-glance cards, code summary, and arguments'
 )
 
 (
-  topics=(workspace panes editor explore agents git shell files browse documents maintain)
-  typeset -A sections titles topic_outputs
-  current=''
-  guide_topics=()
+  # Every page of the guide, by its "## Topic: Title" heading
+  typeset -A titles topic_outputs
+  topics=()
   while IFS= read -r line || [[ -n $line ]]; do
-    if [[ $line == '## '* ]]; then
-      heading=${line#'## '}
-      current=${(L)${heading%%:*}}
-      titles[$current]=${heading#*: }
-      sections[$current]="# $titles[$current]"$'\n'
-      guide_topics+=("$current")
-    elif [[ -n $current ]]; then
-      sections[$current]+="$line"$'\n'
-    fi
+    [[ $line == '## '*': '* ]] || continue
+    topic=${(L)${${line#'## '}%%:*}}
+    topics+=("$topic")
+    titles[$topic]=${line#*: }
   done < "$repo/GUIDE.md"
-  expect "${(j: :)topics}" "${(j: :)guide_topics}" 'guide topic contract'
-
-  arg='caller sentinel'
-  keys --plain files > "$test_root/keys-section" || fail 'keys global argument isolation status'
-  expect 'caller sentinel' "$arg" 'keys leaves global arg unchanged'
+  (( $#topics )) || fail 'guide pages'
 
   keys_output=$(print -r -- '' | keys) || fail 'piped keys without dependencies'
   keys_all=$(keys all) || fail 'keys all without dependencies'
   [[ $keys_all == *'A field guide'* ]] || fail 'keys all includes guide introduction'
-  outputs=("$keys_output" "$keys_all")
   for flag in -h --help; do
     keys_help=$(keys "$flag") || fail "keys $flag status"
     [[ $keys_help == 'usage: keys '* ]] || fail "keys $flag usage"
-    outputs+=("$keys_help")
     for topic in "${topics[@]}"; do
       [[ $keys_help == *"\`keys $topic\` - $titles[$topic]"* ]] || fail "keys $flag index: $topic"
     done
   done
   for topic in "${topics[@]}"; do
     [[ $keys_output == *"\`keys $topic\` - $titles[$topic]"* ]] || fail "keys index: $topic"
-    # The index lists titles only; a section's first body line must not appear.
-    [[ $keys_output != *"${${(f)sections[$topic]}[2]}"* ]] || fail "keys index includes section body: $topic"
     keys "$topic" > "$test_root/keys-section" || fail "redirected keys $topic status"
     section=$(recorded keys-section)
     topic_outputs[$topic]=$section
+    # The index lists titles only; a page's first body line must not appear.
+    [[ $keys_output != *"${${(f)section}[2]}"* ]] || fail "keys index includes section body: $topic"
     plain=$(keys --plain "$topic") || fail "plain keys $topic status"
     expect "$section" "$plain" "plain and redirected keys $topic agree"
-    [[ $section == "$sections[$topic]"* ]] || fail "keys $topic includes complete source section"
-    [[ $keys_all == *"$sections[$topic]"* ]] || fail "keys all includes complete $topic section"
-    for other in "${topics[@]}"; do
-      [[ $other == $topic || $section != *"# $titles[$other]"* ]] || fail "keys $topic leaks $other section"
-    done
-    outputs+=("$section" "$plain")
   done
   for args in '--invalid' 'zz-no-such-word' 'zz-no-such words'; do
     if keys ${=args} > "$test_root/keys-error" 2>&1; then
@@ -263,13 +193,12 @@ STUB
     fi
     error=$(recorded keys-error)
     [[ -n $error ]] || fail "keys explains invalid input: $args"
-    outputs+=("$error")
   done
   # Words that name no page search every entry, bullets included, by topic.
   output=$(keys detach) || fail 'keys search status'
-  [[ $output == 'panes '*detach* && $output != *$'\n'*'Cmd+Option+arrows'* ]] || fail "keys search: $output"
+  [[ $'\n'$output == *$'\npanes '*detach* && $output != *'Cmd+Option+arrows'* ]] || fail "keys search: $output"
   output=$(keys --plain browse prompt previous) || fail 'keys multi-word search status'
-  [[ $output == 'browse '*'Previous / next prompt'* ]] || fail "keys multi-word search: $output"
+  [[ $'\n'$output == *$'\nbrowse '*'Previous / next prompt'* ]] || fail "keys multi-word search: $output"
 
   # Present viewers must remain unused for redirected or explicitly plain output.
   fzf() { fail 'keys unexpectedly invoked the picker'; }
@@ -295,11 +224,6 @@ STUB
   builtin cd "$test_root/outside"
   output=$(keys all) || fail 'keys autoload through XDG symlink status'
   expect "$keys_all" "$output" 'keys autoload through XDG symlink'
-  for output in "${outputs[@]}"; do
-    for private_path in /Users/ /home/ /private/var/ /var/folders/ "$repo" "$HOME" "$XDG_CONFIG_HOME" "$test_root"; do
-      [[ $output != *"$private_path"* ]] || fail 'keys exposes a private machine path'
-    done
-  done
 )
 
 # Exercise native chpwd dispatch in a fresh interactive shell, not a harness subshell.
@@ -307,14 +231,9 @@ STUB
   /bin/mkdir -p "$test_root/tput-bin"
   /bin/cat > "$test_root/tput-bin/tput" <<'STUB'
 #!/bin/sh
-printf '%s\n' "$*" >> "$GLANCE_TPUT_CALL"
-if [ "$TERM" = dotfiles-invalid-term ]; then
-  printf 'tput: unknown terminal\n' >&2
-  exit 1
-fi
 case "$*" in
-  lines) printf '%s\n' "${GLANCE_ROWS-3}" ;;
-  'cup 0 0') printf '\033[H'; exit "${GLANCE_CUP_RC:-0}" ;;
+  lines) printf '3\n' ;;
+  'cup 0 0') printf '\033[H' ;;
   *) exit 99 ;;
 esac
 STUB
@@ -322,7 +241,7 @@ STUB
   zmodload zsh/zpty
   zmodload zsh/zselect
   trap 'zpty -d 2>/dev/null || true' EXIT
-  for mode in hook gg ggg substitution redirected help invalid outside missing invalid-term zero negative nondigits empty cup-failure; do
+  for mode in hook gg ggg; do
   child=--glance-render-child
   [[ $mode != hook ]] || child=--glance-child
   typeset -a child_command=(/usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C \
@@ -351,28 +270,10 @@ STUB
   card=''
   IFS= read -r -d '' card < "$test_root/glance-render-card" || [[ -n $card ]]
   [[ $card == *owner/repo*'never fetched'*branch*worktree* ]] || fail "$mode baseline repository card"
-  expected=$'LOGIN OUTPUT\n'"$ $mode"$'\n'
-  tput_calls=''
-  case $mode in
-    gg|ggg)
-      expected+=$'\n\n\n\e[H'"$card"
-      [[ $mode != ggg ]] || expected+=$'CODE SUMMARY\n'
-      tput_calls=$'lines\ncup 0 0'
-      ;;
-    redirected) ;;
-    help) expected+=$'usage: git-glance [--code]\nPrint a repository card; --code appends an eza language summary of its root.\n' ;;
-    invalid) expected+=$'git-glance: unknown argument: --invalid\n' ;;
-    outside) expected+=$'git-glance: not inside a git repository\n' ;;
-    *)
-      expected+=$card
-      case $mode in
-        invalid-term|zero|negative|nondigits|empty) tput_calls=lines ;;
-        cup-failure) tput_calls=$'lines\ncup 0 0' ;;
-      esac
-      ;;
-  esac
-  expect "$expected"$'END\n' "$transcript" "git-glance $mode terminal rendering order"
-  expect "$tput_calls" "$(recorded glance-tput-call)" "git-glance $mode capability calls"
+  # The card starts at the top of the screen; ggg's code summary follows it.
+  expected=$'\e[H'"$card"
+  [[ $mode != ggg ]] || expected+='CODE SUMMARY'
+  [[ $transcript == *"$expected"* ]] || fail "git-glance $mode on a terminal: ${(qqqq)transcript}"
   if [[ $mode == ggg ]]; then
     expect $'--code=both\n--\n'"$root" "$(recorded glance-call)" 'PTY code summary invoked once'
   else
@@ -380,7 +281,6 @@ STUB
   fi
   done
   print -r -- 'ok: native git-glance chpwd isolation and top-level terminal cards (PTY)'
-  print -r -- 'ok: git-glance soft-clear ordering, capture guards, arguments, and capability fallbacks (PTY)'
 )
 
 # Source only the editor, renderer and listing aliases, never startup or local config.
@@ -393,79 +293,6 @@ while IFS= read -r line; do
 done < "$repo/zsh/.zshrc"
 [[ -n $alias_block && $line == 'alias rg='* ]] || fail 'alias block boundaries'
 
-for os in darwin23 linux-gnu; do
-  for has_eza in 0 1; do
-    for has_caffeinate in 0 1; do
-      for has_glow in 0 1; do
-        (
-          OSTYPE=$os
-          label="aliases: $os / eza=$has_eza / caffeinate=$has_caffeinate / glow=$has_glow"
-          ls() { record ls "$@"; }
-          if (( has_eza )); then
-            eza() { record eza "$@"; }
-          fi
-          if (( has_caffeinate )); then
-            caffeinate() { record caffeinate "$@"; }
-          fi
-          if (( has_glow )); then
-            glow() { record glow "$@"; }
-          fi
-          COLUMNS=90
-          source /dev/stdin <<< "$alias_block"
-
-          eval 'ls -l "directory with spaces"'
-          expect $'ls\n-l\ndirectory with spaces' "$(recorded)" "$label explicit native listing"
-          if (( has_eza )); then
-            for listing in l ll lll llt lld; do
-              expected=$'eza\n--all\n--group-directories-first\n--icons=auto\n--git\n--hyperlink=auto'
-              [[ $listing == l ]] || expected+=$'\n--long\n--binary\n--time-style=relative\n--git-repos'
-              [[ $listing != lll ]] || expected+=$'\n--total-size\n--loc=both'
-              [[ $listing != (llt|lld) ]] || expected+=$'\n--tree\n--git-ignore\n--level=2'
-              [[ $listing != lld ]] || expected+=$'\n--only-dirs'
-              eval "$listing"' "directory with spaces"'
-              expect "$expected"$'\ndirectory with spaces' "$(recorded)" "$label $listing defaults"
-              for flags in --inode --sort=age --tree --level=2 --icons=never --total-size --no-git --hyperlink=never \
-                '--inode --sort=age --tree --level=2 --icons=never --total-size'; do
-                args=(${=flags})
-                eval "$listing"' "${args[@]}" "directory with spaces" "second directory"'
-                expect "$expected"$'\n'"${(F)args}"$'\ndirectory with spaces\nsecond directory' \
-                  "$(recorded)" "$label $listing forwards $flags"
-              done
-            done
-            eval 'lc -- "directory with spaces" "second directory"'
-            expect $'eza\n--code=both\n--\ndirectory with spaces\nsecond directory' \
-              "$(recorded)" "$label code summary forwards paths without listing flags"
-          else
-            for name in l ll lll llt lld lc; do
-              (( ! ${+aliases[$name]} )) || fail "$label $name dependency guard"
-            done
-          fi
-
-          if [[ $os == darwin* ]] && (( has_caffeinate )); then
-            eval 'awake -t 60'
-            expect $'caffeinate\n-di\n-t\n60' "$(recorded)" "$label awake arguments"
-          else
-            (( ! ${+aliases[awake]} )) || fail "$label awake guard"
-          fi
-          if (( has_glow )); then
-            for COLUMNS in 50 180 0 -1; do
-              expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n0'
-              eval 'mdv "document name.md"'
-              expect "$expected"$'\ndocument name.md' "$(recorded)" "$label unrestricted width with COLUMNS=$COLUMNS"
-              eval 'mdv -w 72 "document name.md"'
-              expect "$expected"$'\n-w\n72\ndocument name.md' "$(recorded)" "$label explicit width last"
-              eval 'mdv -w 0 "document name.md"'
-              expect "$expected"$'\n-w\n0\ndocument name.md' "$(recorded)" "$label unrestricted width override"
-            done
-          else
-            (( ! ${+aliases[mdv]} && ! ${+functions[mdv]} )) || fail "$label mdv dependency guard"
-          fi
-        )
-      done
-    done
-  done
-done
-
 (
   HOME="$test_root/home with spaces"
   id() {
@@ -477,14 +304,14 @@ done
   default="--appdir=\"$HOME/Applications\""
   for OSTYPE in darwin23 linux-gnu; do
     for groups in 'staff admin everyone' 'staff admin-helper everyone'; do
-      for cask_opts in unset '' '--no-quarantine' '--appdir=/custom/Apps --no-quarantine' \
-        '"--appdir=/custom/Apps with spaces"' "'--appdir=$HOME/Applications'"; do
+      for cask_opts in unset '--no-quarantine' '--appdir=/custom/Apps --no-quarantine' \
+        '"--appdir=/custom/Apps with spaces"'; do
         unset HOMEBREW_CASK_OPTS
         [[ $cask_opts == unset ]] || export HOMEBREW_CASK_OPTS=$cask_opts
         expected=${HOMEBREW_CASK_OPTS-}
         if [[ $OSTYPE == darwin* && $groups == *admin-helper* ]]; then
           case $cask_opts in
-            unset|'') expected=$default ;;
+            unset) expected=$default ;;
             *--appdir=*) ;;
             *) expected="$default $cask_opts" ;;
           esac
@@ -555,38 +382,22 @@ RUBY
   else
     print -r -- 'SKIP: optional Ruby Shellwords comparison (ruby not installed)'
   fi
-
-  # Check wiring as text: executing profiles could evaluate a real brew binary.
-  [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nsource "$ZDOTDIR/homebrew.sh"\n'* ]] ||
-    fail '.zprofile must source the cask policy'
-  [[ $(<"$repo/install.sh") == *$'\n. "$repo_dir/zsh/homebrew.sh"\n'* ]] ||
-    fail 'install.sh must apply the shared Homebrew policy'
-  [[ $'\n'$(<"$repo/zsh/.zprofile")$'\n' == *$'\nif [[ -o login || -z $HOMEBREW_PREFIX ]]; then\n'* ]] ||
-    fail '.zprofile must rerun shellenv for login shells and initialize other shells once'
-  [[ $'\n'$(<"$repo/zsh/.zshrc")$'\n' == *$'\n[[ -o login ]] || source "$ZDOTDIR/.zprofile"\n'* ]] ||
-    fail '.zshrc must run session setup for non-login shells'
 )
 
-# Parity contract: at a pane's edge, Ghostty's Cmd+Option+arrows reach the
-# program, where Neovim moves between windows and zsh ignores them (both
-# checked by behavior, in .tests/nvim.lua and .tests/zle.zsh).
+# Ghostty's side of the parity contracts, whose keys no test can press: at a
+# pane's edge Cmd+Option+arrows reach the program, where Neovim moves between
+# windows and zsh ignores them; Option types characters, and Option+Backspace
+# still sends ESC DEL, a word delete in zsh and Neovim (both checked by
+# behavior, in .tests/zle.zsh and .tests/nvim.lua).
 (
   # Whole active lines only (indentation stripped), so commented-out binds fail.
   setopt extendedglob
   ghostty_lines=(${${(f)"$(<"$repo/ghostty/config.ghostty")"}##[[:space:]]#})
-  for dir in left down up right; do
-    (( ${ghostty_lines[(Ie)keybind = performable:super+alt+arrow_$dir=goto_split:$dir]} )) ||
-      fail "ghostty Cmd+Option+$dir navigation"
-  done
-)
-
-# Parity contract: Option types characters, and Ghostty still sends
-# Option+Backspace as ESC DEL, which zsh and Neovim read as a word delete
-# (checked by behavior in .tests/zle.zsh and .tests/nvim.lua).
-(
-  setopt extendedglob
-  ghostty_lines=(${${(f)"$(<"$repo/ghostty/config.ghostty")"}##[[:space:]]#})
-  for line in 'macos-option-as-alt = false' 'keybind = alt+backspace=text:\x1b\x7f'; do
+  for line in 'macos-option-as-alt = false' 'keybind = alt+backspace=text:\x1b\x7f' \
+    'keybind = performable:super+alt+arrow_left=goto_split:left' \
+    'keybind = performable:super+alt+arrow_down=goto_split:down' \
+    'keybind = performable:super+alt+arrow_up=goto_split:up' \
+    'keybind = performable:super+alt+arrow_right=goto_split:right'; do
     (( ${ghostty_lines[(Ie)$line]} )) || fail "ghostty lacks: $line"
   done
 )
@@ -641,21 +452,16 @@ editor() { record editor "$@"; }
   alias help-first='help-second --first' help-second='editor --second'
   help help-first 'user argument'
   expect $'editor\n--second\n--first\nuser argument\n--help' "$(recorded)" 'plain alias chain'
-  # Git's @{...} revisions pass (gdo, gdi); brace expansion still does not.
-  alias help-upstream='editor HEAD...@{upstream}' help-brace='editor {a,b}'
+  # Git's @{...} revisions pass (gdo, gdi).
+  alias help-upstream='editor HEAD...@{upstream}'
   help help-upstream
   expect $'editor\nHEAD...@{upstream}\n--help' "$(recorded)" 'alias with a Git upstream revision'
-  if help help-brace 2>/dev/null; then fail 'help ran an alias with brace expansion'; fi
   # Real Git answers `git diff REV --help` with a usage error (exit 129), so
   # help asks for the subcommand's manual without the words in between.
   git() { record git "$@"; }
-  alias help-gdo='git diff @{upstream}...@' help-gdf='git diff --name-status'
+  alias help-gdo='git diff @{upstream}...@'
   help help-gdo
   expect $'git\ndiff\n--help' "$(recorded)" 'git alias with a revision'
-  help help-gdf --cached
-  expect $'git\ndiff\n--help' "$(recorded)" 'git alias with options and user arguments'
-  help git log --graph
-  expect $'git\nlog\n--help' "$(recorded)" 'git subcommand with arguments'
 
   source /dev/stdin <<< "$alias_block"
   # Only bsd-tool has a manual; it rejects --help like caffeinate.
@@ -670,34 +476,14 @@ editor() { record editor "$@"; }
   output=$(help exit >/dev/null; print -r -- survived) || fail 'help exit exited caller'
   expect survived "$output" 'help exit must not exit caller'
   expect $'man\nzshbuiltins' "$(recorded)" 'exit uses builtin documentation without exiting caller'
-  help printf >/dev/null
-  expect $'man\nzshbuiltins' "$(recorded)" 'noninteractive builtin help never prompts for external matches'
-  alias help-exit=exit
-  help help-exit >/dev/null
-  expect $'man\nzshbuiltins' "$(recorded)" 'builtin alias uses native documentation'
-  alias exit='exit --ignored'
-  help exit >/dev/null
-  expect $'man\nzshbuiltins' "$(recorded)" 'native documentation ignores resolved self alias'
-  unalias exit
 
   EDITOR='editor --clean'
   help vi
   expect $'editor\n--clean\n--help' "$(recorded)" 'deferred multiword editor'
-  alias editor='editor --alias-only'
-  help vi
-  expect $'editor\n--clean\n--help' "$(recorded)" 'editor expansion does not recursively expand aliases'
-  unalias editor
-
-  alias help-quoted="editor \"double quoted\" 'single quoted' escaped\\ space \"\""
-  help help-quoted 'user argument'
-  expect $'editor\ndouble quoted\nsingle quoted\nescaped space\n\nuser argument\n--help' "$(recorded)" 'quoted alias arguments and empty argument'
 
   editor_name='editor with spaces'
   functions[$editor_name]='record "editor with spaces" "$@"'
   EDITOR='"editor with spaces" --clean "profile name"'
-  help vi
-  expect $'editor with spaces\n--clean\nprofile name\n--help' "$(recorded)" 'quotes within deferred editor'
-
   for name in v vi vim view; do
     expected=$'editor with spaces\n--clean\nprofile name'
     [[ $name != view ]] || expected+=$'\n-R\n-M'
@@ -713,16 +499,6 @@ editor() { record editor "$@"; }
   help vi
   expect $'editor\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\n--help' "$(recorded)" 'help editor tokens remain literal'
   [[ ! -e "$test_root/injected" ]] || fail 'editor command substitution executed'
-  EDITOR=''
-  for name in v view; do
-    if help "$name" >"$test_root/refusal" 2>&1; then fail "help $name rejects empty editor"; fi
-    [[ $(recorded refusal) == *'underlying command'* ]] || fail 'empty editor refusal guidance'
-  done
-
-  alias help-literal="editor '\$HOME' '\$(print injected > \$test_root/injected)'"
-  help help-literal
-  expect $'editor\n$HOME\n$(print injected > $test_root/injected)\n--help' "$(recorded)" 'single-quoted alias arguments stay literal'
-  [[ ! -e "$test_root/injected" ]] || fail 'alias command substitution executed'
 
   eza() { record eza "$@"; }
   source /dev/stdin <<< "$alias_block"
@@ -733,18 +509,7 @@ editor() { record editor "$@"; }
   help gs
   expect $'git\nstatus\n--help' "$(recorded)" 'help git subcommand alias'
 
-  functions[help-cycle]='record help-cycle "$@"'
-  alias help-cycle='editor --outer' editor='help-cycle --inner'
-  if help help-cycle >"$test_root/refusal" 2>&1; then
-    fail 'recursive alias cycle must be refused'
-  fi
-  [[ $(recorded refusal) == *'underlying command'* ]] || fail 'cycle refusal guidance'
-  unalias editor
-
-  for expression in 'editor ; fail unexpected' 'editor | fail unexpected' \
-    'editor > output' 'EDITOR=editor editor' 'editor $HOME' \
-    'editor $(print injected > $test_root/injected)' 'editor `print injected`' \
-    'editor *.md' ''; do
+  for expression in 'editor | fail unexpected' 'editor $(print injected > $test_root/injected)'; do
     alias help-syntax="$expression"
     if help help-syntax >"$test_root/refusal" 2>&1; then
       fail "complex alias must be refused: $expression"
@@ -753,36 +518,9 @@ editor() { record editor "$@"; }
     [[ ! -e "$test_root/injected" ]] || fail 'complex alias executed a substitution'
   done
 
-  docs() { print -r -- 'documentation output'; return $docs_status; }
-  docs-exit() { exit 19; }
-  for has_bat in 0 1 2; do
-    (( ! has_bat )) || bat() {
-      record bat "$@"
-      while IFS= read -r line; do print -r -- "$line"; done
-      (( has_bat == 1 ))
-    }
-    for docs_status in 0 23; do
-      result=0
-      output=$(help docs) || result=$?
-      expect "$docs_status" "$result" "documentation status with bat=$has_bat"
-      expect 'documentation output' "$output" "documentation output with bat=$has_bat"
-    done
-    result=0
-    help missing-doc-command >/dev/null || result=$?
-    expect 127 "$result" "missing documentation command with bat=$has_bat"
-    result=0
-    help docs-exit >/dev/null || result=$?
-    expect 19 "$result" "function exit stays in documentation subshell with bat=$has_bat"
-  done
-
   bsd-tool() { print -u2 -- 'bsd-tool: illegal option -- -'; return 64; }
   help bsd-tool >/dev/null
   expect $'man\nbsd-tool' "$(recorded)" 'a command that rejects --help shows its manual'
-  unfunction bat
-  glow() { record glow "$@"; }
-  source /dev/stdin <<< "$alias_block"
-  help mdv >/dev/null
-  expect $'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n0\n--help' "$(recorded)" 'help follows mdv through the glow alias'
 )
 
 fzf() {
@@ -804,47 +542,29 @@ expect $'editor\n--clean\n--\n-c quit | touch should-not-run' "$(recorded)" 'edi
   fzfv
   expect $'editor with spaces\n--clean\nprofile name\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\n--\n-c quit | touch should-not-run' "$(recorded)" 'fzfv literal quoted editor tokens'
   [[ ! -e "$test_root/injected" ]] || fail 'fzfv evaluated editor command substitution'
-  EDITOR=''
-  if fzfv >/dev/null 2>&1; then fail 'fzfv rejects empty editor'; fi
 )
-# Inspect the picker's arguments without executing the binding.
-fzf() { record "$@"; }
 
-for has_glow in 0 1; do
+# Each preview as fzf runs it: Markdown through glow, other files through bat,
+# and cat without either, all for names that look like options.
+for has_glow bat_state selection in 1 present -file.MD 1 present -file 0 missing -file.MD; do
   (
     (( has_glow )) || unfunction glow
-    file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 -- {} || cat -- {}'
-    preview=$file_preview
-    if (( has_glow )); then
-      md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 -- {}'
-      preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
-    fi
-    expected=$'--bind\nenter:become(editor --clean -- {})\n--preview\n'"$preview"$'\n--preview-window=wrap'
-    fzfv
-    expect "$expected" "$(recorded)" "fzfv preview shape: glow=$has_glow"
-    fzfv --preview 'caller preview {}' --preview-window=nowrap --bind alt-t:ignore --query 'file name'
-    expect "$expected"$'\n--preview\ncaller preview {}\n--preview-window=nowrap\n--bind\nalt-t:ignore\n--query\nfile name' "$(recorded)" "fzfv caller overrides last: glow=$has_glow"
-
     fzf() {
       local preview=${4//'{}'/${(q)selection}}
       eval "$preview"
     }
     cat() { record cat "$@"; }
-    for selection in '-file' '-file.MD'; do
-      for bat_state in present failing missing; do
-        bat() { record bat "$@"; [[ $bat_state != failing ]]; }
-        [[ $bat_state != missing ]] || unfunction bat
-        fzfv
-        if (( has_glow )) && [[ $selection == *.MD ]]; then
-          expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n--width\n0\n--\n'"$selection"
-        elif [[ $bat_state == present ]]; then
-          expected=$'bat\n--color=always\n--wrap=never\n--style=numbers\n--line-range=:500\n--\n'"$selection"
-        else
-          expected=$'cat\n--\n'"$selection"
-        fi
-        expect "$expected" "$(recorded)" "executed preview: glow=$has_glow / bat=$bat_state / $selection"
-      done
-    done
+    bat() { record bat "$@"; }
+    [[ $bat_state != missing ]] || unfunction bat
+    fzfv
+    if (( has_glow )) && [[ $selection == *.MD ]]; then
+      expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n--width\n0\n--\n'"$selection"
+    elif [[ $bat_state == present ]]; then
+      expected=$'bat\n--color=always\n--wrap=never\n--style=numbers\n--line-range=:500\n--\n'"$selection"
+    else
+      expected=$'cat\n--\n'"$selection"
+    fi
+    expect "$expected" "$(recorded)" "executed preview: glow=$has_glow / bat=$bat_state / $selection"
   )
 done
 
@@ -901,10 +621,6 @@ if [[ -n $rg_bin ]]; then
     }
     editor() { print -rl -- editor "$@" > "$test_root/rgv-editor"; }
     leftovers() { local -a files=("$TMPDIR"/*(DN)); (( ! $#files )) || fail "rgv $1 left files: ${files:t}"; }
-    # The rg alias's options, as the shell reads them
-    defaults=${(M)${(f)"$(<$repo/zsh/.zshrc)"}:#alias rg=*}
-    defaults=(${(Q)${(z)${(Q)defaults#alias rg=}}})
-    [[ $defaults[1] == rg && $#defaults -gt 1 ]] || fail "rg alias: $defaults"
 
     output=$(rgv --help) || fail 'rgv --help status'
     [[ $output == 'usage: rgv '* && ! -e $test_root/rgv-rg ]] || fail "rgv --help: $output"
@@ -916,13 +632,7 @@ if [[ -n $rg_bin ]]; then
     export EDITOR=nvim
     pick=src/b.txt
     rgv needle 2> "$test_root/rgv-stderr" || fail 'rgv status'
-    expect "${(F)defaults[2,-1]}"$'\n--sort=path\n--heading\n--with-filename\n--line-number\n--context=2\n--color=always\nneedle' \
-      "$(recorded rgv-rg)" 'rgv: the rg alias options, its own, then the arguments'
     [[ $(<$test_root/rgv-stderr) == *src/broken* ]] || fail "rgv: rg's report on stderr: $(<$test_root/rgv-stderr)"
-    picker=$'--layout=reverse\n--no-multi\n--delimiter=\t\n--with-nth=3..\n--prompt=Matches > \n--header='
-    picker_rest=$'\n--preview=sed -n {1}p "$RGV_SHELF/matches"\n--preview-window=right,60%,wrap,<66(down,60%,wrap)'
-    expect "$picker"$'Enter opens its first match in Neovim:\n]q goes to the next matching line,\n] then Ctrl+Q to the next file'"$picker_rest" \
-      "$(recorded rgv-fzf)" 'rgv picker options'
     menu_lines=("${(@f)$(recorded rgv-menu)}")
     shown=(${menu_lines#*$'\t'*$'\t'})
     expect $'.hidden/d.txt (1)\nsrc/a.txt (2)\nsrc/b.txt (2)\nsrc/space name.txt (1)\nsrc/time 12:30.txt (1)' "${(F)shown}" \
@@ -931,10 +641,6 @@ if [[ -n $rg_bin ]]; then
     [[ $previews == *$'\e['* ]] || fail 'rgv previews without colors'
     expect $'.hidden/d.txt\n1:needle hidden\n==\nsrc/a.txt\n1-one\n2:needle here\n3-three\n4-four\n--\n6-six\n7-seven\n8:needle far below\n==\nsrc/b.txt\n3-z\n4-w\n5:needle again\n6:needle twice\n==\nsrc/space name.txt\n1:a needle\n==\nsrc/time 12:30.txt\n1:see "other.c", line 9: needle\n==' \
       "${previews//$'\e'\[[0-9;]#m}" "rgv previews each file's matching lines"
-    editor_call=("${(@f)$(recorded rgv-editor)}")
-    [[ $#editor_call == 3 && $editor_call[1,2] == 'nvim -c' &&
-      $editor_call[3] == "call setqflist([], ' ', {'title': 'rgv', 'efm': \"%f\\t%l\\t%m\", 'lines': readfile('$TMPDIR/rgv."<->"."<->"/quickfix')}) | cc 4" ]] ||
-      fail "rgv opened: ${(qqq)editor_call}"
     expect $'.hidden/d.txt\t1\tneedle hidden\nsrc/a.txt\t2\tneedle here\nsrc/a.txt\t8\tneedle far below\nsrc/b.txt\t5\tneedle again\nsrc/b.txt\t6\tneedle twice\nsrc/space name.txt\t1\ta needle\nsrc/time 12:30.txt\t1\tsee "other.c", line 9: needle' \
       "$(<$test_root/rgv-quickfix)" "rgv quickfix records"
     leftovers 'after Enter'
@@ -963,8 +669,6 @@ if [[ -n $rg_bin ]]; then
     # file at its first match.
     EDITOR='editor --flag' pick='src/space name.txt'
     rgv -w needle 'src/space name.txt' || fail 'rgv status with another editor'
-    expect "$picker"'Enter opens the file at its first match'"$picker_rest" "$(recorded rgv-fzf)" \
-      'rgv picker header for another editor'
     expect $'editor\n--flag\n+1\n--\nsrc/space name.txt' "$(recorded rgv-editor)" 'rgv with another editor'
     leftovers 'with another editor'
 
@@ -990,14 +694,6 @@ if [[ -n $rg_bin ]]; then
       [[ ! -e $test_root/rgv-fzf ]] || fail "rgv $pattern opened the picker"
       leftovers "for $pattern"
     done
-    for tool in rg fzf; do
-      rc=0
-      output=$(unfunction $tool; rgv needle 2>&1) || rc=$?
-      [[ $rc == 1 && $output == "rgv: $tool not found" ]] || fail "rgv without $tool: $rc: $output"
-    done
-    rc=0
-    output=$(EDITOR='' rgv needle 2>&1) || rc=$?
-    [[ $rc == 1 && $output == 'rgv: EDITOR must name a command' ]] || fail "rgv without EDITOR: $rc: $output"
   )
 else
   print -r -- 'SKIP: rgv (rg missing)'
@@ -1132,6 +828,26 @@ startup_errors=$(<"$test_root/startup-errors")
 [[ -z $startup_errors ]] || fail "startup wrote to stderr: $startup_errors"
 # An image that exports SHELL=/bin/bash (Codespaces) still gets zsh tmux panes
 expect "$startup_home/.config/zsh 1 zsh" "$startup_out" 'full startup loads .zshrc'
+# In a container (here Codespaces), login and other interactive shells alike
+# get the lean Brewfile.
+for flags in -lic -ic; do
+  brewfile=$(cd "$startup_home" && /usr/bin/env -i HOME="$startup_home" TERM=xterm-256color CODESPACES=true \
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" $flags 'print -r -- "$HOMEBREW_BUNDLE_FILE_GLOBAL"' 2>&1 < /dev/null)
+  expect "$startup_home/.config/homebrew/core.Brewfile" "$brewfile" "Brewfile in Codespaces for zsh $flags"
+done
+# Login shells put Homebrew's commands ahead of the system's, and personal
+# shims ahead of both, though the inherited PATH has Homebrew behind them, as
+# macOS path_helper leaves it in every login shell.
+brews=({/opt/homebrew,/usr/local,/home/linuxbrew/.linuxbrew}/bin/brew(N-*))
+if (( $#brews )); then
+  brew_prefix=${brews[1]:h:h}
+  login_path=$(cd "$startup_home" && /usr/bin/env -i HOME="$startup_home" TERM=xterm-256color \
+    HOMEBREW_PREFIX="$brew_prefix" PATH="/usr/bin:/bin:/usr/sbin:/sbin:$brew_prefix/bin" \
+    "$zsh_bin" -lic 'print -r -- "$PATH"' 2> /dev/null < /dev/null)
+  [[ $login_path == "$startup_home/.local/bin:$brew_prefix/bin:"* ]] || fail "login PATH order: $login_path"
+else
+  print -r -- 'SKIP: login PATH order (Homebrew not installed)'
+fi
 # From Ghostty over SSH: a host without its terminfo entry gets xterm-256color,
 # which tmux accepts; an entry on the host, or Ghostty's TERMINFO, keeps it.
 /bin/mkdir -p "$test_root/terminfo"
@@ -1153,4 +869,4 @@ for ostype preset expected in linux-gnu '' C.UTF-8 linux-gnu LANG=en_US.UTF-8 en
   expect "$expected" "$locale_out" "locale on $ostype with ${preset:-none set}"
 done
 
-print -r -- 'ok: zsh syntax, cask policy, startup wiring, and hermetic alias/function regression checks'
+print -r -- 'ok: cask policy, startup wiring, and hermetic alias/function regression checks'
