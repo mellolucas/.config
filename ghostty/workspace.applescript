@@ -1,27 +1,27 @@
 -- Ghostty workspace layout.
 --
 -- Usage:
---   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD STATUS_CMD SHELL_CMD CONTENT_WIDTH CONTENT_HEIGHT LAYOUT MARK
+--   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD SHELL_CMD CONTENT_WIDTH CONTENT_HEIGHT LAYOUT MARK
 --
 -- When the focused pane's title is MARK (the invoking shell titles its own
 -- pane) and it is its tab's only pane, lays out that tab, the pane becoming
--- the main shell; otherwise opens a new tab in the frontmost Ghostty window
+-- the shell; otherwise opens a new tab in the frontmost Ghostty window
 -- (new window when none). Prints "same tab" or "new tab".
 -- CONTENT_WIDTH/CONTENT_HEIGHT are the window text area in pixels (CSI 14 t);
--- when missing or 0 the full layout's splits are equalized instead of
--- ratio-sized. LAYOUT is full (the default) or lean.
+-- when missing or 0 the full layout's splits stay even. LAYOUT is full (the
+-- default) or lean.
 --
--- full (columns 20% / 40% / 40%, middle column rows 30% / 70%):
+-- full (columns 60% / 40%, right column rows 65% / 35%; focus on the editor):
 --
---   ┌────────┬───────────────┬───────────────┐
---   │        │ status shell  │               │
---   │        ├───────────────┤               │
---   │ editor │               │   agent       │
---   │        │  main shell   │               │
---   │        │               │               │
---   └────────┴───────────────┴───────────────┘
+--   ┌───────────────────────────┬──────────────────┐
+--   │                           │                  │
+--   │                           │      agent       │
+--   │          editor           │                  │
+--   │                           ├──────────────────┤
+--   │                           │      shell       │
+--   └───────────────────────────┴──────────────────┘
 --
--- lean (even halves; the shell runs the status command, then the shell one):
+-- lean (even halves; focus on the shell):
 --
 --   ┌──────────────────┬──────────────────┐
 --   │      editor      │                  │
@@ -35,39 +35,38 @@ use scripting additions
 
 on run argv
 	if (count of argv) < 3 then
-		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [STATUS_CMD] [SHELL_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT] [LAYOUT] [MARK]"
+		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [SHELL_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT] [LAYOUT] [MARK]"
 	end if
 
 	set workspaceDir to item 1 of argv
 	set editorCmd to item 2 of argv
 	set agentCmd to item 3 of argv
 
-	set statusCmd to ""
 	set shellCmd to ""
 	set contentWidth to 0
 	set contentHeight to 0
 	set layoutName to "full"
 	set markTitle to ""
 
-	if (count of argv) ≥ 4 then set statusCmd to item 4 of argv
-	if (count of argv) ≥ 5 then set shellCmd to item 5 of argv
-	if (count of argv) ≥ 6 then set contentWidth to (item 6 of argv) as integer
-	if (count of argv) ≥ 7 then set contentHeight to (item 7 of argv) as integer
-	if (count of argv) ≥ 8 then set layoutName to item 8 of argv
-	if (count of argv) ≥ 9 then set markTitle to item 9 of argv
+	if (count of argv) ≥ 4 then set shellCmd to item 4 of argv
+	if (count of argv) ≥ 5 then set contentWidth to (item 5 of argv) as integer
+	if (count of argv) ≥ 6 then set contentHeight to (item 6 of argv) as integer
+	if (count of argv) ≥ 7 then set layoutName to item 7 of argv
+	if (count of argv) ≥ 8 then set markTitle to item 8 of argv
 
-	-- One divider move per axis reaches the target ratios: resize_split moves
-	-- the divider of the pane's nearest ancestor split, and nested splits
-	-- redistribute proportionally, so 50/25/25 -> 20/40/40 and 50/50 -> 30/70.
-	-- CSI 14 t counts device pixels but resize_split moves points; with mixed
-	-- displays the largest scale errs toward smaller moves.
+	-- Splits start even; one divider move per axis reaches the target ratios:
+	-- resize_split moves the divider of the pane's nearest ancestor split
+	-- along that axis, so 50/50 -> 60/40 across and, in the right column,
+	-- 50/50 -> 65/35 down. CSI 14 t counts device pixels but resize_split
+	-- moves points; with mixed displays the largest scale errs toward smaller
+	-- moves.
 	set pixelsPerPoint to 1
 	repeat with screen in (current application's NSScreen's screens() as list)
 		set screenScale to (screen's backingScaleFactor()) as real
 		if screenScale > pixelsPerPoint then set pixelsPerPoint to screenScale
 	end repeat
-	set widthDelta to round (contentWidth * 0.3 / pixelsPerPoint)
-	set heightDelta to round (contentHeight * 0.2 / pixelsPerPoint)
+	set widthDelta to round (contentWidth * 0.1 / pixelsPerPoint)
+	set heightDelta to round (contentHeight * 0.15 / pixelsPerPoint)
 
 	tell application "Ghostty"
 		activate
@@ -103,28 +102,21 @@ on run argv
 			set mainShell to focused terminal of workspaceTab
 		end if
 
-		-- The other panes split from the main shell
+		-- The other panes split from the shell
 		if layoutName is "lean" then
 			-- Splits halve the pane they divide, so no resizing
 			set rightAgent to split mainShell direction right with configuration cfg
 			set leftEditor to split mainShell direction up with configuration cfg
-			set statusShell to mainShell
+			set focusPane to mainShell
 		else
 			set leftEditor to split mainShell direction left with configuration cfg
-			set rightAgent to split mainShell direction right with configuration cfg
-			set statusShell to split mainShell direction up with configuration cfg
-
+			set rightAgent to split mainShell direction up with configuration cfg
 			if widthDelta > 0 and heightDelta > 0 then
-				perform action ("resize_split:left," & widthDelta) on leftEditor
-				perform action ("resize_split:up," & heightDelta) on mainShell
-			else
-				perform action "equalize_splits" on mainShell
+				perform action ("resize_split:right," & widthDelta) on leftEditor
+				perform action ("resize_split:down," & heightDelta) on mainShell
 			end if
+			set focusPane to leftEditor
 		end if
-
-		-- A reused pane's shell runs its own commands once this script returns:
-		-- typed into it, they could reach a program run after workspace
-		set mainTakesInput to (placement is "new tab")
 
 		input text editorCmd to leftEditor
 		send key "enter" to leftEditor
@@ -132,18 +124,14 @@ on run argv
 		input text agentCmd to rightAgent
 		send key "enter" to rightAgent
 
-		-- The lean layout's status shell is the main one
-		if statusCmd is not "" and (mainTakesInput or layoutName is not "lean") then
-			input text statusCmd to statusShell
-			send key "enter" to statusShell
-		end if
-
-		if shellCmd is not "" and mainTakesInput then
+		-- A reused pane's shell runs its own commands once this script returns:
+		-- typed into it, they could reach a program run after workspace
+		if shellCmd is not "" and placement is "new tab" then
 			input text shellCmd to mainShell
 			send key "enter" to mainShell
 		end if
 
-		focus mainShell
+		focus focusPane
 	end tell
 	return placement
 end run

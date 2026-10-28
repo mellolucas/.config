@@ -32,7 +32,7 @@ Open Ghostty, then:
 
 ## Daily use
 
-Start a project with **`workspace`**: the editor, two shells, and an agent in one tab, or with `--layout lean`, the editor above one shell beside the agent. Run **`keys`** to browse the guide's pages with a preview of each, or type to search every line; open a page directly (`keys files`, `keys panes`, `keys git`), or search from the prompt (`keys close tab`); `help COMMAND` shows any command's own help, even through an alias. The [field guide](GUIDE.md) is the same content.
+Start a project with **`workspace`**: the editor on the left 60% of one tab and the agent above a shell on the right, or with `--layout lean`, the editor above the shell beside the agent. Run **`keys`** to browse the guide's pages with a preview of each, or type to search every line; open a page directly (`keys files`, `keys panes`, `keys git`), or search from the prompt (`keys close tab`); `help COMMAND` shows any command's own help, even through an alias. The [field guide](GUIDE.md) is the same content.
 
 ## Maintain the setup
 

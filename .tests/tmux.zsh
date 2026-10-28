@@ -189,35 +189,34 @@ output=$(workspace < /dev/null)
 [[ $(tmux list-sessions -F '#{session_name}' | LC_ALL=C sort) == $'proj_v1\nproj_v1-2\ntest\nwork dir' ]] ||
   fail "sessions: $(tmux list-sessions -F '#{session_name}')"
 
-# A workspace's panes by role, from their positions.
+# A workspace's panes by role, from their positions: the editor left, and on
+# the right the agent above the shell.
 local -A pane width height
 roles() {
   local line left top w h id role
   local -a found=(${(f)"$(tmux list-panes -t "=$1" -F '#{pane_left} #{pane_top} #{pane_width} #{pane_height} #{pane_id}')"})
-  (( $#found == 4 )) || fail "$1 has $#found panes"
-  integer last=0
-  for line in $found; do
-    if (( ${line%% *} > last )); then last=${line%% *}; fi
-  done
+  (( $#found == 3 )) || fail "$1 has $#found panes"
+  pane=() width=() height=()
   for line in $found; do
     read -r left top w h id <<< "$line"
     if (( left == 0 )); then role=editor
-    elif (( left == last )); then role=agent
-    elif (( top == 0 )); then role=top
-    else role=bottom
+    elif (( top == 0 )); then role=agent
+    else role=shell
     fi
     pane[$role]=$id width[$role]=$w height[$role]=$h
   done
+  (( ${#pane} == 3 )) || fail "$1 panes by role: ${(kv)pane}"
 }
 ran() { (( ${${(f)"$(tmux capture-pane -p -t "$1")"}[(Ie)$2]} )); }
 roles 'work dir'
-for role output in editor EDITOR agent AGENT top TOP bottom BOTTOM; do
-  wait_for "the $role pane did not run its command" "ran $pane[$role] $output"
+for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM; do
+  wait_for "the $role pane did not run $output" "ran $pane[$role] $output"
 done
-[[ $(tmux display -p -t '=work dir:' '#{pane_id}') == $pane[bottom] ]] || fail 'focus is not the main shell'
+[[ $(tmux display -p -t '=work dir:' '#{pane_id}') == $pane[editor] ]] || fail 'focus is not the editor'
 
 # From a terminal, the session takes its size before attaching, so the shares
-# hold: columns 20/40/40 and middle rows 30/70, within two cells.
+# hold: the editor 60% of the columns, the agent 65% of the rows, within two
+# cells.
 builtin cd -- "$HOME/sized"
 version[sized]='fixture 1.0' size[sized]='50 200'
 zpty -b sized 'trap - EXIT; stty rows 50 cols 200; workspace'
@@ -227,9 +226,8 @@ integer columns=$(tmux display -p -t '=sized:' '#{window_width}')
 integer rows=$(tmux display -p -t '=sized:' '#{window_height}')
 (( columns == 200 )) || fail "attached at $columns columns"
 near() { (( $2 * 100 - $3 * $4 >= -200 && $2 * 100 - $3 * $4 <= 200 )) || fail "$1: $2 of $4"; }
-near 'editor width' $width[editor] 20 $columns
-near 'middle width' $width[top] 40 $columns
-near 'status shell height' $height[top] 30 $rows
+near 'editor width' $width[editor] 60 $columns
+near 'agent height' $height[agent] 65 $rows
 
 # The lean layout: the editor above the one shell, which runs the status and
 # then the shell command as one line, and the agent right, in even halves. The
@@ -258,8 +256,8 @@ near 'lean editor height' $(tmux display -p -t $lean[editor] '#{pane_height}') 5
 print -r -- 'ok: workspace sessions, commands, and proportions'
 
 # Run from a shell alone in its window, workspace lays out that window around
-# it: the shell becomes the main one, moves to the workspace, and runs its own
-# commands there, typing none into its pane, where a program run after
+# it: the shell becomes the workspace's shell, moves to the workspace, and runs
+# its own commands there, typing none into its pane, where a program run after
 # workspace (read, below) would get them. Run again beside other panes, it
 # opens a new window.
 mkdir -p "$HOME/solo" "$HOME/elsewhere"
@@ -278,7 +276,7 @@ for line in ${(f)"$(tmux list-panes -t '=solo:' -F '#{pane_left} #{pane_top} #{p
   else here[editor]=$id
   fi
 done
-[[ $here[shell] == $solo ]] || fail "the lone pane is not the main shell: ${(kv)here}"
+[[ $here[shell] == $solo ]] || fail "the lone pane is not the workspace's shell: ${(kv)here}"
 for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM shell READ:: shell MOVED; do
   wait_for "the reused $role pane did not show $output" "ran $here[$role] $output"
 done
@@ -288,7 +286,7 @@ done
 type_line $solo "workspace --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status '' ${(q)HOME}/elsewhere; \
 [[ \$PWD == ${(q)HOME}/solo ]] && echo STA''YED"
 wait_for 'beside other panes, workspace did not open a new window' \
-  '[[ $(tmux list-windows -t "=solo" -F "#{window_name} #{window_panes}") == $'"'"'solo 3\nelsewhere 4'"'"' ]]'
+  '[[ $(tmux list-windows -t "=solo" -F "#{window_name} #{window_panes}") == $'"'"'solo 3\nelsewhere 3'"'"' ]]'
 wait_for 'a new window moved the shell' "ran $solo STAYED"
 print -r -- 'ok: workspace builds around a shell alone in its window, else opens one'
 

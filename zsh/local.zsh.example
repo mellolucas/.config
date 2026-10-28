@@ -8,7 +8,7 @@
 # export DOTFILES_WORKSPACE_LAYOUT='lean' # Editor and agent at half the width each
 # export DOTFILES_WORKSPACE_AGENT_CMD='claude'
 # export DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
-# export DOTFILES_WORKSPACE_STATUS_CMD='' # Leave the status shell at its prompt
+# export DOTFILES_WORKSPACE_STATUS_CMD='' # Start the workspace's shell without the gg card
 # export DOTFILES_WORKSPACE_SHELL_CMD=''
 
 # EDITOR accepts quoted executable/argument words, not shell expressions.

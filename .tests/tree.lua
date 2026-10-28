@@ -79,7 +79,7 @@ local function no_previous(label)
   assert(said == "No previous file", label .. ": " .. tostring(said))
 end
 
--- Start as the workspace's narrow editor pane does: `nvim DIR`.
+-- Start as a narrow editor pane does: `nvim DIR`.
 vim.g.mapleader = " "
 dofile(repo .. "/nvim/lua/config/keymaps.lua")
 vim.pack = {

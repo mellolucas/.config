@@ -69,7 +69,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
   # Without a terminal the shell marks no pane, so the script opens a new tab.
-  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode ggg '' 0 0 full '')
+  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode gg 0 0 full '')
   dispatch() {
     local actual
     actual=$(workspace "$@" 3>&1 < /dev/null) || fail "dispatch: ${(qqq)@}"
@@ -86,47 +86,46 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   dispatch
   dispatch --
   dispatch -- "$PWD"
-  export DOTFILES_WORKSPACE_STATUS_CMD=gg
-  expected[5]=gg
+  export DOTFILES_WORKSPACE_STATUS_CMD=ggg
+  expected[5]=ggg
   dispatch
   unset DOTFILES_WORKSPACE_STATUS_CMD
-  expected[5]=ggg
+  expected[5]=gg
   export DOTFILES_WORKSPACE_EDITOR_CMD='' DOTFILES_WORKSPACE_AGENT_CMD=''
   dispatch
   export DOTFILES_WORKSPACE_EDITOR_CMD='env editor --wait' DOTFILES_WORKSPACE_AGENT_CMD='env agent chat'
   export DOTFILES_WORKSPACE_STATUS_CMD='' DOTFILES_WORKSPACE_SHELL_CMD='env bottom'
   expected[3]='env editor --wait'
   expected[4]='env agent chat'
-  expected[5]=''
-  expected[6]='env bottom'
+  expected[5]='env bottom'
   dispatch
+  # The shell takes the status and shell commands as one line; either alone
+  # passes as is.
   expected[3]='editor --wait "quoted file"'
   expected[4]='agent chat --model example'
-  expected[5]='top command'
-  expected[6]='bottom command'
+  expected[5]='top command; bottom command'
   dispatch --agent "$expected[4]" --editor "$expected[3]" \
-    --status "$expected[5]" --shell "$expected[6]"
+    --status 'top command' --shell 'bottom command'
   dispatch --editor="$expected[3]" --agent="$expected[4]" \
-    --status="$expected[5]" --shell="$expected[6]" -- "$PWD"
+    --status='top command' --shell='bottom command' -- "$PWD"
+  expected[5]='top command'
+  dispatch --editor "$expected[3]" --agent "$expected[4]" --status 'top command' --shell=
   expected[5]=''
-  expected[6]=''
   dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell=
-  # The layout reaches the script last: lean by flag or environment, and the
-  # flag wins.
-  expected[9]=lean
+  # The layout reaches the script: lean by flag or environment, and the flag
+  # wins.
+  expected[8]=lean
   dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= --layout lean
   dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= --layout=lean
   DOTFILES_WORKSPACE_LAYOUT=lean dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell=
-  expected[9]=full
+  expected[8]=full
   DOTFILES_WORKSPACE_LAYOUT=lean dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= \
     --layout full
-  # Lean's one shell takes both commands as one line; either alone passes as is.
-  expected[5]='top command; bottom command' expected[9]=lean
+  # Lean's shell takes the same line.
+  expected[5]='top command; bottom command' expected[8]=lean
   dispatch --editor "$expected[3]" --agent "$expected[4]" --status 'top command' --shell 'bottom command' \
     --layout lean
-  expected[5]='' expected[6]='bottom command'
-  dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell 'bottom command' --layout lean
-  expected[6]='' expected[9]=full
+  expected[5]='' expected[8]=full
   reject --layout tiled
   DOTFILES_WORKSPACE_LAYOUT=tiled reject
   # Metacharacters must remain literal data, not run in the launcher shell.
@@ -146,23 +145,24 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     dispatch --editor="$expected[3]" --agent="$expected[4]" --status= --shell= -- --directory
   )
   # Laid out around this shell (the script answers "same tab"), the shell
-  # moves to the workspace and runs its own commands there: the shell command,
-  # and in the lean layout the status command first. With a new tab, the
-  # script types them into the new panes, and the shell stays where it was.
+  # moves to the workspace and runs its own commands there, in either layout:
+  # the status command, then the shell command. With a new tab, the script
+  # types them into that tab's shell, and this one stays where it was.
   workspace_osascript() { print -r -- 'same tab'; }
   (
-    output=$(workspace --shell 'print -r -- OWN:$PWD' "$temporary/path with spaces" < /dev/null) ||
-      fail 'same tab'
-    [[ $output == "OWN:${temporary:A}/path with spaces" ]] || fail "same tab printed: $output"
-    workspace --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'same tab'
+    for layout in full lean; do
+      output=$(workspace --layout $layout --status 'print -r -- STATUS' --shell 'print -r -- OWN:$PWD' \
+        "$temporary/path with spaces" < /dev/null) || fail "$layout same tab"
+      [[ $output == $'STATUS\nOWN:'"${temporary:A}/path with spaces" ]] || fail "$layout same tab printed: $output"
+    done
+    workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'same tab'
     [[ $PWD == "${temporary:A}/path with spaces" ]] || fail "same tab left the shell in $PWD"
-    output=$(workspace --layout lean --status 'print -r -- STATUS' --shell 'print -r -- SHELL' . < /dev/null)
-    [[ $output == $'STATUS\nSHELL' ]] || fail "lean same tab printed: $output"
   )
   workspace_osascript() { print -r -- 'new tab'; }
   (
     builtin cd -- "$temporary"
-    output=$(workspace --shell 'print -r -- OWN' "$temporary/path with spaces" < /dev/null) || fail 'new tab'
+    output=$(workspace --status 'print -r -- STATUS' --shell 'print -r -- OWN' "$temporary/path with spaces" \
+      < /dev/null) || fail 'new tab'
     [[ -z $output ]] || fail "a new tab ran the shell's commands here: $output"
     workspace "$temporary/path with spaces" < /dev/null > /dev/null || fail 'new tab'
     [[ ${PWD:A} == ${temporary:A} ]] || fail "a new tab moved the shell to $PWD"

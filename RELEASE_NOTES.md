@@ -14,7 +14,7 @@ Changes since `v0.0.1`.
 - **A field guide:** `keys` browses the guide's pages with a preview and
   searches every line as you type; `keys TOPIC` and `keys WORDS` work from the
   prompt, and `help COMMAND` shows any command's help, even through an alias.
-- **Workspaces:** `workspace` lays out the editor, shells, and an agent in a
+- **Workspaces:** `workspace` lays out the editor, an agent, and a shell in a
   Ghostty tab, or in the current tab when its shell is alone there.
   `--layout lean` gives the editor and the agent half the width each.
   Elsewhere, tmux lays out the same panes.

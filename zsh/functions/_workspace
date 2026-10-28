@@ -4,7 +4,7 @@ _arguments -S \
   '*--layout=[pane layout]:layout:(full lean)' \
   '*--agent=[command for the agent pane]:command:_cmdstring' \
   '*--editor=[command for the editor pane]:command:_cmdstring' \
-  '*--status=[command the status shell starts with]:command:_cmdstring' \
-  '*--shell=[command the main shell starts with]:command:_cmdstring' \
+  '*--status=[status command the shell starts with]:command:_cmdstring' \
+  '*--shell=[command the shell runs after the status command]:command:_cmdstring' \
   '(- *)'{-h,--help}'[show help]' \
   '1:workspace directory:_directories'

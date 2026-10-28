@@ -5,8 +5,8 @@ emulate -L zsh
 local layout=${DOTFILES_WORKSPACE_LAYOUT:-full}
 local editor=${DOTFILES_WORKSPACE_EDITOR_CMD:-nvim .}
 local agent=${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}
-# Empty shell commands skip their pane's startup command.
-local status_cmd=${DOTFILES_WORKSPACE_STATUS_CMD-ggg}
+# An empty status or shell command is skipped.
+local status_cmd=${DOTFILES_WORKSPACE_STATUS_CMD-gg}
 local shell_cmd=${DOTFILES_WORKSPACE_SHELL_CMD:-}
 local dir=$PWD option value
 local -a directories=()
@@ -17,11 +17,13 @@ while (( $# )); do
       cat <<'EOF'
 usage: workspace [OPTIONS] [--] [DIR]
 
-Lay out a coding workspace. In Ghostty on macOS: in this tab when this shell
-is its only pane and Ghostty can tell which pane that is (the shell becomes
-the main one, moves to DIR, and runs its commands), else in a new tab. Inside
-tmux, the same with windows. Elsewhere, a tmux session named after DIR, which
-rerunning workspace in DIR reattaches.
+Lay out a coding workspace: an editor, an agent, and a shell, which runs the
+status command, then the shell command, as one command line. In Ghostty on
+macOS: in this tab when this shell is its only pane and Ghostty can tell which
+pane that is (this shell becomes the workspace's shell, moves to DIR, and runs
+its commands), else in a new tab. Inside tmux, the same with windows.
+Elsewhere, a tmux session named after DIR, which rerunning workspace in DIR
+reattaches.
 
 Arguments:
   DIR   Workspace directory. Defaults to the current directory.
@@ -30,17 +32,16 @@ Options (override environment; also accept --option=VALUE):
   --layout NAME  full (the default) or lean, below.
   --agent CMD    Command started in the agent pane (nonempty).
   --editor CMD   Command started in the editor pane (nonempty).
-  --status CMD   Command the status shell starts with. Empty skips.
-  --shell CMD    Command the main shell starts with. Empty skips.
+  --status CMD   Status command the shell starts with. Empty skips.
+  --shell CMD    Command the shell runs after the status command. Empty skips.
   -h, --help     Show this help without launching a workspace.
   --             Treat remaining arguments as the directory.
 
 Layouts:
-  full   editor left (20% width); in the middle (40% width), the status shell
-         above (30% height) and the main shell below (70%); agent right (40%)
-  lean   editor above one shell on the left (50% width, 50% height each),
-         which runs the status command, then the shell command, as one
-         command line; agent right (50% width)
+  full   editor left (60% width); on the right (40% width), the agent above
+         (65% height) and the shell below (35%)
+  lean   editor above the shell on the left (50% width, 50% height each);
+         agent right (50% width)
 
 Environment (set lasting defaults in zsh/local.zsh):
   DOTFILES_WORKSPACE_LAYOUT='full'
@@ -52,11 +53,11 @@ Environment (set lasting defaults in zsh/local.zsh):
   DOTFILES_WORKSPACE_AGENT_CMD='ocode'
       Command started in the agent pane.
 
-  DOTFILES_WORKSPACE_STATUS_CMD='ggg'
-      Command the status shell starts with. Empty skips. Defaults to ggg.
+  DOTFILES_WORKSPACE_STATUS_CMD='gg'
+      Status command the shell starts with. Empty skips. Defaults to gg.
 
   DOTFILES_WORKSPACE_SHELL_CMD=''
-      Command the main shell starts with. Empty skips.
+      Command the shell runs after the status command. Empty skips.
 
   DOTFILES_WORKSPACE_SCRIPT=/path/to/workspace.applescript
       Override the Ghostty AppleScript implementation path.
@@ -96,11 +97,10 @@ if [[ $layout != (full|lean) ]]; then
   print -r -u2 -- "workspace: unknown layout: $layout (full or lean)"
   return 1
 fi
-# The lean layout's one shell takes both commands as one line, so a status
-# command that reads the terminal cannot swallow the shell command as input
-if [[ $layout == lean && -n $status_cmd && -n $shell_cmd ]]; then
-  status_cmd="$status_cmd; $shell_cmd" shell_cmd=''
-fi
+# The shell takes both commands as one line, so a status command that reads
+# the terminal cannot swallow the shell command as input
+local -a startup=(${status_cmd:+"$status_cmd"} ${shell_cmd:+"$shell_cmd"})
+shell_cmd=${(j:; :)startup}
 
 if (( ${#directories} > 1 )); then
   print -u2 -- 'workspace: expected at most one directory'
@@ -121,7 +121,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
     print -u2 -- 'hint: run: dotfiles bundle'
     return 1
   }
-  local name line main here='' agent_pane editor_pane status_pane pane command
+  local name line main here='' agent_pane editor_pane focus pane command
   if [[ -z $TMUX ]]; then
     for line in ${(f)"$(tmux list-sessions -F '#{session_name}:#{session_path}' 2>/dev/null)"}; do
       [[ ${line#*:} == "$dir" ]] && name=${line%%:*} && break
@@ -149,38 +149,37 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
       # Sized like this terminal: tmux keeps no shares when attaching resizes it
       main=$(tmux new-session -d -x - -y - -P -F '#{pane_id}' -s "$name" -c "$dir") || return
     fi
-    # The other panes split from the main shell, each taking a share of it.
+    # The other panes split from the shell, each taking a share of it.
     if [[ $layout == lean ]]; then
-      # Even halves: the agent right, the editor above the one shell
+      # Even halves: the agent right, the editor above the shell
       agent_pane=$(tmux split-window -h -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
       editor_pane=$(tmux split-window -v -b -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      status_pane=$main
+      focus=$main
     else
-      # Widths 20/40/40, and the middle column's heights 30/70
-      editor_pane=$(tmux split-window -h -b -l 20% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      agent_pane=$(tmux split-window -h -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      status_pane=$(tmux split-window -v -b -l 30% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      # The editor left at 60% of the width, the agent above the shell at 65%
+      # of the height
+      editor_pane=$(tmux split-window -h -b -l 60% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      agent_pane=$(tmux split-window -v -b -l 65% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      focus=$editor_pane
     fi
     # A reused shell runs its own commands below: typed into it, they could
     # reach a program run after workspace
-    local -a own=()
-    for pane command in "$editor_pane" "$editor" "$agent_pane" "$agent" \
-      "$status_pane" "$status_cmd" "$main" "$shell_cmd"; do
+    for pane command in "$editor_pane" "$editor" "$agent_pane" "$agent" "$main" "$shell_cmd"; do
       [[ -n $command ]] || continue
-      if [[ -n $here && $pane == $main ]]; then own+=("$command"); continue; fi
+      [[ -n $here && $pane == $main ]] && continue
       tmux send-keys -t "$pane" -l -- "$command" || return
       tmux send-keys -t "$pane" Enter || return
     done
-    tmux select-pane -t "$main" || return
+    tmux select-pane -t "$focus" || return
     if [[ -n $here ]]; then
-      # As the main shell, this one moves to the workspace quietly, as the
-      # other panes start there; git-glance's hook (zsh/.zshrc) then remembers
-      # the workspace's repository, as for a shell started there
+      # As the workspace's shell, this one moves to the workspace quietly, as
+      # the other panes start there; git-glance's hook (zsh/.zshrc) then
+      # remembers the workspace's repository, as for a shell started there
       if [[ ${PWD:A} != $dir ]]; then
         builtin cd -q -- "$dir" || return
         (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2>/dev/null)
       fi
-      for command in $own; do eval "$command"; done
+      [[ -z $shell_cmd ]] || eval "$shell_cmd"
     fi
   fi
   [[ -z $TMUX ]] || return 0
@@ -206,7 +205,7 @@ local script=${DOTFILES_WORKSPACE_SCRIPT:-${XDG_CONFIG_HOME:-$HOME/.config}/ghos
 
 # Window text area in pixels (CSI 14 t) for the full layout's ratio-based split
 # sizing. Measured from the invoking pane: exact from an unsplit tab, undersized
-# from a split pane; on 0 the AppleScript falls back to equalized splits.
+# from a split pane; on 0 the AppleScript leaves the splits even.
 local width=0 height=0
 if [[ $layout == full && -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
   local dimensions
@@ -254,7 +253,7 @@ if [[ -t 0 ]]; then
 fi
 output=$(
   /usr/bin/osascript "$script" "$dir" \
-    "$editor" "$agent" "$status_cmd" "$shell_cmd" \
+    "$editor" "$agent" "$shell_cmd" \
     "$width" "$height" "$layout" "$mark" \
     2>&1
 ) || {
@@ -264,20 +263,18 @@ output=$(
   print -r -u2 -- "workspace: $output"
   return $rc
 }
-# Laid out around this shell, the main one: it moves to the workspace quietly,
-# as the other panes start there (git-glance's hook then remembers the
-# workspace's repository, as above), and runs its own commands, titled as the
-# shell integration titles a command (the script types none into it)
+# Laid out around this shell, which becomes the workspace's shell: it moves to
+# the workspace quietly, as the other panes start there (git-glance's hook then
+# remembers the workspace's repository, as above), and runs its own commands,
+# titled as the shell integration titles a command (the script types none into
+# it)
 if [[ ${output##*$'\n'} == 'same tab' ]]; then
-  local command
-  local -a own=("$shell_cmd")
-  [[ $layout == full ]] || own=("$status_cmd" "$shell_cmd")
   if [[ ${PWD:A} != $dir ]]; then
     builtin cd -q -- "$dir" || return
     (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2>/dev/null)
   fi
-  for command in $own; do
-    [[ -z $mark ]] || print -rn -- $'\e]2;'"$command"$'\a' 2>/dev/null > /dev/tty
-    eval "$command"
-  done
+  if [[ -n $shell_cmd ]]; then
+    [[ -z $mark ]] || print -rn -- $'\e]2;'"$shell_cmd"$'\a' 2>/dev/null > /dev/tty
+    eval "$shell_cmd"
+  fi
 fi

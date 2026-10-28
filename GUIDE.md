@@ -12,7 +12,7 @@ The essentials, each a door to the pages that follow.
 
 | Run or press | Result |
 | --- | --- |
-| `workspace` | This project's editor, agent, and shells in one tab |
+| `workspace` | This project's editor, agent, and a shell in one tab |
 | `v FILE` | Edit in Neovim: `Cmd+S` saves, `Cmd+/` comments, `-` shows the file tree |
 | `Cmd+D` / `Cmd+Option+arrows` | Split the pane / move between panes and Neovim's windows |
 | `gg` | This repository at a glance: branch, changes, recent commits |
@@ -27,20 +27,20 @@ The essentials, each a door to the pages that follow.
 
 ## Workspace: Start a workspace
 
-Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: editor left, two shells in the middle, agent right; the lean layout gives the editor and the agent half the width each.
+Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the editor on the left 60%, and on the right the agent above a shell that opens with the `gg` card; the lean layout gives the editor and the agent half the width each.
 
 | Run | Result |
 | --- | --- |
 | `workspace` | Lay out the current directory |
 | `workspace DIR` | Lay out another directory |
-| `workspace --layout lean` | Editor above one shell on the left, agent right, in even halves |
+| `workspace --layout lean` | Editor above the shell on the left, agent right, in even halves |
 | `workspace --agent CMD` | Start a different agent in the agent pane |
-| `workspace --status gg` | Git card without the code summary in the status shell |
-| `workspace --status ''` | Leave the status shell at its prompt |
+| `workspace --status ggg` | The card with the code summary in the shell |
+| `workspace --status ''` | Start the shell without the card |
 | `workspace --help` | Every option and its default |
 
-- Run from a tab where your shell is the only pane, `workspace` lays out that tab around it: your shell becomes the main shell, moves to the directory, and runs its commands there. It opens a new tab from a tab with other panes, or when Ghostty can't tell which pane you're in (a tab title you set by hand prevents it).
-- Focus starts in the main shell (the larger middle one, or the lean layout's only one); `Cmd+Option+arrows` move to the editor and the agent.
+- Run from a tab where your shell is the only pane, `workspace` lays out that tab around it: your shell becomes the workspace's shell, moves to the directory, and runs its commands there. It opens a new tab from a tab with other panes, or when Ghostty can't tell which pane you're in (a tab title you set by hand prevents it).
+- Focus starts in the editor (in the lean layout, in the shell); `Cmd+Option+arrows` move between the panes.
 - For lasting defaults, set `DOTFILES_WORKSPACE_LAYOUT=lean` (on a laptop, say) or the commands in `zsh/local.zsh`.
 - The editor opens on the project's file tree; `Cmd+Shift+Enter` zooms it to explore (`keys explore`).
 - Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux, windows take the place of tabs.
@@ -108,7 +108,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 
 | Press | Result |
 | --- | --- |
-| `Cmd+Shift+Enter` (in the editor) | Zoom: the tree joins the code as a sidebar; again for the shells and agent |
+| `Cmd+Shift+Enter` (in the editor) | Zoom the editor to the whole tab, where the tree joins the code as a sidebar; again for the agent and shell |
 | `-` / `Esc` / `q` | From a file, to it in the tree / from the tree, back to the code / hide the tree |
 | `→` / `←` | Step into a folder or open a file / step out of a folder, closing it (on the top line, out of the root), as in Finder's list view |
 | `-` / `Ctrl+]` | Root: up to the parent folder, keeping yours open / into the folder under the cursor |
@@ -119,11 +119,11 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 | `[c` / `]c` | Previous / next changed file |
 | `?` | Every key, by what it does |
 
-- Unzoomed, the tree and the code take turns in the narrow pane: Enter, `Space`, `Tab`, or `→` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
+- In a pane under 110 columns (a workspace's editor in a window under about 184), the tree and the code take turns: Enter, `Space`, `Tab`, or `→` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
 - In the tree, `Space` previews at once; the `Space` leader keys work from the code.
 - Hidden with `q` while zoomed, the tree stays out of later zooms until you show it again.
 - The tree follows the file you're in and marks Git changes as they happen: `✗` modified, `★` new, `✓` staged, `➜` renamed; a folder shows the marks of what it holds.
-- `-` (from a file) and `Esc` (from the tree) move between the tree and the code at any width. `Cmd+Option+arrows` move between terminal panes: in a workspace, `Cmd+Option+→` from the tree heads for the shell pane, and `Cmd+Option+←` reaches the tree only because no pane sits to the editor's left.
+- `-` (from a file) and `Esc` (from the tree) move between the tree and the code at any width. `Cmd+Option+arrows` move between terminal panes: in a workspace, `Cmd+Option+→` from the tree heads for the agent and shell on the right, and `Cmd+Option+←` reaches the tree only because no pane sits to the editor's left.
 - `Ctrl+^` (`Ctrl+6`) switches to your previous file, also from the tree; the tree is never one, and with no previous file it says so.
 - `Ctrl+V` and `Ctrl+X` split the code window; with only the tree showing, both open beside it. `Ctrl+W c` closes a split, while `Cmd+W` closes the whole editor pane.
 - Follow the code with `Ctrl+]` / `Ctrl+T`, `grr`, and `gO`, and search it with `Cmd+O` and `:grep` (`keys editor`).
