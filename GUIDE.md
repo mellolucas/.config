@@ -200,7 +200,7 @@ List what is here, then find a file by name or by content.
 | --- | --- |
 | `l` | Names, including hidden entries |
 | `ll` | Long view: sizes, Git status, relative ages |
-| `lll` | `ll` plus directory totals and line counts (slower) |
+| `lll` | `ll` plus directory totals, line counts, and each repository's branch (slower) |
 | `llt` / `lld` | Two-level tree / directories only |
 | `lc` | Lines of code by language |
 | `v FILE` / `view FILE` | Edit / read-only in your editor |

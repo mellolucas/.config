@@ -491,7 +491,7 @@ editor() { record editor "$@"; }
   eza() { record eza "$@"; }
   source /dev/stdin <<< "$alias_block"
   help ll 'directory name'
-  expect $'eza\n--all\n--group-directories-first\n--icons=auto\n--git\n--hyperlink=auto\n--long\n--binary\n--time-style=relative\n--git-repos\ndirectory name\n--help' "$(recorded)" 'help listing alias chain'
+  expect $'eza\n--all\n--group-directories-first\n--icons=auto\n--git\n--hyperlink=auto\n--long\n--binary\n--time-style=relative\ndirectory name\n--help' "$(recorded)" 'help listing alias chain'
   alias gs='git status --ignored'
   git() { record git "$@"; }
   help gs
