@@ -678,6 +678,38 @@ for config_path in "$cli_repo" "$test_root/config-alias" "$test_root/CLI-REPO"; 
   done
 done
 
+# So is a checkout inside XDG_CONFIG_HOME, such as a clone at ~/.config/zsh
+# that linking would back up, link included: the folders compare as the disk
+# sees them, also through a path in another case where the disk ignores case,
+# and through ..
+inside="$test_root/inside"
+mkdir -p "$inside/config/zsh/zsh" "$inside/config/zsh/homebrew"
+cp "$repo/install.sh" "$inside/config/zsh/"
+cp "$repo/zsh/.zshenv" "$repo/zsh/xdg.sh" "$repo/zsh/homebrew.sh" "$inside/config/zsh/zsh/"
+printf '# existing Brewfile\n' > "$inside/config/zsh/homebrew/Brewfile"
+cp -R "$inside" "$test_root/inside-before"
+cli_home_before=$(find "$test_root/cli-home")
+for setting in inside case dotdot; do
+  config_path="$inside/config" checkout="$inside/config/zsh"
+  case "$setting" in
+    case) checkout="$inside/CONFIG/zsh" ;;
+    dotdot) config_path="$checkout/.." ;;
+  esac
+  if [ ! -d "$checkout" ]; then
+    printf 'SKIP: a checkout in XDG_CONFIG_HOME through another case (the disk tells cases apart)\n'
+    continue
+  fi
+  for operation in link install update; do
+    if run_cli env XDG_CONFIG_HOME="$config_path" REJECT_GIT=1 \
+      sh "$checkout/install.sh" "$operation" > "$test_root/inside.log" 2>&1; then
+      fail "$operation: a checkout in XDG_CONFIG_HOME ($setting) must be rejected"
+    fi
+    check grep -Fq 'require a checkout separate from XDG_CONFIG_HOME' "$test_root/inside.log"
+    check diff -r "$test_root/inside-before" "$inside"
+    check test "$(find "$test_root/cli-home")" = "$cli_home_before"
+  done
+done
+
 # Unsafe updates fail and change nothing, ignoring the repository selectors a
 # calling Git exports.
 elsewhere="$test_root/invalid-git-path"
@@ -1137,19 +1169,47 @@ check test "$rc" = 1
 check test ! -e "$home/elsewhere"
 check test "$(bundles "$home")" = 3
 
+# A dotfiles link to a checkout that is gone names none: get.sh says so and
+# clones into DOTFILES_DIR, and the install links the command there, the old
+# link backed up.
+home="$test_root/get-gone"
+mkdir -p "$home/.local/bin"
+ln -s "$home/gone/install.sh" "$home/.local/bin/dotfiles"
+run_get HOME="$home" DOTFILES_DIR="$home/src/dots" sh > "$home.log" 2>&1 || fail "get.sh after its checkout was deleted: $(cat "$home.log")"
+check grep -q '^note: .*gone' "$home.log"
+check test "$(readlink "$home/.local/bin/dotfiles")" = "$home/src/dots/install.sh"
+check test "$(readlink "$home/.local/bin/dotfiles.backup."*)" = "$home/gone/install.sh"
+
 # The checkout can't be XDG_CONFIG_HOME or inside it, wherever that is, and
-# get.sh says so before installing anything.
+# get.sh says so before installing anything: also where that folder is there,
+# as the disk compares folders, through another case where the disk ignores
+# case, and through .. in folders not there yet.
 home="$test_root/get-xdg"
-for setting in default-itself default-inside custom; do
+for setting in default-itself default-inside custom there case dotdot; do
   case "$setting" in
     default-itself) set -- '' "$home/.config" ;;
     default-inside) set -- '' "$home/.config/dotfiles" ;;
     custom) set -- "$home/xdg" "$home/xdg/dotfiles" ;;
+    there) set -- '' "$home/.config/zsh" ;;
+    case) set -- '' "$home/.Config/x" ;;
+    dotdot) set -- "$home/xdg/../.config" "$home/new/../.config/dots" ;;
   esac
+  case "$setting" in
+    there | case | dotdot) mkdir -p "$home/.config" ;;
+  esac
+  if [ "$setting" = case ] && [ ! -d "$home/.Config" ]; then
+    printf 'SKIP: get.sh into XDG_CONFIG_HOME through another case (the disk tells cases apart)\n'
+    rmdir "$home/.config"
+    continue
+  fi
   rc=0
   run_get HOME="$home" CLT="$home.clt" XDG_CONFIG_HOME="$1" DOTFILES_DIR="$2" sh > "$home.log" 2>&1 || rc=$?
   [ "$rc" = 1 ] || fail "get.sh into XDG_CONFIG_HOME ($setting) exited $rc: $(cat "$home.log")"
-  check test -z "$(ls -A "$home")"
+  case "$setting" in
+    there | case | dotdot) check test "$(ls -A "$home")" = .config; check rmdir "$home/.config" ;;
+    *) check test -z "$(ls -A "$home")" ;;
+  esac
+  check grep -q '^error: .* is in XDG_CONFIG_HOME' "$home.log"
 done
 
 # A folder there with other files in it is refused before anything is
@@ -1166,6 +1226,27 @@ check test "$(ls -A "$checkout")" = notes
 rm "$checkout/notes"
 run_get HOME="$home" bash > "$home.log" 2>&1 || fail "get.sh into an empty folder: $(cat "$home.log")"
 check test -d "$checkout/.git"
+
+# So is anything but folders on the way: a link to nothing where the checkout
+# goes, or a file in place of a folder above it.
+for blocker in link file; do
+  home="$test_root/get-blocked-$blocker"
+  mkdir -p "$home/code/mellolucas"
+  if [ "$blocker" = link ]; then
+    ln -s "$test_root/nowhere" "$home/code/mellolucas/.config"
+  else
+    rmdir "$home/code/mellolucas"
+    printf 'mine\n' > "$home/code/mellolucas"
+  fi
+  rc=0
+  run_get HOME="$home" CLT="$home.clt" bash > "$home.log" 2>&1 || rc=$?
+  check test "$rc" = 1
+  check test "$(ls -A "$home")" = code
+  check test ! -e "$home.clt"
+  check grep -q '^error: .* is not a folder' "$home.log"
+done
+check test -L "$test_root/get-blocked-link/code/mellolucas/.config"
+check test "$(cat "$test_root/get-blocked-file/code/mellolucas")" = mine
 
 # Arguments after -- reach install.sh: -- link, as on a root server or
 # Alpine, links the configuration without Homebrew.

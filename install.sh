@@ -93,14 +93,21 @@ git_identity() {
   (cd / && git var GIT_AUTHOR_IDENT && git var GIT_COMMITTER_IDENT) >/dev/null 2>&1
 }
 
+# The checkout can't be XDG_CONFIG_HOME or inside it, where linking would back
+# up its own folders. Folders compare as the disk does (-ef): through symlinks
+# and .., and in any case where the disk ignores case.
 require_separate_checkout() {
-  # -ef is supported by the macOS/Linux shells and catches case-equivalent paths.
-  # shellcheck disable=SC3013
-  if config_real=$(CDPATH='' cd -P -- "$xdg_config_home" 2>/dev/null && pwd -P) &&
-    { [ "$config_real" = "$repo_dir" ] || [ "$config_real" -ef "$repo_dir" ]; }; then
-    printf 'error: XDG_CONFIG_HOME is the repository checkout; install and update require a checkout separate from XDG_CONFIG_HOME.\n' >&2
-    exit 1
-  fi
+  folder=$repo_dir
+  # shellcheck disable=SC3013 # every sh this runs in has -ef
+  until [ "$folder" -ef "$xdg_config_home" ]; do
+    case "$folder" in
+      /) return 0 ;;
+      /*/*) folder=${folder%/*} ;;
+      *) folder=/ ;;
+    esac
+  done
+  printf 'error: the checkout %s is in XDG_CONFIG_HOME (%s); install and update require a checkout separate from XDG_CONFIG_HOME.\n' "$repo_dir" "$xdg_config_home" >&2
+  exit 1
 }
 
 backup_path() {

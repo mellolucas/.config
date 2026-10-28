@@ -61,8 +61,8 @@ Changes since `v0.0.1`.
 
 ### Migration
 
-- Keep the checkout outside `~/.config`; installation refuses a checkout that
-  is the configuration home itself. Move local edits into a separate clone
+- Keep the checkout outside `~/.config`; installation refuses a checkout in
+  the configuration home or below it. Move local edits into a separate clone
   rather than moving the directory.
 - `dotfiles install` now links and installs packages, replacing `bootstrap`;
   `dotfiles link` is the former link-only `install`.
