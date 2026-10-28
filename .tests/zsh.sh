@@ -201,14 +201,17 @@ STUB
 )
 
 (
-  # Every page of the guide, by its "## Topic: Title" heading
-  typeset -A titles topic_outputs
-  topics=()
+  # Every page of the guide, by its "## Topic: Title" heading, with its last line
+  typeset -A titles last_lines topic_outputs
+  topics=() topic=''
   while IFS= read -r line || [[ -n $line ]]; do
-    [[ $line == '## '*': '* ]] || continue
-    topic=${(L)${${line#'## '}%%:*}}
-    topics+=("$topic")
-    titles[$topic]=${line#*: }
+    if [[ $line == '## '*': '* ]]; then
+      topic=${(L)${${line#'## '}%%:*}}
+      topics+=("$topic")
+      titles[$topic]=${line#*: }
+    elif [[ -n $topic && -n $line ]]; then
+      last_lines[$topic]=$line
+    fi
   done < "$repo/GUIDE.md"
   (( $#topics )) || fail 'guide pages'
 
@@ -227,6 +230,13 @@ STUB
     keys "$topic" > "$test_root/keys-section" || fail "redirected keys $topic status"
     section=$(recorded keys-section)
     topic_outputs[$topic]=$section
+    # Its own page alone: the title, the body to its last line, not the next page
+    lines=("${(@f)section}")
+    expect "# $titles[$topic]" "$lines[1]" "keys $topic title"
+    (( ${lines[(Ie)$last_lines[$topic]]} )) || fail "keys $topic lacks its last line: $last_lines[$topic]"
+    next=${topics[${topics[(ie)$topic]} + 1]-}
+    [[ -z $next ]] || (( ! ${lines[(Ie)# $titles[$next]]} )) || fail "keys $topic runs into the $next page"
+    [[ $keys_all == *$'\n'"# $titles[$topic]"$'\n'* ]] || fail "keys all lacks the $topic page"
     # The index lists titles only; a page's first body line must not appear.
     [[ $keys_output != *"${${(f)section}[2]}"* ]] || fail "keys index includes section body: $topic"
     plain=$(keys --plain "$topic") || fail "plain keys $topic status"
@@ -315,8 +325,10 @@ STUB
   card=''
   IFS= read -r -d '' card < "$test_root/glance-render-card" || [[ -n $card ]]
   [[ $card == *owner/repo*'never fetched'*branch*worktree* ]] || fail "$mode baseline repository card"
-  # The card starts at the top of the screen; ggg's code summary follows it.
-  expected=$'\e[H'"$card"
+  # The card starts at the top of the screen, once a screenful of newlines (3
+  # rows here) has pushed what was there into scrollback; ggg's code summary
+  # follows it.
+  expected=$'\n\n\n\e[H'"$card"
   [[ $mode != ggg ]] || expected+='CODE SUMMARY'
   [[ $transcript == *"$expected"* ]] || fail "git-glance $mode on a terminal: ${(qqqq)transcript}"
   if [[ $mode == ggg ]]; then
@@ -541,6 +553,26 @@ editor() { record editor "$@"; }
   expect $'man\nbsd-tool' "$(recorded)" 'a command that rejects --help shows its manual'
 )
 
+# help shows the command's own --help, through bat when it's installed (here a
+# stand-in on PATH that names its options before the text), and returns the
+# command's status.
+(
+  unfunction bat
+  help-tool() { print -r -- "usage: help-tool $*"; return 3; }
+  /bin/mkdir -p "$test_root/bat-bin"
+  print -rl -- '#!/bin/sh' 'printf "bat %s\n" "$*"' 'exec /bin/cat' > "$test_root/bat-bin/bat"
+  /bin/chmod +x "$test_root/bat-bin/bat"
+  for bat_state expected in missing 'usage: help-tool --help' \
+    present $'bat --plain --language=help\nusage: help-tool --help'; do
+    path=()
+    [[ $bat_state == missing ]] || path=("$test_root/bat-bin")
+    rc=0
+    output=$(help help-tool) || rc=$?
+    expect "$expected" "$output" "help with bat $bat_state"
+    expect 3 "$rc" "help's status with bat $bat_state"
+  done
+)
+
 fzf() {
   record fzf "$@"
   local action=${2#'enter:become('}
@@ -573,6 +605,19 @@ expect $'editor\n--clean\n--\n-c quit | touch should-not-run' "$(recorded)" 'edi
     done
   done
   [[ ! -e $test_root/call ]] || fail "usage ran: $(recorded)"
+)
+
+# mdv FILE renders the file in glow's pager (here a stand-in on PATH that prints
+# what it got), with the theme and -w 0, and the render reaches the screen.
+(
+  unfunction glow
+  /bin/mkdir -p "$test_root/mdv-bin"
+  print -rl -- '#!/bin/sh' 'printf "%s\n" rendered "$@"' > "$test_root/mdv-bin/glow"
+  /bin/chmod +x "$test_root/mdv-bin/glow"
+  path=("$test_root/mdv-bin")
+  source /dev/stdin <<< "$alias_block"
+  output=$(mdv 'notes file.md') || fail 'mdv status'
+  expect $'rendered\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n0\nnotes file.md' "$output" 'mdv FILE'
 )
 
 # Each preview as fzf runs it: Markdown through glow, other files through bat,
