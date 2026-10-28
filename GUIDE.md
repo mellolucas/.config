@@ -185,7 +185,7 @@ Move around and build commands without retyping.
 | `Ctrl+K` / `Ctrl+Y` | Delete to the end of the line / paste back what a delete removed |
 
 - Typing a directory name alone changes into it; `zsh/local.zsh.example` shows how to reach any project by its name (`cdpath`).
-- The prompt edits like any Mac text field, with zsh's emacs keys (Terminal's own). Words stop at punctuation: on `~/code/project`, `Option+Backspace` deletes `project`.
+- The prompt edits like any Mac text field, with zsh's emacs keys (Terminal's own). Words stop at punctuation but not at underscores: on `~/code/my_project`, `Option+Backspace` deletes `my_project`.
 - `Esc` then a key stands in for an Alt key: `Esc` then `.` inserts the last command's last word.
 - A red `❯` means the last command failed; an unfinished rebase or merge shows beside the branch (`main|rebase-i`).
 - Start a command with a space to keep it out of history.

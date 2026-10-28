@@ -117,7 +117,8 @@ Deliberate duplication that must stay behavior-identical across copies:
 2. **Word and line keys**: Ghostty sends Option+←/→ as `ESC b`/`ESC f`,
    Option+Backspace as `ESC DEL`, and Cmd+←/→/Backspace as Ctrl+A/E/U; other
    terminals send xterm forms. zsh's emacs keymap reads them with Cocoa word
-   boundaries (empty WORDCHARS), and `nvim/lua/config/keymaps.lua` maps
+   boundaries (`WORDCHARS='_'`: underscores stay inside words, other
+   punctuation splits them), and `nvim/lua/config/keymaps.lua` maps
    `<M-b>`/`<M-f>`, `<M-Left>`/`<M-Right>`, `<M-BS>`, and `<C-a>`/`<C-e>` to
    match. Change both together.
 

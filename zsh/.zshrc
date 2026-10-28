@@ -61,9 +61,9 @@ zstyle ':completion:*' menu select
 # and Option or Cmd with the arrows and Backspace, which Ghostty sends as
 # ESC b/f/DEL and Ctrl+A/E/U). zsh would pick vi mode, as EDITOR is nvim
 bindkey -e
-# Word keys stop at punctuation, as in Mac text fields: Option+Backspace
-# deletes a path's last part
-WORDCHARS=''
+# Word keys stop at punctuation but not at underscores, as in Mac text fields
+# and Neovim: Option+Backspace deletes a path's last part, a snake_case name whole
+WORDCHARS='_'
 # Cmd+Backspace arrives as Ctrl+U: delete to the line's start, as on a Mac
 bindkey '^U' backward-kill-line
 # Other terminals send xterm sequences for the word keys: Alt+Left/Right in

@@ -288,11 +288,11 @@ for mode in native fzf; do
   expect 'Up again, in application cursor form, keeps the prefix' 'echo alpha'
   snapshot $'\x18\x12echo\e[A\eOA\e[B'
   expect 'Down returns toward the latest' 'echo beta'
-  # Word keys stop at punctuation, as on a Mac, and what they delete pastes back
+  # Word keys stop at punctuation but not underscores, and what they delete pastes back
   snapshot $'\x18\x12cd foo/bar.baz\ebX'
   expect 'Option+Left stops at punctuation' 'cd foo/bar.Xbaz'
-  snapshot $'\x18\x12cd ~/code/project\e\x7f'
-  expect 'Option+Backspace deletes the last part of a path' 'cd ~/code/'
+  snapshot $'\x18\x12cd ~/code/my_project\e\x7f'
+  expect 'Option+Backspace deletes the last part of a path, underscores included' 'cd ~/code/'
   snapshot $'\x18\x12one two\e\x7fX'
   expect 'Option+Backspace deletes a word and keeps typing' 'one X'
   snapshot $'\x18\x12alpha omega\e\x7f\x19'
