@@ -116,11 +116,13 @@ Deliberate duplication that must stay behavior-identical across copies:
    Neovim's Ctrl+W keys apply there.
 2. **Word and line keys**: Ghostty sends Option+←/→ as `ESC b`/`ESC f`,
    Option+Backspace as `ESC DEL`, and Cmd+←/→/Backspace as Ctrl+A/E/U; other
-   terminals send xterm forms. zsh's emacs keymap reads them with Cocoa word
-   boundaries (`WORDCHARS='_'`: underscores stay inside words, other
-   punctuation splits them), and `nvim/lua/config/keymaps.lua` maps
-   `<M-b>`/`<M-f>`, `<M-Left>`/`<M-Right>`, `<M-BS>`, and `<C-a>`/`<C-e>` to
-   match. Change both together.
+   terminals send xterm forms. Where text is typed they step like Cocoa:
+   letters, digits, `_`, and `.` make up words (Cocoa joins `.` only between
+   them), other punctuation splits them, and Option+→ stops at a word's end.
+   zsh's emacs keymap reads them with `WORDCHARS='_.'` and
+   `emacs-forward-word`; `nvim/lua/config/keymaps.lua` gives insert and
+   command-line modes the same words and line keys (`<C-a>`/`<C-e>`), and
+   normal mode keeps Vim's words. Change both together.
 
 ## Agent working rules
 

@@ -275,7 +275,7 @@ for key in $'\e[1;3D' $'\e[1;5D'; do
 done
 for key in $'\e[1;3C' $'\e[1;5C'; do
   snapshot $'\x18\x12one two\x01'"$key"X
-  expect "word forward: ${(V)key}" 'one Xtwo'
+  expect "word forward: ${(V)key}" 'oneX two'
 done
 # Up and Down while typing search history by the text so far; presses stay
 # in one snapshot, since the search continues only across consecutive keys.
@@ -285,11 +285,15 @@ snapshot $'\x18\x12echo\e[A\eOA'
 expect 'Up again, in application cursor form, keeps the prefix' 'echo alpha'
 snapshot $'\x18\x12echo\e[A\eOA\e[B'
 expect 'Down returns toward the latest' 'echo beta'
-# Word keys stop at punctuation but not underscores, and what they delete pastes back
+# Word keys step as Mac text fields do: _ and . stay inside words, other
+# punctuation splits them, Option+Right stops at a word's end, and what they
+# delete pastes back
 snapshot $'\x18\x12cd foo/bar.baz\ebX'
-expect 'Option+Left stops at punctuation' 'cd foo/bar.Xbaz'
-snapshot $'\x18\x12cd ~/code/my_project\e\x7f'
-expect 'Option+Backspace deletes the last part of a path, underscores included' 'cd ~/code/'
+expect 'Option+Left keeps a dotted name whole, stopping at other punctuation' 'cd foo/Xbar.baz'
+snapshot $'\x18\x12cd foo/bar.baz\x01\efX\efY'
+expect "Option+Right stops at a word's end" 'cdX fooY/bar.baz'
+snapshot $'\x18\x12cd ~/code/my_file.lua\e\x7f'
+expect 'Option+Backspace deletes the last part of a path, underscores and dots included' 'cd ~/code/'
 snapshot $'\x18\x12one two\e\x7fX'
 expect 'Option+Backspace deletes a word and keeps typing' 'one X'
 snapshot $'\x18\x12alpha omega\e\x7f\x19'

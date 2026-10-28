@@ -61,9 +61,11 @@ zstyle ':completion:*' menu select
 # and Option or Cmd with the arrows and Backspace, which Ghostty sends as
 # ESC b/f/DEL and Ctrl+A/E/U). zsh would pick vi mode, as EDITOR is nvim
 bindkey -e
-# Word keys stop at punctuation but not at underscores, as in Mac text fields
-# and Neovim: Option+Backspace deletes a path's last part, a snake_case name whole
-WORDCHARS='_'
+# Word keys step as in Mac text fields and Neovim: letters, digits, _ and .
+# make up words, other punctuation splits them, and Option+→ stops at a word's
+# end. Option+Backspace deletes a path's last part, my_file.lua whole
+WORDCHARS='_.'
+bindkey '^[f' emacs-forward-word
 # Cmd+Backspace arrives as Ctrl+U: delete to the line's start, as on a Mac
 bindkey '^U' backward-kill-line
 # Other terminals send xterm sequences for the word keys: Alt+Left/Right in
@@ -72,7 +74,7 @@ bindkey '^U' backward-kill-line
 () {
   local key
   for key in '^[[1;3D' '^[[1;5D'; do bindkey $key backward-word; done
-  for key in '^[[1;3C' '^[[1;5C'; do bindkey $key forward-word; done
+  for key in '^[[1;3C' '^[[1;5C'; do bindkey $key emacs-forward-word; done
   for key in '^[[H' '^[OH' '^[[1~'; do bindkey $key beginning-of-line; done
   for key in '^[[F' '^[OF' '^[[4~'; do bindkey $key end-of-line; done
   bindkey '^[[3~' delete-char
