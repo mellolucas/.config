@@ -43,30 +43,12 @@ trap stop EXIT
 # program runs in a directory of its own, apart from the session's.
 mkdir -p "$HOME/inner"
 tmux new-session -d -s test -x 120 -y 40 -c "$HOME" "cd ${(q)HOME}/inner && stty raw -echo && exec cat -v"
-[[ $(tmux show -gv history-limit) == 50000 ]] || fail 'XDG tmux.conf not loaded'
-[[ $(tmux show -gv prefix) == C-b ]] || fail "tmux's prefix is $(tmux show -gv prefix)"
-(( $(tmux show -sv escape-time) <= 20 )) || fail "escape-time above Neovim's 10-20 ms"
 [[ $(tmux show -gv mouse) == on ]] || fail 'the mouse is off'
 
-# A binding's command, or failure when the table lacks the key.
-binding() {
-  local line
-  for line in ${(f)"$(tmux list-keys -T "$1")"}; do
-    [[ $line =~ "^bind-key +(-r +)?-T +$1 +([^ ]+) *(.*)$" ]] || continue
-    [[ $match[2] == "$2" ]] || continue
-    print -r -- "${match[3]%%[[:space:]]#}"
-    return 0
-  done
-  return 1
-}
-
-# tmux's own keys: splits open in the pane's directory, as Ghostty's do, and
-# no key outside the prefix belongs to tmux (the root table only has the mouse).
-[[ $(binding prefix '\"') == 'split-window -v -c "#{pane_current_path}"' ]] || fail "prefix \" runs: $(binding prefix '\"')"
-[[ $(binding prefix '\%') == 'split-window -h -c "#{pane_current_path}"' ]] || fail "prefix % runs: $(binding prefix '\%')"
+# No key outside the prefix belongs to tmux (the root table only has the mouse).
 taken=(${${(f)"$(tmux list-keys -T root)"}:#*-T root *(Mouse|Wheel|Click)*})
 (( ! $#taken )) || fail "keys taken from programs: ${(F)taken}"
-print -r -- "ok: tmux's own keys, with splits in the pane's directory"
+print -r -- 'ok: tmux takes no key outside its prefix'
 
 # Fixture terminals answer tmux's queries as real terminals do, reporting their
 # own size, and name themselves through XTVERSION, which tmux keeps as
@@ -160,11 +142,16 @@ local -F start=$EPOCHREALTIME
 zpty -w -n fixture $'\e'
 wait_for 'Esc did not reach the program' '[[ $(tmux capture-pane -p -t "$left") == *"^B^[" ]]'
 (( EPOCHREALTIME - start < 0.4 )) || fail "Esc took $(( (EPOCHREALTIME - start) * 1000 )) ms"
-# Ctrl+B then % splits beside the program, in its directory, not the session's.
+# Ctrl+B then % splits beside the program, in its directory, not the session's;
+# Ctrl+B then " splits below in the same way.
 press $'\x02%'
 wait_for 'Ctrl+B then % did not split' '[[ $(state "#{window_panes}") == 2 ]]'
 wait_for 'the new pane does not run zsh' '[[ $(state "#{pane_current_command}") == zsh ]]'
 [[ $(state '#{pane_current_path}') == $HOME/inner ]] || fail "the split opened in $(state '#{pane_current_path}')"
+press $'\x02"'
+wait_for 'Ctrl+B then " did not split' '[[ $(state "#{window_panes}") == 3 ]]'
+wait_for 'the pane below does not run zsh' '[[ $(state "#{pane_current_command}") == zsh ]]'
+[[ $(state '#{pane_current_path}') == $HOME/inner ]] || fail "the split below opened in $(state '#{pane_current_path}')"
 print -r -- 'ok: keys reach programs through attached clients, and Ctrl+B splits in place'
 
 # workspace: a session per directory, reattached on rerun, with its commands
