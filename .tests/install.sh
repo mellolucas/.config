@@ -28,8 +28,9 @@ unset $xdg_vars
 mkdir -p "$HOME" "$test_root/repo/zsh" "$test_root/bin"
 cp "$repo/install.sh" "$test_root/repo/install.sh"
 cp "$repo/zsh/.zshenv" "$repo/zsh/homebrew.sh" "$repo/zsh/xdg.sh" "$test_root/repo/zsh/"
-mkdir -p "$test_root/repo/homebrew"
+mkdir -p "$test_root/repo/homebrew" "$test_root/repo/zsh/bin"
 cp "$repo/homebrew/npmrc" "$test_root/repo/homebrew/npmrc"
+cp "$repo/zsh/bin/edit" "$test_root/repo/zsh/bin/edit"
 
 # Load function definitions without the CLI dispatcher.
 test "$(grep -c '^# CLI dispatcher\.$' "$repo/install.sh")" = 1
@@ -102,11 +103,13 @@ mkdir -p "$test_root/cli-home/config" "$test_root/cli-home/.local/bin"
 ln -s "$test_root/repo/zsh" "$test_root/cli-home/config/zsh"
 ln -s "$test_root/cli-home/config/zsh/.zshenv" "$test_root/cli-home/.zshenv"
 ln -s "$installer" "$test_root/cli-home/.local/bin/dotfiles"
+ln -s "$test_root/repo/zsh/bin/edit" "$test_root/cli-home/.local/bin/edit"
 check run_cli sh "$installer" uninstall > "$test_root/cli-uninstall.log"
 check test ! -L "$test_root/cli-home/.zshenv"
 check test ! -e "$test_root/cli-home/.zshenv"
 check test ! -L "$test_root/cli-home/config/zsh"
 check test ! -L "$test_root/cli-home/.local/bin/dotfiles"
+check test ! -L "$test_root/cli-home/.local/bin/edit"
 rmdir "$test_root/cli-home/config"
 
 # The bootstrap delegates interactivity to Homebrew without overwriting callers.
@@ -168,6 +171,7 @@ with_layout install_dotfiles > "$test_root/install.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
 check test -L "$HOME/.local/bin/dotfiles"
+check test "$(readlink "$HOME/.local/bin/edit")" = "$repo_dir/zsh/bin/edit"
 check test -d "$XDG_DATA_HOME/codex"
 check test -d "$XDG_STATE_HOME/codex"
 with_layout install_dotfiles >> "$test_root/install.log"
@@ -184,6 +188,7 @@ check test ! -L "$XDG_CONFIG_HOME/zsh"
 check test ! -L "$HOME/.zshenv"
 check test ! -e "$HOME/.zshenv"
 check test ! -L "$HOME/.local/bin/dotfiles"
+check test ! -L "$HOME/.local/bin/edit"
 check test -L "$XDG_CONFIG_HOME/foreign"
 check test -f "$test_root/foreign"
 check test ! -L "$XDG_CONFIG_HOME/retired"
@@ -197,15 +202,17 @@ uninstall_dotfiles >> "$test_root/uninstall.log"
 mkdir -p "$test_root/other/zsh"
 ln -s "$test_root/other/zsh" "$XDG_CONFIG_HOME/zsh"
 ln -s "$test_root/other/dotfiles" "$HOME/.local/bin/dotfiles"
+ln -s "$test_root/other/edit" "$HOME/.local/bin/edit"
 ln -s "$test_root/other/zshenv" "$HOME/.zshenv"
 uninstall_dotfiles > "$test_root/uninstall.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.local/bin/dotfiles"
+check test -L "$HOME/.local/bin/edit"
 check test -L "$HOME/.zshenv"
-for path in "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.zshenv"; do
+for path in "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin/edit" "$HOME/.zshenv"; do
   check grep -Fqx "skip: not owned by this repo: $path" "$test_root/uninstall.log"
 done
-rm "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.zshenv"
+rm "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin/edit" "$HOME/.zshenv"
 
 # Exercise native dispatch without invoking real Homebrew or npm.
 mkdir "$test_root/package-bin"
@@ -275,6 +282,7 @@ $npm_update"
     else
       check test -L "$HOME/.zshenv"
       check test -L "$HOME/.local/bin/dotfiles"
+      check test -L "$HOME/.local/bin/edit"
       # shellcheck disable=SC2012 # fixture names are plain words
       check test "$(ls -A "$XDG_CONFIG_HOME" | tr '\n' ' ')" = 'homebrew zsh '
       check test -d "$XDG_DATA_HOME/codex"
@@ -793,7 +801,7 @@ doctor_says() (
 mkdir "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache"
 ln -s "$test_root/missing" "$HOME/.dangling"
 mkdir -p "$XDG_CONFIG_HOME"
-rm -rf "$XDG_CONFIG_HOME/zsh"
+rm -rf "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/edit"
 ln -s "$test_root/missing" "$XDG_CONFIG_HOME/zsh"
 ln -s "$repo_dir/retired" "$XDG_CONFIG_HOME/retired"
 if (
@@ -815,6 +823,7 @@ check doctor_says ✗ 'login shell' /bin/bash chsh
 check doctor_says ✗ tmux 3.5 3.6 'brew upgrade tmux'
 check doctor_says ✗ 'Git identity' git/config.d/personal.example
 check doctor_says ✗ Brewfile missing 'dotfiles link'
+check doctor_says ✗ 'edit command' missing 'dotfiles link'
 # Every problem marked counts.
 marked=$(grep -c '^✗ ' "$test_root/doctor.log")
 check grep -Fqx "$marked problems found" "$test_root/doctor.log"
@@ -857,6 +866,7 @@ complete_doctor() (
 complete_doctor > "$test_root/doctor.log" 2>&1 || fail "doctor found problems in a complete setup: $(cat "$test_root/doctor.log")"
 check test "$(tail -n 1 "$test_root/doctor.log")" = 'no problems found'
 check doctor_says ✓ links '2 in'
+check doctor_says ✓ 'edit command' .local/bin/edit
 check doctor_says ✓ 'Git identity'
 # Clutter in $HOME alone is a note, not a problem.
 : > "$HOME/.zshrc"

@@ -1,0 +1,78 @@
+#!/usr/bin/env zsh
+# A command rather than a function or an alias, so agents' shells have it too
+emulate -R zsh
+setopt extended_glob
+
+# $EDITOR here, a quoted command and its arguments, as vi takes it
+# (zsh/.zshrc). A terminal editor waits for one: without it, as for agents,
+# edit says so instead
+here() {
+  if [[ ! -t 1 ]]; then
+    print -r -u2 -- "edit: no workspace editor is running here, and $EDITOR needs a terminal"
+    exit 1
+  fi
+  local -a editor=("${(@Q)${(z)EDITOR}}")
+  [[ -n $editor[1] ]] || { print -u2 'edit: EDITOR must name a command'; exit 1 }
+  exec "${editor[@]}" "$@"
+}
+
+local -i end=${argv[(i)--]} i
+local -a leading=("${@[1,end-1]}")
+if (( ${leading[(I)(-h|--help)]} )); then
+  cat <<'EOF'
+usage: edit [FILE[:LINE]]...
+
+In a workspace, open each FILE in its editor, at LINE when given, and focus
+the editor's pane; without a FILE, only focus it. Outside a workspace, or
+while its editor isn't running, run $EDITOR here, at the first FILE's LINE,
+when this is a terminal. FILE:LINE is a file and its line unless a file has
+that whole name.
+
+Options for the editor (-d, -R, +N...) run $EDITOR here with the arguments as
+given, as vi does.
+EOF
+  exit 0
+fi
+(( ! ${leading[(I)(-*|+*)]} )) || here "$@"
+(( end > $# )) || argv[end]=()
+
+local arg
+local -a files lines
+for arg; do
+  if [[ ! -e $arg && $arg == (#b)(?*):(<->) ]]; then
+    files+=("$match[1]") lines+=("$match[2]")
+  else
+    files+=("$arg") lines+=('')
+  fi
+done
+
+# A live editor answers with its tmux pane, empty outside tmux
+local socket=${DOTFILES_EDITOR_SOCKET-} pane
+if [[ -z $socket ]] || (( ! $+commands[nvim] )) ||
+    ! pane=$(nvim --server "$socket" --remote-expr '$TMUX_PANE' 2> /dev/null); then
+  here ${lines[1]:++$lines[1]} ${files:+--} "${files[@]}"
+fi
+
+# Ghostty can't tell a program its pane, so the workspace keeps the editor's
+# beside the socket (zsh/functions/workspace)
+local terminal=${socket%.sock}.ghostty
+if [[ -n $pane ]]; then
+  tmux select-window -t "$pane" \; select-pane -t "$pane" 2> /dev/null
+elif [[ -s $terminal ]]; then
+  osascript -e 'on run argv' -e 'tell application "Ghostty" to focus terminal id (item 1 of argv)' \
+    -e 'end run' "$(<$terminal)" > /dev/null 2>&1
+else
+  false
+fi || print -r -u2 -- "edit: can't focus the editor's pane from here"
+
+(( $#files )) || exit 0
+# Each file at its line, the first one last, so that it shows, named from
+# the editor's folder
+local quoted error
+local -a drops
+for (( i = $#files; i > 0; i-- )); do
+  quoted=${${files[i]:a}//\'/\'\'}
+  drops+=("'drop ${lines[i]:++$lines[i] }' .. fnameescape(fnamemodify('$quoted', ':.'))")
+done
+error=$(nvim --server "$socket" --remote-expr "v:lua.require'config.workspace'.open([${(j:, :)drops}])") || exit
+[[ -z $error ]] || { print -r -u2 -- "edit: $error"; exit 1 }

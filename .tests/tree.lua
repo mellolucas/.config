@@ -91,7 +91,8 @@ vim.pack = {
 }
 package.loaded["config.pack"] = dofile(repo .. "/nvim/lua/config/pack.lua")
 vim.o.columns = 40
-dofile(repo .. "/nvim/lua/config/explorer.lua")
+-- As require loads it, for config.workspace to find
+package.loaded["config.explorer"] = dofile(repo .. "/nvim/lua/config/explorer.lua")
 vim.cmd("args " .. fn.fnameescape(project))
 local listing = api.nvim_get_current_buf()
 api.nvim_exec_autocmds("VimEnter", {})
@@ -343,10 +344,39 @@ assert(not api.nvim_buf_is_valid(listing), "wide start keeps the directory listi
 empty = api.nvim_win_get_buf(api.nvim_tabpage_list_wins(0)[2])
 assert(not vim.bo[empty].buflisted, "the empty window beside a wide start is listed as a file")
 
+-- Files other programs open here (edit, rgv: config.workspace) land in the
+-- code, never in the tree: beside the sidebar, or in the place of a tree
+-- that fills its tab page, as a file opened from it does, whether it covers a
+-- file or none, keeping the tab page.
+vim.env.DOTFILES_EDITOR_SOCKET = nil
+local workspace = dofile(repo .. "/nvim/lua/config/workspace.lua")
+local function open_from_outside(name)
+  fn.writefile({ name }, project .. "/" .. name)
+  local tabs = #api.nvim_list_tabpages()
+  local failed = workspace.open({ "drop " .. fn.fnameescape(project .. "/" .. name) })
+  settle()
+  assert(failed == "" and #api.nvim_list_tabpages() == tabs, "opening " .. name .. " from outside: " .. failed)
+  assert(current() == name, "opening " .. name .. " from outside left the cursor in " .. current())
+end
+open_from_outside("e.txt")
+expect({ "tree", "e.txt" }, "a file from outside beside the sidebar")
+resize(40)
+press("-")
+expect({ "tree" }, "a full-window tree covering e.txt")
+open_from_outside("f.txt")
+expect({ "f.txt" }, "a file from outside in a full-window tree's place")
+assert(alternate() == "e.txt", "alternate after a file from outside: " .. alternate())
+vim.cmd.tabnew()
+vim.cmd("args " .. fn.fnameescape(project))
+api.nvim_exec_autocmds("VimEnter", {})
+expect({ "tree" }, "a narrow start covering no file")
+open_from_outside("g.txt")
+expect({ "g.txt" }, "a file from outside at a narrow start")
+
 local errors = vim.tbl_filter(function(line)
   return line:match("E%d+:") ~= nil
 end, vim.split(fn.execute("messages"), "\n"))
 assert(#errors == 0, "messages: " .. table.concat(errors, " | "))
 vim.cmd.cd(fn.fnameescape(repo))
 fn.delete(project, "rf")
-print("ok: file tree with the real plugins (narrow and wide starts, zoom at 110 columns, tab pages, Tab and Space, → and ←, - and the root, alternate file)")
+print("ok: file tree with the real plugins (narrow and wide starts, zoom at 110 columns, tab pages, Tab and Space, → and ←, - and the root, alternate file, files opened from outside)")

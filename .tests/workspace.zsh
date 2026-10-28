@@ -14,7 +14,7 @@ if [[ ${1:-} == --mark-child ]]; then
   executable_check='[[ -x /usr/bin/osascript ]]'
   code=${code/$executable_check/'[[ 1 == 1 ]]'}
   functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
-  workspace_osascript() { print -r -- "ARGUMENT:${@[-1]}:END" >&3; }
+  workspace_osascript() { print -r -- "ARGUMENT:$9:END" >&3; }
   workspace --layout lean 3>&1
   print -r -- FINISHED
   exit
@@ -51,10 +51,17 @@ fi
 
 zmodload zsh/zpty
 typeset -F SECONDS=0
-trap 'zpty -d 2>/dev/null || true' EXIT
+# The editor's socket and the id beside it stay here, apart from Neovim's own
+# folder, and no workspace this runs in is the one under test
+unset XDG_RUNTIME_DIR DOTFILES_EDITOR_SOCKET
+export TMPDIR=$(mktemp -d "${${TMPDIR:-/tmp}%/}/ws.XXXXXX")
+run_folder=$TMPDIR
+trap 'zpty -d 2>/dev/null || true; command rm -rf -- "$run_folder"' EXIT
 trap 'exit 1' HUP INT TERM
 
 fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
+# The socket the workspace of folder $1 names for its editor
+socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cksum)"%% *}.sock"; }
 
 # Stub the launcher's executable check and absolute path, preserving its
 # argument list; the Ghostty route needs macOS, Ghostty, and no tmux.
@@ -70,7 +77,8 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
   # Without a terminal the shell marks no pane, so the script opens a new tab.
-  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode gg 0 0 full '')
+  # The panes it starts get the socket their editor serves.
+  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode gg 0 0 full '' "$(socket_for "${PWD:A}")")
   dispatch() {
     local actual
     actual=$(workspace "$@" 3>&1 < /dev/null) || fail "dispatch: ${(qqq)@}"
@@ -140,11 +148,23 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   mkdir -- "$temporary/path with spaces" "$temporary/--directory"
   (
     builtin cd -- "$temporary"
-    expected[2]="${temporary:A}/path with spaces"
+    expected[2]="${temporary:A}/path with spaces" expected[10]=$(socket_for "${temporary:A}/path with spaces")
     dispatch 'path with spaces' --editor="$expected[3]" --agent="$expected[4]" --status= --shell=
-    expected[2]="${temporary:A}/--directory"
+    expected[2]="${temporary:A}/--directory" expected[10]=$(socket_for "${temporary:A}/--directory")
     dispatch --editor="$expected[3]" --agent="$expected[4]" --status= --shell= -- --directory
   )
+  # Each workspace folder has its own socket, in a folder only its owner can
+  # enter; where that folder lets others in, no pane gets one.
+  zmodload -F zsh/stat b:zstat
+  local -a mode
+  zstat -A mode +mode -- "$TMPDIR/nvim.$USERNAME"
+  (( (mode[1] & 8#777) == 8#700 )) || fail "the sockets' folder has mode $(( [#8] mode[1] & 8#777 ))"
+  [[ $(socket_for "${PWD:A}") != $(socket_for "${temporary:A}/path with spaces") ]] || fail 'two folders share a socket'
+  chmod 755 "$TMPDIR/nvim.$USERNAME"
+  expected[10]=''
+  dispatch --editor="$expected[3]" --agent="$expected[4]" --status= --shell ''
+  chmod 700 "$TMPDIR/nvim.$USERNAME"
+  expected[10]=$(socket_for "${PWD:A}")
   # Laid out around this shell (the script answers "same tab"), the shell
   # moves to the workspace and runs its own commands there, in either layout:
   # the status command, then the shell command. With a new tab, the script
@@ -167,6 +187,31 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     [[ -z $output ]] || fail "a new tab ran the shell's commands here: $output"
     workspace "$temporary/path with spaces" < /dev/null > /dev/null || fail 'new tab'
     [[ ${PWD:A} == ${temporary:A} ]] || fail "a new tab moved the shell to $PWD"
+  )
+  # The shell a workspace is laid out around takes its editor's socket, one
+  # that opens a new tab doesn't; the editor's terminal id, which the script
+  # prints first, goes beside the socket for edit, unless an editor serves
+  # that socket already.
+  (
+    socket=$(socket_for "${temporary:A}/path with spaces")
+    rm -f -- ${socket%.sock}.ghostty
+    workspace_osascript() { print -r -- 'same tab'; }
+    workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket without an id'
+    [[ ! -e ${socket%.sock}.ghostty ]] || fail "a script printing no id left one: $(<${socket%.sock}.ghostty)"
+    workspace_osascript() { print -rl -- EDITOR-ONE 'same tab'; }
+    workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket in the same tab'
+    [[ $DOTFILES_EDITOR_SOCKET == $socket ]] || fail "the workspace's shell took ${(qqq)DOTFILES_EDITOR_SOCKET-}"
+    [[ $(<${socket%.sock}.ghostty) == EDITOR-ONE ]] || fail "the editor's id: $(<${socket%.sock}.ghostty)"
+    unset DOTFILES_EDITOR_SOCKET
+    workspace_osascript() { print -rl -- EDITOR-TWO 'new tab'; }
+    workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket in a new tab'
+    (( ! ${+DOTFILES_EDITOR_SOCKET} )) || fail "a shell beside a new tab took ${(qqq)DOTFILES_EDITOR_SOCKET}"
+    [[ $(<${socket%.sock}.ghostty) == EDITOR-TWO ]] || fail "the new tab's editor id: $(<${socket%.sock}.ghostty)"
+    zmodload -F zsh/net/socket b:zsocket
+    zsocket -l $socket || fail 'listening on the socket'
+    workspace_osascript() { print -rl -- EDITOR-THREE 'new tab'; }
+    workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket served'
+    [[ $(<${socket%.sock}.ghostty) == EDITOR-TWO ]] || fail "a served socket's editor id: $(<${socket%.sock}.ghostty)"
   )
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
 
@@ -305,15 +350,17 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   [[ $PWD == $tasks/next && -e draft && $(state) == $known ]] || fail 'refusing changed something'
   rm draft
   # Merged, the branch goes too, Git prunes what a deleted folder left, and
-  # the shell moves to the main checkout.
+  # the shell moves to the main checkout, leaving the task's editor.
   git -C "$checkout" merge -q --no-edit task/fix
   git -C "$checkout" worktree add -q --detach "$temporary/code/owner/deleted"
   rm -rf -- "$temporary/code/owner/deleted"
   builtin cd -- "$tasks/fix"
+  export DOTFILES_EDITOR_SOCKET=$(socket_for "$tasks/fix")
   workspace --done > "$temporary/output" 2>&1 || fail "merged: $(<"$temporary/output")"
   [[ $(<"$temporary/output") == "workspace: removed task fix's worktree; its other panes can be closed"$'\n''Deleted branch task/fix '* ]] ||
     fail "merged: $(<"$temporary/output")"
   [[ $PWD == $checkout && ! -e $tasks/fix ]] || fail 'the merged worktree stayed'
+  (( ! ${+DOTFILES_EDITOR_SOCKET} )) || fail "the shell kept the task's editor: $DOTFILES_EDITOR_SOCKET"
   [[ $(state) != *task/fix* && $(state) != *deleted* ]] || fail "merged: $(state)"
   # An unmerged branch stays, with how to delete it.
   builtin cd -- "$tasks/next"
@@ -339,6 +386,8 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   temporary=${temporary:A}
   trap 'command rm -rf -- "$temporary"' EXIT
   mkdir -p "$temporary/bin" "$temporary/work dir"
+  # The system's own tools stay
+  ln -s "$commands[cksum]" "$commands[mkdir]" "$temporary/bin/"
 
   # Without tmux on PATH the command explains itself and creates nothing.
   if output=$(PATH=$temporary/bin workspace "$temporary/work dir" 2>&1 < /dev/null); then

@@ -308,6 +308,7 @@ link_dotfiles() {
   fi
 
   link_path "$installer" "$user_bin_home/dotfiles"
+  link_path "$repo_dir/zsh/bin/edit" "$user_bin_home/edit"
   link_npm_global_config
 }
 
@@ -804,6 +805,7 @@ doctor_dotfiles() {
   else
     doctor_problem 'dotfiles command' "missing; run: $(tilde "$repo_dir")/install.sh link"
   fi
+  doctor_link 'edit command' "$repo_dir/zsh/bin/edit" "$user_bin_home/edit"
 
   # Loops run in this shell, not a pipe, so their problems count.
   links=0
@@ -962,6 +964,7 @@ uninstall_dotfiles() {
   remove_orphaned_links
 
   remove_owned_link "$user_bin_home/dotfiles" "$installer"
+  remove_owned_link "$user_bin_home/edit" "$repo_dir/zsh/bin/edit"
   if npmrc=$(npm_global_config); then
     remove_owned_link "$npmrc" "$repo_dir/homebrew/npmrc"
   fi

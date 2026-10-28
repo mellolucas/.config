@@ -44,7 +44,7 @@ with() {
 check 'installer syntax' sh -c 'sh -n install.sh && sh -n get.sh'
 with shellcheck 'shellcheck' shellcheck install.sh get.sh zsh/homebrew.sh zsh/xdg.sh .tests/run .tests/install.sh .tests/git.sh
 # shellcheck disable=SC2016 # zsh, not sh, expands the loop
-with zsh 'zsh syntax' zsh -fc 'for f in zsh/.zshenv zsh/.zprofile zsh/.zshrc zsh/*.sh zsh/functions/*; do zsh -n "$f" || exit 1; done'
+with zsh 'zsh syntax' zsh -fc 'for f in zsh/.zshenv zsh/.zprofile zsh/.zshrc zsh/*.sh zsh/functions/* zsh/bin/*; do zsh -n "$f" || exit 1; done'
 with git 'git config' git config --file git/config --list
 with ghostty 'ghostty config' ghostty +validate-config --config-file=ghostty/config.ghostty
 with biome 'opencode config' biome lint opencode/opencode.jsonc opencode/cli.json

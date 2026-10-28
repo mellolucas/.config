@@ -26,7 +26,8 @@ macOS: in this tab when this shell is its only pane and Ghostty can tell which
 pane that is (this shell becomes the workspace's shell, moves to DIR, and runs
 its commands), else in a new tab. Inside tmux, the same with windows.
 Elsewhere, a tmux session named after DIR, which rerunning workspace in DIR
-reattaches.
+reattaches. In the workspace's panes, edit (v), rgv, and agents open files in
+its editor when it is Neovim, and focus it (edit --help).
 
 Arguments:
   DIR   Workspace directory. Defaults to the current directory.
@@ -137,9 +138,11 @@ if (( finish )); then
     return 1
   fi
   # Quietly, so the repository's card doesn't push what follows out of sight;
-  # git-glance's hook (zsh/.zshrc) then remembers the repository, as below
+  # git-glance's hook (zsh/.zshrc) then remembers the repository, as below.
+  # This shell leaves the task's editor too
   builtin cd -q -- "$checkout" || return
   (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2> /dev/null)
+  unset DOTFILES_EDITOR_SOCKET
   print -r -- "workspace: removed task ${branch#task/}'s worktree; its other panes can be closed"
   git -c advice.forceDeleteBranch=false branch -d "$branch" ||
     print -r -- "workspace: kept branch $branch; to delete it anyway: git branch -D $branch"
@@ -204,6 +207,14 @@ fi
 }
 dir=${dir:A}
 
+# Every pane the workspace starts gets the socket its editor serves
+# (config.workspace) for edit and rgv: one per workspace folder, in Neovim's
+# runtime folder, private as Neovim keeps it
+local socket='' run=${${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}%/}/nvim.$USERNAME
+mkdir -p -m 700 -- $run 2> /dev/null
+local -a private=($run(N/Uf:go-rwx:))
+(( ! $#private )) || socket=$run/ws-${"$(print -rn -- $dir | cksum)"%% *}.sock
+
 # Outside Ghostty on macOS, and inside tmux, tmux lays out the same panes.
 if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
   (( $+commands[tmux] )) || {
@@ -212,6 +223,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
     return 1
   }
   local name line main here='' agent_pane editor_pane focus pane command
+  local -a with_socket=(${socket:+-e} ${socket:+DOTFILES_EDITOR_SOCKET=$socket})
   if [[ -z $TMUX ]]; then
     for line in ${(f)"$(tmux list-sessions -F '#{session_name}:#{session_path}' 2>/dev/null)"}; do
       [[ ${line#*:} == "$dir" ]] && name=${line%%:*} && break
@@ -226,7 +238,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
         main=$TMUX_PANE here=1
         tmux rename-window -t "$main" -- "${dir:t}" || return
       else
-        main=$(tmux new-window -P -F '#{pane_id}' -n "${dir:t}" -c "$dir") || return
+        main=$(tmux new-window $with_socket -P -F '#{pane_id}' -n "${dir:t}" -c "$dir") || return
       fi
     else
       # Session names cannot hold . or :, and stay unique per directory
@@ -237,19 +249,19 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
         name=$base-$(( ++n ))
       done
       # Sized like this terminal: tmux keeps no shares when attaching resizes it
-      main=$(tmux new-session -d -x - -y - -P -F '#{pane_id}' -s "$name" -c "$dir") || return
+      main=$(tmux new-session -d $with_socket -x - -y - -P -F '#{pane_id}' -s "$name" -c "$dir") || return
     fi
     # The other panes split from the shell, each taking a share of it.
     if [[ $layout == lean ]]; then
       # Even halves: the agent right, the editor above the shell
-      agent_pane=$(tmux split-window -h -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      editor_pane=$(tmux split-window -v -b -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      agent_pane=$(tmux split-window $with_socket -h -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      editor_pane=$(tmux split-window $with_socket -v -b -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
       focus=$main
     else
       # The editor left at 60% of the width, the agent above the shell at 65%
       # of the height
-      editor_pane=$(tmux split-window -h -b -l 60% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      agent_pane=$(tmux split-window -v -b -l 65% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      editor_pane=$(tmux split-window $with_socket -h -b -l 60% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      agent_pane=$(tmux split-window $with_socket -v -b -l 65% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
       focus=$editor_pane
     fi
     # A reused shell runs its own commands below: typed into it, they could
@@ -269,6 +281,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
         builtin cd -q -- "$dir" || return
         (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2>/dev/null)
       fi
+      export DOTFILES_EDITOR_SOCKET=$socket
       [[ -z $shell_cmd ]] || eval "$shell_cmd"
     fi
   fi
@@ -333,7 +346,7 @@ if [[ $layout == full && -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
 fi
 
 local output mark=''
-local -i rc=0
+local -i rc=0 served=0
 # Ghostty can't tell a shell which pane it runs in, so this shell titles its
 # own pane with a unique mark for the script to find; the next prompt's title
 # replaces it
@@ -341,10 +354,16 @@ if [[ -t 0 ]]; then
   mark="workspace $$.$RANDOM"
   print -rn -- $'\e]2;'"$mark"$'\a' 2>/dev/null > /dev/tty || mark=''
 fi
+# Nor can it tell edit which pane the editor runs in: the script prints its
+# id, which goes beside the socket, unless an editor serves this folder already
+if [[ -n $socket ]] && zmodload -F zsh/net/socket b:zsocket 2>/dev/null && zsocket $socket 2>/dev/null; then
+  served=1
+  exec {REPLY}>&-
+fi
 output=$(
   /usr/bin/osascript "$script" "$dir" \
     "$editor" "$agent" "$shell_cmd" \
-    "$width" "$height" "$layout" "$mark" \
+    "$width" "$height" "$layout" "$mark" "$socket" \
     2>&1
 ) || {
   rc=$?
@@ -353,6 +372,8 @@ output=$(
   print -r -u2 -- "workspace: $output"
   return $rc
 }
+local -a printed=("${(@f)output}")
+(( served )) || [[ -z $socket || -z $printed[-2] ]] || print -r -- $printed[-2] > ${socket%.sock}.ghostty
 # Laid out around this shell, which becomes the workspace's shell: it moves to
 # the workspace quietly, as the other panes start there (git-glance's hook then
 # remembers the workspace's repository, as above), and runs its own commands,
@@ -363,6 +384,7 @@ if [[ ${output##*$'\n'} == 'same tab' ]]; then
     builtin cd -q -- "$dir" || return
     (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2>/dev/null)
   fi
+  export DOTFILES_EDITOR_SOCKET=$socket
   if [[ -n $shell_cmd ]]; then
     [[ -z $mark ]] || print -rn -- $'\e]2;'"$shell_cmd"$'\a' 2>/dev/null > /dev/tty
     eval "$shell_cmd"

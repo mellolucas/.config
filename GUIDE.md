@@ -40,11 +40,13 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 | `workspace --status ggg` | The card with the code summary in the shell |
 | `workspace --status ''` | Start the shell without the card |
 | `workspace --help` | Every option and its default |
+| `v FILE:LINE` | From any of its panes, open the file in the workspace's editor at that line, and go there |
 
 - Run from a tab where your shell is the only pane, `workspace` lays out that tab around it: your shell becomes the workspace's shell, moves to the directory, and runs its commands there. It opens a new tab from a tab with other panes, or when Ghostty can't tell which pane you're in (a tab title you set by hand prevents it).
 - `workspace --task NAME` works from anywhere in a repository, a task included: the worktree sits beside the main checkout, in `~/code/OWNER/REPO.worktrees/NAME`, and its branch starts from the commit you're on. Rerun it to reopen the task: OpenCode, Claude Code, and Codex resume their last session there (Copilot CLI starts a new one). `gg` lists the repository's tasks.
 - `workspace --done` moves your shell to the main checkout, and the task's other panes can be closed. Git won't remove a task with uncommitted or untracked changes, and keeps its branch until it's merged (`git branch -D task/NAME` deletes it anyway).
 - Focus starts in the editor (in the lean layout, in the shell); `Cmd+Option+arrows` move between the panes.
+- Files open in the workspace's one editor, which comes into focus: `v FILE` or `v FILE:LINE` from its shell (`v` alone goes to the editor), `rgv`'s Enter, and agents, with `edit FILE:LINE`, the command `v` runs. Outside a workspace, or while its editor is closed, `v` opens Neovim where you are, as `vi` always does.
 - For lasting defaults, set `DOTFILES_WORKSPACE_LAYOUT=lean` (on a laptop, say) or the commands in `zsh/local.zsh`.
 - The editor opens on the project's file tree; `Cmd+Shift+Enter` zooms it to explore (`keys explore`).
 - Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux, windows take the place of tabs.
@@ -104,6 +106,7 @@ Command keys do what they do in every Mac app. They reach Neovim through Ghostty
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
 - `Option+←` / `Option+→` jump words and `Cmd+←` / `Cmd+→` reach the line's start / end, in the text and on the command line; while typing and on the command line, `Option+Backspace` deletes a word. `Cmd+←` / `Cmd+→` arrive as Vim's `Ctrl+A` / `Ctrl+E`: to add 1 to a number, select it and press `g` then `Ctrl+A`. The file tree keeps its own keys (`?`).
 - Undo history survives closing and reopening a file.
+- In a workspace, files opened from its other panes (`v FILE:LINE`, `rgv`, an agent's `edit FILE:LINE`) open here, in the code beside the file tree or in its place, and bring you here.
 - The file tree has its own page: `keys explore`.
 
 ## Explore: Explore a codebase

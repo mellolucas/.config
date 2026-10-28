@@ -1,6 +1,8 @@
 -- Run from the repository root: nvim --headless -u NONE -l .tests/nvim.lua
 local api = vim.api
 local fn = vim.fn
+-- No Neovim started here serves the workspace these checks may run in
+vim.env.DOTFILES_EDITOR_SOCKET = nil
 -- Stand-ins for the programs the commands run, first on PATH.
 local bin = fn.tempname()
 fn.mkdir(bin, "p")
@@ -476,6 +478,56 @@ do
   assert(fn.readblob(lockfile) == fn.readblob("nvim/nvim-pack-lock.json"),
     "the offline launch rewrote the lockfile: " .. fn.readblob(lockfile))
   fn.delete(home, "rf")
+end
+
+-- In a workspace, which names the socket in DOTFILES_EDITOR_SOCKET, the first
+-- Neovim serves it: a second leaves it to the first, logging no failed start,
+-- one outside a workspace serves none, and one after a crash takes over the
+-- socket the crash left.
+do
+  local dir = fn.tempname()
+  fn.mkdir(dir, "p")
+  local socket, log = dir .. "/ws.sock", dir .. "/nvim.log"
+  local function neovim(env, ...)
+    return vim.system({ vim.v.progpath, "--headless", "-u", "NONE", "-i", "NONE", "-n",
+      "--cmd", "set rtp^=" .. fn.getcwd() .. "/nvim", "-c", "lua require('config.workspace')", ... },
+      { env = vim.tbl_extend("force", env, { NVIM_LOG_FILE = log }), text = true, timeout = 10000 })
+  end
+  -- The servers a Neovim with this environment starts
+  local function servers(env)
+    local result = neovim(env, "-c", "lua io.stdout:write(table.concat(vim.fn.serverlist(), '\\n'))", "-c", "qa!"):wait()
+    assert(result.code == 0, "Neovim with " .. vim.inspect(env) .. ": " .. tostring(result.stderr))
+    return vim.split(result.stdout, "\n")
+  end
+  -- The process serving the socket, if any
+  local function serving()
+    local ok, channel = pcall(fn.sockconnect, "pipe", socket, { rpc = true })
+    if not ok then
+      return nil
+    end
+    local pid = fn.rpcrequest(channel, "nvim_call_function", "getpid", {})
+    fn.chanclose(channel)
+    return pid
+  end
+  local env = { DOTFILES_EDITOR_SOCKET = socket }
+  assert(not vim.tbl_contains(servers({}), socket) and not vim.tbl_contains(servers({ DOTFILES_EDITOR_SOCKET = "" }), socket)
+    and not vim.uv.fs_stat(socket), "a Neovim outside a workspace served its socket")
+  assert(vim.tbl_contains(servers(env), socket), "the first Neovim in a workspace serves no socket")
+  local first = neovim(env)
+  -- The first one ends as a crash would, whatever the checks find
+  local checked, failure = pcall(function()
+    assert(vim.wait(5000, function() return serving() == first.pid end, 20), "the first Neovim did not serve")
+    local second = servers(env)
+    assert(not vim.tbl_contains(second, socket) and serving() == first.pid, "a second Neovim took over the socket")
+    assert(fn.filereadable(log) == 0 or not table.concat(fn.readfile(log), "\n"):find("Failed to start server", 1, true),
+      "a second Neovim logged a failed start")
+  end)
+  first:kill(9)
+  first:wait()
+  assert(checked, failure)
+  assert(vim.uv.fs_stat(socket), "the crash left no socket to take over")
+  assert(vim.tbl_contains(servers(env), socket), "no Neovim took over the socket a crash left")
+  fn.delete(dir, "rf")
 end
 
 -- :grep runs grepprg through the shell: an unmatched zsh glob would silently

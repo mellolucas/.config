@@ -26,7 +26,7 @@ cd ~/code/mellolucas/.config
 exec zsh -l
 ```
 
-Installation links each configuration directory into `$XDG_CONFIG_HOME`, adds the `~/.zshenv` entrypoint and the `dotfiles` command, then ensures Homebrew and applies the Brewfile. Bootstrapping Homebrew needs curl and bash; on macOS, Homebrew's installer adds the Xcode Command Line Tools itself. Skip the "Next steps" Homebrew prints: `zsh/.zprofile` already loads Homebrew, and following them leaves a `~/.zprofile` this setup ignores. Conflicting files are moved to timestamped backups, never overwritten, and rerunning is safe.
+Installation links each configuration directory into `$XDG_CONFIG_HOME`, adds the `~/.zshenv` entrypoint and the `dotfiles` and `edit` commands, then ensures Homebrew and applies the Brewfile. Bootstrapping Homebrew needs curl and bash; on macOS, Homebrew's installer adds the Xcode Command Line Tools itself. Skip the "Next steps" Homebrew prints: `zsh/.zprofile` already loads Homebrew, and following them leaves a `~/.zprofile` this setup ignores. Conflicting files are moved to timestamped backups, never overwritten, and rerunning is safe.
 
 ### First run
 

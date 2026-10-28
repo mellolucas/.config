@@ -175,8 +175,10 @@ if command -v github-open >/dev/null 2>&1; then
   alias ghopen='github-open'
 fi
 
-# EDITOR is a quoted command/argument list, not a shell expression.
-alias v='"${(@Q)${(z)EDITOR}}"'
+# v opens files in the workspace's editor, when there is one (zsh/bin/edit).
+# vi, vim, and view run EDITOR here: a quoted command/argument list, not a
+# shell expression.
+alias v='edit'
 alias vi='"${(@Q)${(z)EDITOR}}"'
 alias vim='"${(@Q)${(z)EDITOR}}"'
 alias view='"${(@Q)${(z)EDITOR}}" -R -M'

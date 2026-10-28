@@ -9,9 +9,10 @@ if [[ $1 == (-h|--help) ]]; then
 Search with ripgrep, then browse the matching files: one line per file with
 its number of matching lines, and those lines in the preview, with two lines
 of context. Typing filters the files by path; Option+Up / Option+Down scroll
-the preview. Enter opens the file at its first match; in Neovim, with every
-matching line in the quickfix list: ]q / [q go to the next / previous one,
-] then Ctrl+Q / [ then Ctrl+Q to the next / previous file.
+the preview. Enter opens the file at its first match, in a workspace in its
+editor; in Neovim, with every matching line in the quickfix list: ]q / [q go
+to the next / previous one, ] then Ctrl+Q / [ then Ctrl+Q to the next /
+previous file.
 
 Options and paths are rg's (rg --help), after the rg alias's defaults: hidden
 files, symlinks followed, smart case, .git skipped. Options that change how
@@ -62,7 +63,7 @@ zf_mkdir -m 700 "$shelf" || return
       ends+=($(( number - 1 )))
       file=''
     elif (( ! skip )) && [[ $plain == (#b)(<->):(*) ]]; then
-      quickfix+=("$file"$'\t'"$match[1]"$'\t'"$match[2]")
+      quickfix+=("${file:a}"$'\t'"$match[1]"$'\t'"$match[2]")
       (( counts[-1]++ )) || firsts[-1]=$#quickfix lines[-1]=$match[1]
     fi
   done < "$shelf/matches"
@@ -91,11 +92,20 @@ zf_mkdir -m 700 "$shelf" || return
   esac
 
   i=${${selection#*$'\t'}%%$'\t'*}
-  if [[ ${editor[1]:t} == nvim ]]; then
-    # Neovim reads the records with their own format: matching text parsed
-    # by 'errorformat' could name another file
-    local list=${${:-$shelf/quickfix}//\'/\'\'}
-    "${editor[@]}" -c "call setqflist([], ' ', {'title': 'rgv', 'efm': \"%f\t%l\t%m\", 'lines': readfile('$list')}) | cc $firsts[i]"
+  # Neovim reads the records with their own format: matching text parsed by
+  # 'errorformat' could name another file. Their whole paths, which the
+  # workspace's editor needs from any folder, show relative to Neovim's own
+  local list=${${:-$shelf/quickfix}//\'/\'\'}
+  local load="call setqflist([], ' ', {'title': 'rgv', 'efm': \"%f\t%l\t%m\", 'lines': map(readfile('$list'), {_, record -> substitute(record, '^[^\t]*', '\\=fnamemodify(submatch(0), \":.\")', '')})}) | cc $firsts[i]"
+  local quoted=${load//\'/\'\'} error
+  # In a workspace, its editor takes the list (config.workspace), and edit
+  # focuses it
+  if [[ -n ${DOTFILES_EDITOR_SOCKET-} ]] && (( $+commands[nvim] )) && error=$(nvim --server \
+      "$DOTFILES_EDITOR_SOCKET" --remote-expr "v:lua.require'config.workspace'.open(['$quoted'])" 2> /dev/null); then
+    [[ -z $error ]] || print -r -u2 -- "rgv: $error"
+    edit
+  elif [[ ${editor[1]:t} == nvim ]]; then
+    "${editor[@]}" -c "$load"
   else
     "${editor[@]}" "+$lines[i]" -- "$paths[i]"
   fi

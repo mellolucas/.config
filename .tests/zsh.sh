@@ -80,6 +80,8 @@ test_root=${test_root:A}
 trap '/bin/rm -rf -- "$test_root"' EXIT
 trap 'exit 1' HUP INT TERM
 export HOME="$test_root/home" XDG_CONFIG_HOME="$test_root/config"
+# Never the editor of a workspace these checks run in
+unset DOTFILES_EDITOR_SOCKET
 root="$HOME/code/owner/repo"
 rel=$'nested dir/file #&%\xc3\xa9.md'
 /bin/mkdir -p "$root/${rel:h}" "$test_root/outside" "$XDG_CONFIG_HOME"
@@ -642,7 +644,7 @@ editor() { record editor "$@"; }
   editor_name='editor with spaces'
   functions[$editor_name]='record "editor with spaces" "$@"'
   EDITOR='"editor with spaces" --clean "profile name"'
-  for name in v vi vim view; do
+  for name in vi vim view; do
     expected=$'editor with spaces\n--clean\nprofile name'
     [[ $name != view ]] || expected+=$'\n-R\n-M'
     eval "$name"' "file name"'
@@ -679,6 +681,16 @@ editor() { record editor "$@"; }
   bsd-tool() { print -u2 -- 'bsd-tool: illegal option -- -'; return 64; }
   help bsd-tool >/dev/null
   expect $'man\nbsd-tool' "$(recorded)" 'a command that rejects --help shows its manual'
+)
+
+# v is edit, a command of its own (zsh/bin/edit), whose help help shows.
+(
+  unfunction bat
+  unset ZDOTDIR
+  path=("$repo/zsh/bin" "${zsh_bin:h}" /usr/bin /bin)
+  source /dev/stdin <<< "$alias_block"
+  output=$(help v) || fail 'help v status'
+  [[ $output == $'v → edit\nusage: edit '* ]] || fail "help v: $output"
 )
 
 # help shows the command's own --help, through bat when it's installed (here a
@@ -844,8 +856,9 @@ if [[ -n $rg_bin ]]; then
     [[ $previews == *$'\e['* ]] || fail 'rgv previews without colors'
     expect $'.hidden/d.txt\n1:needle hidden\n==\nsrc/a.txt\n1-one\n2:needle here\n3-three\n4-four\n--\n6-six\n7-seven\n8:needle far below\n==\nsrc/b.txt\n3-z\n4-w\n5:needle again\n6:needle twice\n==\nsrc/space name.txt\n1:a needle\n==\nsrc/time 12:30.txt\n1:see "other.c", line 9: needle\n==' \
       "${previews//$'\e'\[[0-9;]#m}" "rgv previews each file's matching lines"
-    expect $'.hidden/d.txt\t1\tneedle hidden\nsrc/a.txt\t2\tneedle here\nsrc/a.txt\t8\tneedle far below\nsrc/b.txt\t5\tneedle again\nsrc/b.txt\t6\tneedle twice\nsrc/space name.txt\t1\ta needle\nsrc/time 12:30.txt\t1\tsee "other.c", line 9: needle' \
-      "$(<$test_root/rgv-quickfix)" "rgv quickfix records"
+    # Whole paths, which the workspace's editor needs from any folder
+    records=(${(f):-$'.hidden/d.txt\t1\tneedle hidden\nsrc/a.txt\t2\tneedle here\nsrc/a.txt\t8\tneedle far below\nsrc/b.txt\t5\tneedle again\nsrc/b.txt\t6\tneedle twice\nsrc/space name.txt\t1\ta needle\nsrc/time 12:30.txt\t1\tsee "other.c", line 9: needle'})
+    expect "${(F)${(@)records/#/$fixture/}}" "$(<$test_root/rgv-quickfix)" "rgv quickfix records"
     leftovers 'after Enter'
 
     # Neovim itself reads the list: each record's file and line, never what
@@ -900,6 +913,145 @@ if [[ -n $rg_bin ]]; then
   )
 else
   print -r -- 'SKIP: rgv (rg missing)'
+fi
+
+# edit opens files in the workspace's editor, here a real headless Neovim
+# serving the socket the workspace names, and focuses its pane: through tmux
+# (the pane Neovim runs in) or Ghostty (the id the workspace keeps beside the
+# socket), stand-ins recording what they're asked. Without that editor, or
+# outside a workspace, it runs $EDITOR here (a stand-in), on a terminal only.
+if [[ -n $nvim_bin ]]; then
+  (
+    setopt extendedglob
+    zmodload zsh/zpty
+    unset ZDOTDIR RIPGREP_CONFIG_PATH
+    path=(/usr/bin /bin)
+    bin=$test_root/edit-bin files=$test_root/edit-files run=$test_root/edit-run
+    mkdir -p "$bin" "$files/sub" "$run"
+    socket=$run/ws.sock
+    for tool in tmux osascript 'editor with spaces'; do
+      print -rl -- '#!/bin/sh' "printf '%s\n' \"\$@\" > '$test_root/${tool%% *}-args'" > "$bin/$tool"
+    done
+    chmod +x "$bin"/*
+    print -rl -- one two three four 'needle in a' > "$files/sub/a.txt"
+    print -rl -- one two 'needle in b' > "$files/b.txt"
+    print -r -- 'named like FILE:LINE' > "$files/c.txt:4"
+    # edit in a workspace's pane, as an agent runs it: without a terminal
+    edit_command=(/usr/bin/env -i HOME="$HOME" PATH="$bin:$repo/zsh/bin:${nvim_bin:h}:${zsh_bin:h}:/usr/bin:/bin"
+      EDITOR='"editor with spaces" --clean "$HOME"' DOTFILES_EDITOR_SOCKET="$socket" "$repo/zsh/bin/edit")
+    run_edit() { "${edit_command[@]}" "$@"; }
+    # The same on a terminal, until it ends
+    on_terminal() {
+      local chunk
+      local -i tries=0
+      rm -f "$test_root/editor-args"
+      zpty -b edit-terminal "${(j: :)${(@q)edit_command}} ${(j: :)${(@q)argv}}"
+      while zpty -t edit-terminal 2> /dev/null; do
+        (( ++tries < 500 )) || fail "edit on a terminal never ended: $*"
+        zpty -r -t edit-terminal chunk 2> /dev/null || sleep 0.01
+      done
+      zpty -d edit-terminal
+    }
+    asked() { "$nvim_bin" --server "$socket" --remote-expr "$1" 2> /dev/null; }
+    # The workspace's editor, serving the socket from the workspace's folder,
+    # with the environment given; it goes when these checks end, as they may
+    # before stop
+    server=''
+    trap '[[ -z $server ]] || kill $server 2> /dev/null' EXIT
+    serve() {
+      ( builtin cd -- "$files" && exec /usr/bin/env -i HOME="$HOME" PATH=/usr/bin:/bin DOTFILES_EDITOR_SOCKET="$socket" "$@" \
+          "$nvim_bin" --headless -u NONE -i NONE -n --cmd "set rtp^=$repo/nvim" -c "lua require('config.workspace')" \
+          < /dev/null > /dev/null 2>&1 ) &
+      server=$!
+      local -i tries=0
+      until asked 1 > /dev/null; do
+        (( ++tries < 250 )) || fail 'the editor never served its socket'
+        sleep 0.02
+      done
+    }
+    stop() { kill $server; wait $server 2> /dev/null || :; server=''; }
+    shows() { asked 'bufname() . ":" . line(".")'; }
+
+    # In tmux: each file at its line, named from the editor's folder, the
+    # first one shown, and the editor's pane focused. A file named like
+    # FILE:LINE opens as itself; without a file, edit only focuses.
+    serve TMUX_PANE=%7
+    builtin cd -- "$files/sub"
+    run_edit a.txt:3 || fail 'edit FILE:LINE status'
+    expect sub/a.txt:3 "$(shows)" 'edit FILE:LINE'
+    expect $'select-window\n-t\n%7\n;\nselect-pane\n-t\n%7' "$(recorded tmux-args)" 'edit focuses the tmux pane'
+    builtin cd -- "$files"
+    run_edit b.txt:2 sub/a.txt:4 || fail 'edit with several files'
+    expect 'b.txt:2 sub/a.txt:4' "$(asked 'bufname() . ":" . line(".") . " " . bufname("#") . ":" . getbufinfo(bufnr("#"))[0].lnum')" \
+      'edit with several files'
+    run_edit c.txt:4 || fail 'edit of a file named like FILE:LINE'
+    expect c.txt:4:1 "$(shows)" 'a file named like FILE:LINE'
+    rm "$test_root/tmux-args"
+    run_edit || fail 'edit without a file'
+    [[ -e $test_root/tmux-args ]] || fail 'edit without a file focused nothing'
+    expect c.txt:4:1 "$(shows)" 'edit without a file'
+    # The editor's errors are edit's
+    asked "execute('autocmd BufEnter * throw \"broken\"')" > /dev/null
+    if run_edit b.txt 2> "$test_root/edit-error"; then fail 'edit succeeded where the editor failed'; fi
+    [[ $(recorded edit-error) == 'edit: '*broken* ]] || fail "edit's error: $(recorded edit-error)"
+    stop
+
+    # In Ghostty, by the id beside the socket; without one, edit says it can't
+    # focus the editor's pane, and still opens the file.
+    serve
+    print -r -- ID-42 > "$run/ws.ghostty"
+    run_edit b.txt:1 || fail 'edit in Ghostty'
+    focused=("${(@f)$(recorded osascript-args)}")
+    [[ $focused[-1] == ID-42 && $focused == *'focus terminal id'* ]] || fail "edit in Ghostty: ${(qqq)focused}"
+    rm "$run/ws.ghostty"
+    output=$(run_edit sub/a.txt:2 2>&1) || fail "edit without a pane to focus: $output"
+    expect "edit: can't focus the editor's pane from here" "$output" 'edit without a pane to focus'
+    expect sub/a.txt:2 "$(shows)" 'edit without a pane to focus'
+
+    # rgv's Enter, from any folder, hands the editor the list of matching
+    # lines, at the chosen file's first, and edit focuses it.
+    if [[ -n $rg_bin ]]; then
+      rm -f "$test_root/osascript-args"
+      print -r -- ID-43 > "$run/ws.ghostty"
+      (
+        export DOTFILES_EDITOR_SOCKET=$socket TMPDIR=$test_root/edit-tmp
+        mkdir -p "$TMPDIR"
+        path=("$bin" "$repo/zsh/bin" "${rg_bin:h}" "${nvim_bin:h}" "${zsh_bin:h}" /usr/bin /bin)
+        autoload -Uz rgv
+        fzf() { local -a menu=("${(@f)$(cat)}"); print -r -- "$menu[2]"; }
+        builtin cd -- "$files/sub"
+        rgv needle .. || fail 'rgv in a workspace'
+      )
+      expect 'sub/a.txt:5 rgv b.txt:3 sub/a.txt:5' \
+        "$(asked 'bufname() . ":" . line(".") . " " . getqflist({"title": 0}).title . " " . join(map(getqflist(), {_, item -> bufname(item.bufnr) . ":" . item.lnum}))')" \
+        'rgv in a workspace'
+      [[ $(recorded osascript-args) == *ID-43 ]] || fail 'rgv in a workspace focused no editor'
+    else
+      print -r -- 'SKIP: rgv in a workspace (rg missing)'
+    fi
+    stop
+
+    # With no editor serving the socket, or outside a workspace, edit runs
+    # $EDITOR here as vi takes it, at the first file's line, and options as
+    # given; without a terminal, it says so instead.
+    if run_edit sub/a.txt:3 > /dev/null 2> "$test_root/edit-error"; then fail 'edit ran an editor without a terminal'; fi
+    [[ $(recorded edit-error) == 'edit: no workspace editor is running here, '* && ! -e $test_root/editor-args ]] ||
+      fail "edit without a terminal: $(recorded edit-error)"
+    on_terminal sub/a.txt:3 b.txt
+    expect $'--clean\n$HOME\n+3\n--\nsub/a.txt\nb.txt' "$(recorded editor-args)" 'edit without the editor'
+    on_terminal -R b.txt
+    expect $'--clean\n$HOME\n-R\nb.txt' "$(recorded editor-args)" 'edit with an option'
+    edit_command=(${edit_command:#DOTFILES_EDITOR_SOCKET=*})
+    on_terminal b.txt:2
+    expect $'--clean\n$HOME\n+2\n--\nb.txt' "$(recorded editor-args)" 'edit outside a workspace'
+    for flag in -h --help; do
+      output=$(run_edit b.txt $flag) || fail "edit $flag status"
+      [[ $output == 'usage: edit '* ]] || fail "edit $flag: $output"
+    done
+    print -r -- "ok: edit opens files in the workspace's editor and focuses it, rgv hands it the list, or else they run the editor here"
+  )
+else
+  print -r -- "SKIP: edit and rgv in a workspace's editor (nvim missing)"
 fi
 
 # github-open runs gh browse at the repository's root with the path from

@@ -16,14 +16,14 @@ if [[ ${1:-} != --fixture ]]; then
   temporary=$(mktemp -d "${TMPDIR:-/tmp}/tmux-test.XXXXXXXX")
   temporary=${temporary:A}
   trap 'command rm -rf -- "$temporary"' EXIT
-  mkdir -p "$temporary"/{config,data,state,cache,zsh}
+  mkdir -p "$temporary"/{config,data,state,cache,zsh,run}
   ln -s "$repo/tmux" "$temporary/config/tmux"
   # An empty .zshrc also keeps zsh's new-user menu away.
   : > "$temporary/zsh/.zshrc"
   /usr/bin/env -i HOME="$temporary" PATH="$PATH" TERM=xterm-256color SHELL="$commands[zsh]" \
     ZDOTDIR="$temporary/zsh" XDG_CONFIG_HOME="$temporary/config" XDG_DATA_HOME="$temporary/data" \
     XDG_STATE_HOME="$temporary/state" XDG_CACHE_HOME="$temporary/cache" TMUX_TMPDIR="$temporary" \
-    "$commands[zsh]" -f "$self" --fixture
+    TMPDIR="$temporary/run" "$commands[zsh]" -f "$self" --fixture
   exit
 fi
 
@@ -255,6 +255,22 @@ near 'lean editor width' $(tmux display -p -t $lean[editor] '#{pane_width}') 50 
 near 'lean editor height' $(tmux display -p -t $lean[editor] '#{pane_height}') 50 $rows
 print -r -- 'ok: workspace sessions, commands, and proportions'
 
+# Every pane the workspace starts gets the socket its editor serves, one per
+# workspace folder (zsh/functions/workspace).
+socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cksum)"%% *}.sock"; }
+mkdir -p "$HOME/sockets"
+builtin cd -- "$HOME/sockets"
+DOTFILES_WORKSPACE_EDITOR_CMD='echo E:$DOTFILES_EDITOR_SOCKET' DOTFILES_WORKSPACE_AGENT_CMD='echo A:$DOTFILES_EDITOR_SOCKET' \
+  DOTFILES_WORKSPACE_STATUS_CMD='echo S:$DOTFILES_EDITOR_SOCKET' DOTFILES_WORKSPACE_SHELL_CMD= workspace < /dev/null > /dev/null
+roles sockets
+# A line a pane printed, however the pane wraps it
+printed() { (( ${${(f)"$(tmux capture-pane -pJ -t "$1")"}[(Ie)$2]} )); }
+for role output in editor E agent A shell S; do
+  wait_for "the $role pane did not get the editor's socket" \
+    "printed $pane[$role] ${(q):-$output:$(socket_for $HOME/sockets)}"
+done
+print -r -- "ok: workspace hands every pane its editor's socket"
+
 # Run from a shell alone in its window, workspace lays out that window around
 # it: the shell becomes the workspace's shell, moves to the workspace, and runs
 # its own commands there, typing none into its pane, where a program run after
@@ -266,7 +282,8 @@ solo=$(tmux display -p -t '=solo:' '#{pane_id}')
 type_line() { tmux send-keys -t "$1" -l -- "$2"; tmux send-keys -t "$1" Enter; }
 type_line $solo "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace --layout lean \
 --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status 'echo T''OP' --shell 'echo BOT''TOM' ${(q)HOME}/solo; \
-read -t 1 -r reply; echo READ:\$reply:; [[ \$PWD == ${(q)HOME}/solo ]] && echo MO''VED"
+read -t 1 -r reply; echo READ:\$reply:; [[ \$PWD == ${(q)HOME}/solo ]] && echo MO''VED; \
+[[ \$DOTFILES_EDITOR_SOCKET == ${(q)$(socket_for $HOME/solo)} ]] && echo SOCK''ET"
 wait_for 'the lone pane did not become a lean workspace' '(( $(tmux list-panes -t "=solo:" | wc -l) == 3 ))'
 local -A here
 for line in ${(f)"$(tmux list-panes -t '=solo:' -F '#{pane_left} #{pane_top} #{pane_id}')"}; do
@@ -277,7 +294,7 @@ for line in ${(f)"$(tmux list-panes -t '=solo:' -F '#{pane_left} #{pane_top} #{p
   fi
 done
 [[ $here[shell] == $solo ]] || fail "the lone pane is not the workspace's shell: ${(kv)here}"
-for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM shell READ:: shell MOVED; do
+for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM shell READ:: shell MOVED shell SOCKET; do
   wait_for "the reused $role pane did not show $output" "ran $here[$role] $output"
 done
 [[ $(tmux list-windows -t '=solo' | wc -l) -eq 1 ]] || fail 'a lone pane got a new window'
@@ -288,6 +305,15 @@ type_line $solo "workspace --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --sta
 wait_for 'beside other panes, workspace did not open a new window' \
   '[[ $(tmux list-windows -t "=solo" -F "#{window_name} #{window_panes}") == $'"'"'solo 3\nelsewhere 3'"'"' ]]'
 wait_for 'a new window moved the shell' "ran $solo STAYED"
+# Inside tmux, whose session keeps the environment it started with, every
+# pane the workspace starts there gets the socket too: around a lone shell
+# (lean) and in a new window (full).
+for line in ${(f)"$(tmux list-panes -s -t '=solo' -F '#{window_name} #{pane_id}')"}; do
+  read -r window id <<< "$line"
+  type_line $id 'echo SOCK:$DOTFILES_EDITOR_SOCKET'
+  wait_for "a pane of window $window did not get its editor's socket" \
+    "printed $id ${(q):-SOCK:$(socket_for $HOME/$window)}"
+done
 print -r -- 'ok: workspace builds around a shell alone in its window, else opens one'
 
 # workspace --task lays out a task's worktree, through real Git, in a session
@@ -435,9 +461,9 @@ zsh -fc 'fpath=(\"\$FUNCTIONS\"); autoload -Uz rgv; rgv needle'"
   tmux send-keys -t '=rgv:' Enter
   wait_for 'rgv did not return after Enter' '! tmux has-session -t "=rgv" 2>/dev/null'
   rgv_args=("${(@f)$(<$HOME/rgv-args)}")
-  [[ $#rgv_args == 2 && $rgv_args[1] == -c && $rgv_args[2] == *"readfile('$HOME/tmp/rgv."<->"."<->"/quickfix')}) | cc 2" ]] ||
+  [[ $#rgv_args == 2 && $rgv_args[1] == -c && $rgv_args[2] == *"readfile('$HOME/tmp/rgv."<->"."<->"/quickfix'), "*"}) | cc 2" ]] ||
     fail "rgv opened: ${(qqq)rgv_args}"
-  [[ $(<$HOME/rgv-quickfix) == $'src/a.txt\t2\tneedle here\nsrc/b.txt\t3\tneedle again' ]] ||
+  [[ $(<$HOME/rgv-quickfix) == "$HOME/rgv/src/a.txt"$'\t2\tneedle here\n'"$HOME/rgv/src/b.txt"$'\t3\tneedle again' ]] ||
     fail "rgv quickfix records: $(<$HOME/rgv-quickfix)"
   leftovers=("$HOME"/tmp/*(DN))
   (( ! $#leftovers )) || fail "rgv left temporary files: ${leftovers:t}"

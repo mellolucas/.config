@@ -362,3 +362,17 @@ vim.api.nvim_create_autocmd({ "VimResized", "TabEnter" }, {
     end
   end,
 })
+
+-- Out of the tree to the code, for files other programs open here
+-- (config.workspace): the window beside it, or, in the place of a tree that
+-- fills its tab page, the file it covers or an empty window
+return {
+  leave = function()
+    local code = code_window()
+    if code then
+      vim.api.nvim_set_current_win(code)
+    else
+      close()
+    end
+  end,
+}
