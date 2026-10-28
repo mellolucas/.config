@@ -71,7 +71,8 @@ end
 
 -- Pane-edge Cmd+Option+arrows (<D-M-…>) move between windows in normal mode
 -- and do nothing otherwise: each, from mid-text, while typing or after an
--- operator, leaves the text and the insertion point alone.
+-- operator, leaves the text and the insertion point alone, and a selection or
+-- the command line as it was.
 local typing = api.nvim_create_buf(false, true)
 api.nvim_win_set_buf(0, typing)
 vim.o.showmode = false
@@ -95,6 +96,13 @@ for _, arrow in ipairs({ "Left", "Down", "Up", "Right" }) do
   api.nvim_feedkeys(api.nvim_replace_termcodes("i" .. chord .. "X<Esc>ld" .. chord .. "<Esc>", true, false, true), "xt", false)
   local lines = api.nvim_buf_get_lines(typing, 0, -1, false)
   assert(vim.deep_equal(lines, { "ab", "cXd", "ef" }), "Cmd+Option+" .. arrow .. " typed or deleted: " .. vim.inspect(lines))
+  api.nvim_buf_set_lines(typing, 0, -1, false, { "abcd", "efgh", "ijkl" })
+  api.nvim_win_set_cursor(0, { 2, 1 })
+  press("vl" .. chord .. "y")
+  assert(fn.getreg('"') == "fg", "Cmd+Option+" .. arrow .. " changed the selection to " .. vim.inspect(fn.getreg('"')))
+  vim.g.edge = nil
+  press(":let g:edge = 'ab'<Left><Left>" .. chord .. "X<CR>")
+  assert(vim.g.edge == "aXb", "Cmd+Option+" .. arrow .. " on the command line: " .. vim.inspect(vim.g.edge))
 end
 
 -- Option+Left/Right (<M-b>/<M-f>) jump to word starts without leaving the mode.
@@ -372,6 +380,38 @@ do
   assert(loaded, "language servers offline: " .. tostring(err))
   assert(servers and servers[1]:find("Language servers unavailable", 1, true) and servers[2] == vim.log.levels.WARN,
     "language servers failure warning: " .. vim.inspect(said))
+end
+
+-- That first launch as a user makes it, Neovim reading its configuration from
+-- XDG_CONFIG_HOME with plugin downloads blocked: the file tree and the
+-- language servers warn, no error interrupts startup, and the setup's keys
+-- work, Cmd+S saving and - opening netrw. The configuration is a copy of the
+-- tracked files, as vim.pack rewrites the lockfile without the plugins it
+-- couldn't install.
+do
+  local home = fn.tempname()
+  local config = home .. "/config"
+  local tracked = vim.system({ "git", "ls-files", "-z", "--", "nvim" }, { text = true }):wait().stdout
+  for _, file in ipairs(vim.split(tracked, "\0", { trimempty = true })) do
+    fn.mkdir(config .. "/" .. fn.fnamemodify(file, ":h"), "p")
+    assert(vim.uv.fs_copyfile(file, config .. "/" .. file))
+  end
+  local path = home .. "/notes.md"
+  local launch = vim.system({ vim.v.progpath, "--headless", path, "-c",
+    "lua vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'saved' }) vim.api.nvim_feedkeys(vim.keycode('<D-s>-'), 'mx', false) io.stdout:write(vim.bo.filetype)",
+    "-c", "qall!" }, {
+    env = { XDG_CONFIG_HOME = config, XDG_DATA_HOME = home .. "/data", XDG_STATE_HOME = home .. "/state",
+      XDG_CACHE_HOME = home .. "/cache", GIT_ALLOW_PROTOCOL = "file" },
+    text = true,
+    timeout = 10000,
+  }):wait()
+  local said = launch.stderr or ""
+  assert(launch.code == 0 and not said:find("E%d+:"), "offline launch: " .. said)
+  assert(said:find("File tree unavailable", 1, true) and said:find("Language servers unavailable", 1, true),
+    "offline launch warnings: " .. said)
+  assert(fn.filereadable(path) == 1 and fn.readfile(path)[1] == "saved", "Cmd+S after an offline launch")
+  assert(launch.stdout == "netrw", "- after an offline launch opened " .. tostring(launch.stdout))
+  fn.delete(home, "rf")
 end
 
 -- :grep runs grepprg through the shell: an unmatched zsh glob would silently
