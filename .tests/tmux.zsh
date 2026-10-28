@@ -324,13 +324,16 @@ if (( $+commands[fzf] )); then
   # the Cmd+S rows among them, and a capital letter keeps to its case, finding
   # fewer. The row below the query starts with the count of results; the list
   # ends where the preview's border starts.
-  search() {
+  results_for() {
     local first_row="Find a task > $1"
-    tmux send-keys -t '=keys:' C-u
-    tmux send-keys -t '=keys:' -l -- "$1"
     wait_for "keys did not count its results for $1" \
       '[[ $(screen) == "$first_row"* ]] && settled && [[ ${${(f)REPLY}[2]} =~ "^ *([0-9]+)/" ]]'
     results=$match[1]
+  }
+  search() {
+    tmux send-keys -t '=keys:' C-u
+    tmux send-keys -t '=keys:' -l -- "$1"
+    results_for "$1"
   }
   search cmd+s
   for key in $save_keys; do
@@ -339,6 +342,14 @@ if (( $+commands[fzf] )); then
   integer lower=$results
   search Cmd+S
   (( results && results < lower )) || fail "Cmd+S found $results lines, and cmd+s $lower"
+  tmux send-keys -t '=keys:' Escape
+  wait_for 'Esc did not close keys' '! tmux has-session -t "=keys" 2>/dev/null'
+  # keys WORDS opens the picker already searching for them, listing what it finds.
+  tmux new-session -d -s keys -x 120 -y 24 -c "$repo" \
+    "TMPDIR=${(q)HOME}/tmp zsh -fc 'fpath=(zsh/functions \$fpath); autoload -Uz keys; keys close tab'"
+  tmux resize-window -t '=keys:' -x 120 -y 24
+  results_for 'close tab'
+  (( results )) || fail 'keys close tab found nothing'
   tmux send-keys -t '=keys:' Escape
   wait_for 'Esc did not close keys' '! tmux has-session -t "=keys" 2>/dev/null'
   if (( $+commands[glow] && $+commands[less] )); then
@@ -358,7 +369,7 @@ if (( $+commands[fzf] )); then
   fi
   leftovers=("$HOME"/tmp/*(DN))
   (( ! $#leftovers )) || fail "keys left temporary files: ${leftovers:t}"
-  print -r -- 'ok: keys lists every page beside its preview, scrolls it, searches smart-case, and reads the page picked'
+  print -r -- 'ok: keys lists every page beside its preview, scrolls it, searches smart-case, opens searching for the words given, and reads the page picked'
 else
   print -r -- 'SKIP: keys picker through real fzf (fzf missing)'
 fi
