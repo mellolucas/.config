@@ -289,6 +289,41 @@ STUB
   [[ $line == "branch    $branch → origin/"*"… ↑2 ↓1" && ${#line} -le 80 ]] || fail "busy branch row at 80 columns: $line"
 )
 
+# The card lists the repository's tasks, the worktrees workspace --task opens
+# on task/ branches, by name: as many as fit the card, each cut short with …
+# past 30 columns, and not the one it shows. Without any, there is no row.
+(
+  for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null LC_ALL=C.UTF-8
+  export GIT_AUTHOR_NAME=Tester GIT_AUTHOR_EMAIL=tester@example.com
+  export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=tester@example.com
+  setopt extendedglob
+  path=("$test_root/git-bin")
+  autoload -Uz git-glance
+  project=$HOME/code/owner/project
+  git init -q -b main "$project"
+  builtin cd "$project"
+  git commit -q --allow-empty -m first
+  # The tasks row of the card at COLUMNS, which no line may be wider than
+  tasks_row() {
+    local card
+    card=$(COLUMNS=$1 git-glance) || fail "git-glance status at $1 columns"
+    lines=(${(f)card//$'\e'\[[0-9;]#m})
+    for line in $lines; do
+      (( ${#line} <= $1 )) || fail "git-glance line wider than $1 columns: $line"
+    done
+    print -r -- ${(M)lines:#tasks *}
+  }
+  expect '' "$(tasks_row 80)" 'tasks row without tasks'
+  long=a-task-name-long-enough-to-be-cut-short
+  for task in beta alpha $long; do git worktree add -q -b task/$task ../project.worktrees/$task; done
+  git branch task/without-worktree
+  expect 'tasks     a-task-name-long-enough-to-be… · alpha · beta' "$(tasks_row 80)" 'tasks row'
+  expect 'tasks     a-task-name-long-enough-to-be…' "$(tasks_row 40)" 'tasks row at 40 columns'
+  builtin cd ../project.worktrees/alpha
+  expect 'tasks     a-task-name-long-enough-to-be… · beta' "$(tasks_row 80)" "another task's tasks row"
+)
+
 (
   # Every page of the guide, by its "## Topic: Title" heading, with its last line
   typeset -A titles last_lines topic_outputs

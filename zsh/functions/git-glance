@@ -81,10 +81,13 @@ local -a wt
 (( untracked ))  && wt+=("${untracked} untracked")
 (( $#wt ))       || wt=('%F{green}clean%f')
 
-local -a stashes others
+local -a stashes others tasks
 stashes=(${(f)"$(git stash list --format='%gs')"})
 others=(${(f)"$(git for-each-ref refs/heads --count=6 --sort=-committerdate --format='%(refname:short)')"})
 others=(${others:#$branch})
+# Tasks with a worktree (workspace --task), but this one
+tasks=(${(f)"$(git for-each-ref --format='%(if)%(worktreepath)%(then)%(refname:strip=3)%(end)' refs/heads/task/)"})
+[[ $branch != task/* ]] || tasks=(${tasks:#${branch#task/}})
 
 # The card fits the window, 40 to 100 columns wide (80 without one): truncate
 # visible text first, %-escape after, so prompt escapes stay zero-width and no
@@ -128,14 +131,21 @@ done
 local stash=${stashes[1]:-} nstash=$#stashes
 (( ${#stash} > width - 13 - $#nstash )) && stash="${stash[1,width - 14 - $#nstash]}…"
 
-local name
+# The branches and tasks rows: names cut to 30 columns, as many as fit
+local list name
 local -a shown
-local -i used=0
-for name in $others[1,4]; do
-  (( ${#name} > 30 )) && name="${name[1,29]}…"
-  (( used += ${#name} + (used ? 3 : 0) ))
-  (( used > width - 10 )) && break
-  shown+=("${name//\%/%%}")
+local -A rows
+local -i used
+others=($others[1,4])
+for list in others tasks; do
+  shown=() used=0
+  for name in ${(P)list}; do
+    (( ${#name} > 30 )) && name="${name[1,29]}…"
+    (( used += ${#name} + (used ? 3 : 0) ))
+    (( used > width - 10 )) && break
+    shown+=("${name//\%/%%}")
+  done
+  rows[$list]=${(j: · :)shown}
 done
 
 local -i pad=$(( width - ${#repo} - ${#fetched} ))
@@ -155,7 +165,8 @@ print -rP -- "%F{8}${(l:width::─:):-}%f"
 print -rP -- "branch    %F{cyan}${branch//\%/%%}%f $track"
 print -rP -- "worktree  $worktree"
 (( nstash ))    && print -rP -- "stash     $nstash · ${stash//\%/%%}"
-(( $#shown ))   && print -rP -- "branches  ${(j: · :)shown}"
+[[ -n $rows[others] ]] && print -rP -- "branches  $rows[others]"
+[[ -n $rows[tasks] ]]  && print -rP -- "tasks     $rows[tasks]"
 # Recent commits: the subject gives way first, then the author, then the age
 if git rev-parse -q --verify HEAD >/dev/null 2>&1; then
   print
