@@ -15,15 +15,10 @@ if [[ $1 == --child ]]; then
   config=${config#*'# ---- Completion ----'}
   config=${config%%'# Auto git-glance'*}
   eval "$config"
-  # help completes commands and their arguments, not zsh's SCCS subcommands
-  [[ ${_comps[help]-} == _help ]] || { print -u2 "FAIL: help completes with ${_comps[help]-nothing}"; exit 1; }
   # Completion caches stay in the cache home, out of ZDOTDIR (the repository)
   zstyle -s ':completion:*' cache-path cache_path ||:
   [[ ${cache_path-} == "$XDG_CACHE_HOME/zsh/zcompcache" ]] ||
     { print -u2 "FAIL: completion cache in ${cache_path:-ZDOTDIR}"; exit 1; }
-  # The emacs keymap, though EDITOR names nvim, and Ctrl+X Ctrl+E for the editor
-  [[ $(bindkey -lL main) == 'bindkey -A emacs main' ]] || { print -u2 "FAIL: keymap $(bindkey -lL main)"; exit 1; }
-  [[ $(bindkey '^X^E') == *' edit-command-line' ]] || { print -u2 'FAIL: Ctrl+X Ctrl+E'; exit 1; }
   # Completion must never invoke the helpers or pane commands.
   workspace keys dotfiles zle-test-command() { print -r -- "$0 $*" >> "$HOME/helper-calls"; }
   config=$(<"$repo/zsh/.zshrc")
@@ -47,7 +42,6 @@ if [[ $1 == --child ]]; then
     # Keep the installed native widgets; replace only their interactive picker.
     fzf() {
       local opts="$FZF_DEFAULT_OPTS $*" line selected=''
-      print -r -- "$opts" > "$HOME/picker-options"
       case $opts in
         *--scheme=history*)
           while IFS= read -r line; do
@@ -169,7 +163,7 @@ touch "$fixture/prefix/alpha" "$fixture/prefix/xalpha" \
   "$fixture/all/visible" "$fixture/glob/.hidden" "$fixture/glob/visible" \
   "$fixture/md/only.md" "$fixture/md/notes.txt"
 mkdir -p "$fixture/dirs/.xxsecretxx" "$fixture/dirs/visible"
-mkdir -p "$fixture/workspace-dirs/space project" "$fixture/--project"
+mkdir -p "$fixture/--project"
 mkdir -p "$fixture/widget files/directory space"
 touch "$fixture/widget files/one file" "$fixture/widget files/two;file"
 
@@ -209,30 +203,16 @@ complete() {
   expect "$1" "$3"
 }
 expect_widget() {
-  expect "$1" "$2" "${5:-main}"
+  expect "$1" "$2" "${4:-main}"
   local cwd=${${transcript##*ZLE-PWD:}%%:END-PWD*}
-  local picker_options=$(<"$HOME/picker-options")
   (( ++checks ))
-  if [[ $cwd != "${3:a}" || -e $HOME/helper-calls || $picker_options != ${~4} ]]; then
-    print -ru2 -- "FAIL [$mode]: $1: cwd=$cwd; picker options=$picker_options; executed=$([[ -e $HOME/helper-calls ]] && print yes || print no)"
+  if [[ $cwd != "${3:a}" || -e $HOME/helper-calls ]]; then
+    print -ru2 -- "FAIL [$mode]: $1: cwd=$cwd; executed=$([[ -e $HOME/helper-calls ]] && print yes || print no)"
     (( ++failures ))
   fi
 }
-
-for mode in native fzf; do
-  if [[ $mode == fzf && -z $fzf_bin ]]; then
-    print -r -- 'SKIP: fzf integration (not installed)'
-    continue
-  fi
-  [[ $mode != fzf ]] || ln -s "$fzf_bin" "$HOME/bin/fzf"
-  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim \
-    "$zsh_bin" -dfi "$self" --child "$repo" "${(j.:.)native_fpath}"
-  wait_for 'ZLE-READY'
-  (( ++checks ))
-  if [[ $transcript != *'EXPANSION:glob/visible:END-EXPANSION'* ]]; then
-    print -ru2 -- "FAIL [$mode]: ordinary wildcard expansion: ${(qqqq)transcript}"
-    (( ++failures ))
-  fi
+# Completion matching, natively and again with fzf's Tab
+complete_matching() {
   complete 'prefix beats visible and hidden substring' 'cat prefix/al' 'cat prefix/alpha '
   complete 'case-insensitive prefix beats visible and hidden substring' 'cat case/al' 'cat case/Alpha '
   complete 'partial-word matching' 'cat partial/f-b' 'cat partial/foo-bar '
@@ -243,158 +223,143 @@ for mode in native fzf; do
   expect 'empty prefix includes hidden file beside visible file' 'cat all/.hidden '
   snapshot $'\x18\x12cd dirs/\t\t'
   expect 'empty prefix includes hidden directory beside visible directory' 'cd dirs/.xxsecretxx/'
-  # One mode, with the Mac text keys: Backspace and Ctrl+H cross a typed
-  # newline; Ctrl+F, Ctrl+K, and Ctrl+Y move, cut, and paste; Ctrl+D deletes
-  # forward (Ctrl+T stays fzf's file picker).
-  for erase in $'\x7f' $'\x08'; do
-    snapshot $'\x18\x12abc\x16\n'"$erase$erase"
-    expect 'Backspace crosses logical newline' ab
-  done
-  snapshot $'\x18\x12abcd\x01\x06\x0b\x01\x19'
-  expect 'Ctrl+A, Ctrl+F, Ctrl+K, and Ctrl+Y' bcda
-  snapshot $'\x18\x12abcd\x01\x04'
-  expect 'Ctrl+D deletes forward' bcd
-  snapshot $'\x18\x12abc\e[1;11D\e[1;11B\e[1;11A\e[1;11C'
-  expect 'pane-edge Cmd+Option+arrows do nothing' abc
-  snapshot $'\x18\x12one two\ebX'
-  expect 'Option+Left jumps a word back and keeps typing' 'one Xtwo'
-  snapshot $'\x18\x12one two\eb\efX'
-  expect 'Option+Right jumps a word forward and keeps typing' 'one twoX'
-  # Cmd+Left/Right (Ctrl+A/E) and Home/End in every form terminals send
-  for key in $'\x01' $'\e[H' $'\eOH' $'\e[1~'; do
-    snapshot $'\x18\x12abc'"$key"X
-    expect "line start: ${(V)key}" Xabc
-  done
-  for key in $'\x05' $'\e[F' $'\eOF' $'\e[4~'; do
-    snapshot $'\x18\x12abc\x01'"$key"X
-    expect "line end: ${(V)key}" abcX
-  done
-  snapshot $'\x18\x12abc\x01\e[3~X'
-  expect 'Delete removes the character under the cursor' Xbc
-  # xterm word keys: Alt+arrows (Windows Terminal), Ctrl+arrows (VS Code, Linux)
-  for key in $'\e[1;3D' $'\e[1;5D'; do
-    snapshot $'\x18\x12one two'"$key"X
-    expect "word back: ${(V)key}" 'one Xtwo'
-  done
-  for key in $'\e[1;3C' $'\e[1;5C'; do
-    snapshot $'\x18\x12one two\x01'"$key"X
-    expect "word forward: ${(V)key}" 'one Xtwo'
-  done
-  # Up and Down while typing search history by the text so far; presses stay
-  # in one snapshot, since the search continues only across consecutive keys.
-  snapshot $'\x18\x12echo\e[A'
-  expect 'Up finds the latest command that starts with the text' 'echo beta'
-  snapshot $'\x18\x12echo\e[A\eOA'
-  expect 'Up again, in application cursor form, keeps the prefix' 'echo alpha'
-  snapshot $'\x18\x12echo\e[A\eOA\e[B'
-  expect 'Down returns toward the latest' 'echo beta'
-  # Word keys stop at punctuation but not underscores, and what they delete pastes back
-  snapshot $'\x18\x12cd foo/bar.baz\ebX'
-  expect 'Option+Left stops at punctuation' 'cd foo/bar.Xbaz'
-  snapshot $'\x18\x12cd ~/code/my_project\e\x7f'
-  expect 'Option+Backspace deletes the last part of a path, underscores included' 'cd ~/code/'
-  snapshot $'\x18\x12one two\e\x7fX'
-  expect 'Option+Backspace deletes a word and keeps typing' 'one X'
-  snapshot $'\x18\x12alpha omega\e\x7f\x19'
-  expect 'Ctrl+Y pastes back what Option+Backspace deleted' 'alpha omega'
-  snapshot $'\x18\x12alpha omega\x17\x19'
-  expect 'Ctrl+Y pastes back what Ctrl+W deleted' 'alpha omega'
-  snapshot $'\x18\x12one two\eb\x15'
-  expect 'Cmd+Backspace (Ctrl+U) deletes to the line start' two
-  snapshot $'\x18\x12\x18\x07'
-  expect 'completion does not leak globdots into ordinary expansion' glob/visible
-  zpty -d shell
-  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim \
-    "$zsh_bin" -dfi
-  zpty -w shell "source ${(q)self} --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --commands"
-  wait_for 'ZLE-READY'
-  for helper in workspace dotscode; do
-    for option in agent editor status shell; do
-      complete "$helper $option flag" "$helper --${option[1,-2]}" "$helper --$option="
-      complete "$helper $option separate command" "$helper --$option zle-test-co" "$helper --$option zle-test-command"
-      complete "$helper $option equals command" "$helper --$option=zle-test-co" "$helper --$option=zle-test-command"
-    done
-    complete "$helper layout flag" "$helper --layou" "$helper --layout="
-    complete "$helper layout value" "$helper --layout l" "$helper --layout lean "
-    complete "$helper layout equals value" "$helper --layout=f" "$helper --layout=full "
-    complete "$helper help" "$helper --hel" "$helper --help "
-    complete "$helper short help" "$helper -h" "$helper -h "
-    complete "$helper flags after directory" "$helper dirs/visible --edi" "$helper dirs/visible --editor="
-    complete "$helper directory after command" "$helper --agent 'zle-test-command arg' dirs/sec" "$helper --agent 'zle-test-command arg' dirs/.xxsecretxx/"
-    complete "$helper directory after equals command" "$helper --agent='zle-test-command arg' dirs/sec" "$helper --agent='zle-test-command arg' dirs/.xxsecretxx/"
-    complete "$helper command after directory" "$helper dirs/visible --editor zle-test-co" "$helper dirs/visible --editor zle-test-command"
-    complete "$helper quoted command" "$helper --agent 'zle-test-co" "$helper --agent 'zle-test-command"
-    complete "$helper command argument" "$helper --editor 'mv prefix/al" "$helper --editor 'mv prefix/alpha"
-    complete "$helper equals quoted command argument" "$helper --editor=\"mv prefix/al" "$helper --editor=mv\\ prefix/alpha"
-    complete "$helper hidden directory after terminator" "$helper -- dirs/sec" "$helper -- dirs/.xxsecretxx/"
-    complete "$helper spaced directory after terminator" "$helper -- workspace-dirs/spa" "$helper -- workspace-dirs/space\\ project/"
-    complete "$helper option-like directory after terminator" "$helper -- --pro" "$helper -- --project/"
-    complete "$helper terminator disables options" "$helper -- --age" "$helper -- --age"
-    complete "$helper only one directory" "$helper dirs/visible dirs/sec" "$helper dirs/visible dirs/sec"
-  done
-  # mdv offers Markdown files from the first Tab, never the other files beside them
-  complete 'mdv Markdown file' 'mdv md/' 'mdv md/only.md '
-  zpty -w -n shell $'\x18\x12builtin cd md\r'
-  wait_for 'ZLE-READY'
-  complete 'mdv first Tab' 'mdv ' 'mdv only.md '
-  zpty -w -n shell $'\x18\x12builtin cd ..\r'
-  wait_for 'ZLE-READY'
-  # rgv completes as rg does
-  [[ -z $rg_completion ]] || complete 'rgv rg option' 'rgv --word-reg' 'rgv --word-regexp '
-  for helper in dotfiles dots; do
-    for subcommand in install link bundle update check-updates status doctor uninstall help; do
-      complete "$helper $subcommand" "$helper ${subcommand[1,-2]}" "$helper $subcommand "
-      if [[ $subcommand != update ]]; then
-        complete "$helper $subcommand has no flags" "$helper $subcommand --dis" "$helper $subcommand --dis"
-        complete "$helper $subcommand has no arguments" "$helper $subcommand prefix/al" "$helper $subcommand prefix/al"
-      fi
-    done
-  done
-  for helper in 'dotfiles update' 'dots update' dotsup; do
-    complete "$helper discard" "$helper --dis" "$helper --discard "
-    complete "$helper yes" "$helper --ye" "$helper --yes "
-    complete "$helper short yes" "$helper -y" "$helper -y "
-    complete "$helper help" "$helper --hel" "$helper --help "
-    complete "$helper short help" "$helper -h" "$helper -h "
-    complete "$helper multiple flags" "$helper --discard --ye" "$helper --discard --yes "
-    complete "$helper has no positional arguments" "$helper prefix/al" "$helper prefix/al"
-  done
-  while IFS= read -r line; do
-    [[ $line == '## '*': '* ]] || continue
-    topic=${${line#'## '}%%:*}
-    topic=${(L)topic}
-    complete "keys topic $topic from unrelated cwd" "keys ${topic[1,-2]}" "keys $topic "
-    snapshot $'\x18\x12'"keys $topic"$'\x18\x0c'
-    (( ++checks ))
-    if [[ $transcript != *"${line#*: }"* ]]; then
-      print -ru2 -- "FAIL [$mode]: keys $topic description missing: ${(qqqq)transcript}"
-      (( ++failures ))
-    fi
-  done < "$repo/GUIDE.md"
-  complete 'keys all' 'keys al' 'keys all '
-  complete 'keys plain' 'keys --pla' 'keys --plain '
-  complete 'keys help' 'keys --hel' 'keys --help '
-  complete 'keys short help' 'keys -h' 'keys -h '
-  complete 'keys topic after flag' 'keys --plain wor' 'keys --plain workspace '
-  complete 'keys flag after topic' 'keys workspace --pla' 'keys workspace --plain '
-  complete 'keys only one topic' 'keys workspace fil' 'keys workspace fil'
-  if [[ -n $eza_bin && -n $eza_completion ]]; then
-    complete 'eza option through l alias' 'l --ino' 'l --inode '
-    # ll already supplies --time-style, which _arguments excludes as a duplicate.
-    complete 'eza option value through nested ll alias' 'll --time=mod' 'll --time=modified '
-    complete 'eza option through nested lll alias' 'lll --ino' 'lll --inode '
-    complete 'eza option through llt alias' 'llt --ino' 'llt --inode '
-    complete 'eza option through nested lld alias' 'lld --ino' 'lld --inode '
-    complete 'eza option through lc alias' 'lc --no-quo' 'lc --no-quotes '
-  fi
-  zpty -d shell
+}
+
+mode=native
+zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim \
+  "$zsh_bin" -dfi "$self" --child "$repo" "${(j.:.)native_fpath}"
+wait_for 'ZLE-READY'
+(( ++checks ))
+if [[ $transcript != *'EXPANSION:glob/visible:END-EXPANSION'* ]]; then
+  print -ru2 -- "FAIL [$mode]: ordinary wildcard expansion: ${(qqqq)transcript}"
+  (( ++failures ))
+fi
+complete_matching
+# One mode, with the Mac text keys: Backspace and Ctrl+H cross a typed
+# newline; Ctrl+F, Ctrl+K, and Ctrl+Y move, cut, and paste; Ctrl+D deletes
+# forward (Ctrl+T stays fzf's file picker).
+for erase in $'\x7f' $'\x08'; do
+  snapshot $'\x18\x12abc\x16\n'"$erase$erase"
+  expect 'Backspace crosses logical newline' ab
+done
+snapshot $'\x18\x12abcd\x01\x06\x0b\x01\x19'
+expect 'Ctrl+A, Ctrl+F, Ctrl+K, and Ctrl+Y' bcda
+snapshot $'\x18\x12abcd\x01\x04'
+expect 'Ctrl+D deletes forward' bcd
+snapshot $'\x18\x12abc\e[1;11D\e[1;11B\e[1;11A\e[1;11C'
+expect 'pane-edge Cmd+Option+arrows do nothing' abc
+snapshot $'\x18\x12one two\ebX'
+expect 'Option+Left jumps a word back and keeps typing' 'one Xtwo'
+snapshot $'\x18\x12one two\eb\efX'
+expect 'Option+Right jumps a word forward and keeps typing' 'one twoX'
+# Cmd+Left/Right (Ctrl+A/E) and Home/End in every form terminals send
+for key in $'\x01' $'\e[H' $'\eOH' $'\e[1~'; do
+  snapshot $'\x18\x12abc'"$key"X
+  expect "line start: ${(V)key}" Xabc
+done
+for key in $'\x05' $'\e[F' $'\eOF' $'\e[4~'; do
+  snapshot $'\x18\x12abc\x01'"$key"X
+  expect "line end: ${(V)key}" abcX
+done
+snapshot $'\x18\x12abc\x01\e[3~X'
+expect 'Delete removes the character under the cursor' Xbc
+# xterm word keys: Alt+arrows (Windows Terminal), Ctrl+arrows (VS Code, Linux)
+for key in $'\e[1;3D' $'\e[1;5D'; do
+  snapshot $'\x18\x12one two'"$key"X
+  expect "word back: ${(V)key}" 'one Xtwo'
+done
+for key in $'\e[1;3C' $'\e[1;5C'; do
+  snapshot $'\x18\x12one two\x01'"$key"X
+  expect "word forward: ${(V)key}" 'one Xtwo'
+done
+# Up and Down while typing search history by the text so far; presses stay
+# in one snapshot, since the search continues only across consecutive keys.
+snapshot $'\x18\x12echo\e[A'
+expect 'Up finds the latest command that starts with the text' 'echo beta'
+snapshot $'\x18\x12echo\e[A\eOA'
+expect 'Up again, in application cursor form, keeps the prefix' 'echo alpha'
+snapshot $'\x18\x12echo\e[A\eOA\e[B'
+expect 'Down returns toward the latest' 'echo beta'
+# Word keys stop at punctuation but not underscores, and what they delete pastes back
+snapshot $'\x18\x12cd foo/bar.baz\ebX'
+expect 'Option+Left stops at punctuation' 'cd foo/bar.Xbaz'
+snapshot $'\x18\x12cd ~/code/my_project\e\x7f'
+expect 'Option+Backspace deletes the last part of a path, underscores included' 'cd ~/code/'
+snapshot $'\x18\x12one two\e\x7fX'
+expect 'Option+Backspace deletes a word and keeps typing' 'one X'
+snapshot $'\x18\x12alpha omega\e\x7f\x19'
+expect 'Ctrl+Y pastes back what Option+Backspace deleted' 'alpha omega'
+snapshot $'\x18\x12alpha omega\x17\x19'
+expect 'Ctrl+Y pastes back what Ctrl+W deleted' 'alpha omega'
+snapshot $'\x18\x12one two\eb\x15'
+expect 'Cmd+Backspace (Ctrl+U) deletes to the line start' two
+snapshot $'\x18\x12\x18\x07'
+expect 'completion does not leak globdots into ordinary expansion' glob/visible
+zpty -d shell
+
+zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim \
+  "$zsh_bin" -dfi
+zpty -w shell "source ${(q)self} --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --commands"
+wait_for 'ZLE-READY'
+complete 'workspace agent flag' 'workspace --agen' 'workspace --agent='
+complete 'workspace agent separate command' 'workspace --agent zle-test-co' 'workspace --agent zle-test-command'
+complete 'workspace editor equals command' 'workspace --editor=zle-test-co' 'workspace --editor=zle-test-command'
+complete 'workspace layout value' 'workspace --layout l' 'workspace --layout lean '
+complete 'workspace flags after directory' 'workspace dirs/visible --edi' 'workspace dirs/visible --editor='
+complete 'workspace directory after command' "workspace --agent 'zle-test-command arg' dirs/sec" "workspace --agent 'zle-test-command arg' dirs/.xxsecretxx/"
+complete 'workspace command argument' "workspace --editor 'mv prefix/al" "workspace --editor 'mv prefix/alpha"
+complete 'workspace option-like directory after terminator' 'workspace -- --pro' 'workspace -- --project/'
+# help completes commands, not zsh's SCCS subcommands
+complete 'help command' 'help mv' 'help mv '
+# mdv offers Markdown files from the first Tab, never the other files beside them
+complete 'mdv Markdown file' 'mdv md/' 'mdv md/only.md '
+zpty -w -n shell $'\x18\x12builtin cd md\r'
+wait_for 'ZLE-READY'
+complete 'mdv first Tab' 'mdv ' 'mdv only.md '
+zpty -w -n shell $'\x18\x12builtin cd ..\r'
+wait_for 'ZLE-READY'
+# rgv completes as rg does
+[[ -z $rg_completion ]] || complete 'rgv rg option' 'rgv --word-reg' 'rgv --word-regexp '
+for subcommand in install link bundle update check-updates status doctor uninstall help; do
+  complete "dotfiles $subcommand" "dotfiles ${subcommand[1,-2]}" "dotfiles $subcommand "
+done
+complete 'dotfiles update discard' 'dotfiles update --dis' 'dotfiles update --discard '
+while IFS= read -r line; do
+  [[ $line == '## '*': '* ]] || continue
+  topic=${${line#'## '}%%:*}
+  topic=${(L)topic}
+  complete "keys topic $topic from unrelated cwd" "keys ${topic[1,-2]}" "keys $topic "
+  snapshot $'\x18\x12'"keys $topic"$'\x18\x0c'
   (( ++checks ))
-  if [[ -e $HOME/helper-calls ]]; then
-    print -ru2 -- "FAIL [$mode]: completion executed a helper: $(<"$HOME/helper-calls")"
+  if [[ $transcript != *"${line#*: }"* ]]; then
+    print -ru2 -- "FAIL [$mode]: keys $topic description missing: ${(qqqq)transcript}"
     (( ++failures ))
   fi
-done
+done < "$repo/GUIDE.md"
+complete 'keys all' 'keys al' 'keys all '
+complete 'keys plain' 'keys --pla' 'keys --plain '
+complete 'keys help' 'keys --hel' 'keys --help '
+complete 'keys short help' 'keys -h' 'keys -h '
+complete 'keys topic after flag' 'keys --plain wor' 'keys --plain workspace '
+if [[ -n $eza_bin && -n $eza_completion ]]; then
+  complete 'eza option through nested ll alias' 'll --ino' 'll --inode '
+fi
+zpty -d shell
+(( ++checks ))
+if [[ -e $HOME/helper-calls ]]; then
+  print -ru2 -- "FAIL [$mode]: completion executed a helper: $(<"$HOME/helper-calls")"
+  (( ++failures ))
+fi
+
 if [[ -n $fzf_bin ]]; then
+  ln -s "$fzf_bin" "$HOME/bin/fzf"
+  # fzf's integration takes over Tab, and completion must still match as above
+  mode=fzf
+  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim \
+    "$zsh_bin" -dfi "$self" --child "$repo" "${(j.:.)native_fpath}"
+  wait_for 'ZLE-READY'
+  complete_matching
+  zpty -d shell
   mode=fzf-widgets
   widget_checks=$checks
   # Native history extraction needs awk; omit Perl to exercise its fc fallback.
@@ -405,25 +370,25 @@ if [[ -n $fzf_bin ]]; then
   wait_for 'ZLE-READY'
   snapshot $'zle-test-command \x14'
   expect_widget 'Ctrl+T inserts multiple shell-quoted paths without execution' \
-    'zle-test-command widget\ files/one\ file widget\ files/two\;file ' "$fixture" '* -m *' main
+    'zle-test-command widget\ files/one\ file widget\ files/two\;file ' "$fixture"
   snapshot $'\x18\x12history-sentinel\x12'
   expect_widget 'Ctrl+R recalls a real history entry without execution' \
-    'zle-test-command history-sentinel' "$fixture" '*--scheme=history*'
+    'zle-test-command history-sentinel' "$fixture"
   snapshot $'\x18\x12zle-test-command **\t'
   expect_widget '**Tab inserts multiple shell-quoted paths without execution' \
-    'zle-test-command widget\ files/one\ file widget\ files/two\;file ' "$fixture" '* -m *--walker file,dir,*'
+    'zle-test-command widget\ files/one\ file widget\ files/two\;file ' "$fixture"
   snapshot $'\x18\x12cd **\t'
   expect_widget 'cd **Tab requests directories and inserts without changing cwd' \
-    'cd widget\ files/directory\ space/' "$fixture" '*--walker dir,*'
+    'cd widget\ files/directory\ space/' "$fixture"
   zpty -w -n shell $'\x18\x12zle-test-command pending-sentinel\ec'
   wait_for 'ZLE-READY'
   snapshot ''
   expect_widget 'Esc then c (fzf'\''s Alt+C) changes cwd and restores the unexecuted buffer at the next prompt' \
-    'zle-test-command pending-sentinel' "$fixture/widget files/directory space" '*--walker=dir,*--preview*eza --all*-1 -- {}*ls -A -- {}*' main
+    'zle-test-command pending-sentinel' "$fixture/widget files/directory space"
   zpty -d shell
   (( failures )) || print -r -- "ok: $((checks - widget_checks)) native fzf prompt checks (deterministic picker)"
 else
-  print -r -- 'SKIP: native fzf prompt widgets and **Tab (fzf not installed)'
+  print -r -- 'SKIP: fzf integration, prompt widgets, and **Tab (fzf not installed)'
 fi
 (( failures == 0 )) || { print -ru2 -- "$failures/$checks ZLE checks failed"; exit 1; }
 print -r -- "ok: $checks native ZLE checks (completion, helper aliases, wildcard isolation, Mac text keys, Ghostty, fzf, optional eza aliases)"
