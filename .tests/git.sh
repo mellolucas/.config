@@ -131,14 +131,21 @@ real_git init -q --template= "$test_root/origin"
 tree=$(real_git -C "$test_root/origin" mktree < /dev/null)
 commit=$(real_git -C "$test_root/origin" commit-tree "$tree" -m fixture)
 real_git -C "$test_root/origin" update-ref HEAD "$commit"
+real_git -C "$test_root/origin" branch upstream-branch
 real_git -C "$test_root/origin" tag upstream-tag
 real_git init -q --template= "$test_root/client"
 real_git -C "$test_root/client" remote add origin "$test_root/origin"
 real_git -C "$test_root/client" fetch -q origin
+check real_git -C "$test_root/client" show-ref --verify --quiet refs/remotes/origin/upstream-branch
 real_git -C "$test_root/client" tag local-only FETCH_HEAD
+# Fetching prunes branches deleted upstream but keeps every tag.
+real_git -C "$test_root/origin" branch -q -D upstream-branch
 real_git -C "$test_root/origin" tag -d upstream-tag > /dev/null
 real_git -C "$test_root/client" -c fetch.prune="$prune" -c fetch.pruneTags="$prune_tags" fetch -q origin
+if real_git -C "$test_root/client" show-ref --verify --quiet refs/remotes/origin/upstream-branch; then
+  fail 'fetch kept origin/upstream-branch, deleted upstream'
+fi
 check real_git -C "$test_root/client" show-ref --verify --quiet refs/tags/local-only
 check real_git -C "$test_root/client" show-ref --verify --quiet refs/tags/upstream-tag
 
-printf 'PASS: Git pager, clone dispatch, argument validation, and tag retention\n'
+printf 'PASS: Git pager, clone dispatch, argument validation, branch pruning, and tag retention\n'
