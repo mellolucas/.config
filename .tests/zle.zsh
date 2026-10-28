@@ -350,6 +350,13 @@ complete 'keys topic after flag' 'keys --plain wor' 'keys --plain workspace '
 if [[ -n $eza_bin && -n $eza_completion ]]; then
   complete 'eza option through nested ll alias' 'll --ino' 'll --inode '
 fi
+# Ctrl+X Ctrl+E edits the command line in EDITOR, nvim (here a stand-in that
+# rewrites the file), and brings the edit back to the prompt unexecuted
+print -rl -- '#!/bin/sh' 'for file; do :; done' 'echo "zle-test-command edited" > "$file"' > "$HOME/bin/nvim"
+chmod +x "$HOME/bin/nvim"
+snapshot $'\x18\x12zle-test-command original\x18\x05'
+expect_widget 'Ctrl+X Ctrl+E brings the edited command back unexecuted' 'zle-test-command edited' "$fixture"
+rm "$HOME/bin/nvim"
 zpty -d shell
 (( ++checks ))
 if [[ -e $HOME/helper-calls ]]; then
