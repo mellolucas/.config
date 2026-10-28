@@ -39,7 +39,10 @@ if [[ $1 == --child ]]; then
     eval "if command -v glow ${config%%$'\nfi'*}"$'\nfi'
   fi
   if [[ $4 == --widgets ]]; then
-    # Keep the installed native widgets; replace only their interactive picker.
+    # Keep the installed native widgets; replace only their interactive picker,
+    # except Esc then c's: the real fzf, on a terminal with a size, and a query
+    # that leaves one directory to highlight.
+    stty rows 24 columns 80
     fzf() {
       local opts="$FZF_DEFAULT_OPTS $*" line selected=''
       case $opts in
@@ -50,7 +53,8 @@ if [[ $1 == --child ]]; then
           [[ -n $selected ]] || return 1
           print -r -- "$selected"
           ;;
-        *--walker=dir,*|*'--walker dir,'*) print -r -- 'widget files/directory space' ;;
+        *--walker=dir,*) command fzf --query 'directory space' ;;
+        *'--walker dir,'*) print -r -- 'widget files/directory space' ;;
         *) print -rl -- 'widget files/one file' 'widget files/two;file' ;;
       esac
     }
@@ -165,7 +169,8 @@ touch "$fixture/prefix/alpha" "$fixture/prefix/xalpha" \
 mkdir -p "$fixture/dirs/.xxsecretxx" "$fixture/dirs/visible"
 mkdir -p "$fixture/--project"
 mkdir -p "$fixture/widget files/directory space"
-touch "$fixture/widget files/one file" "$fixture/widget files/two;file"
+touch "$fixture/widget files/one file" "$fixture/widget files/two;file" \
+  "$fixture/widget files/directory space/previewed-file"
 
 failures=0
 checks=0
@@ -364,7 +369,11 @@ if [[ -n $fzf_bin ]]; then
   widget_checks=$checks
   # Native history extraction needs awk; omit Perl to exercise its fc fallback.
   ln -s "${commands[awk]}" "$HOME/bin/awk"
-  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim \
+  # Esc then c's preview runs in SHELL, listing with eza (linked above when
+  # installed) or ls.
+  ln -s "${commands[ls]}" "$HOME/bin/ls"
+  ln -s "${commands[stty]}" "$HOME/bin/stty"
+  zpty -b shell /usr/bin/env -i HOME="$HOME" ZDOTDIR="$HOME" LC_ALL=C EDITOR=nvim SHELL="$zsh_bin" \
     "$zsh_bin" -dfi
   zpty -w shell "source ${(q)self} --child ${(q)repo} ${(q)${(j.:.)native_fpath}} --widgets"
   wait_for 'ZLE-READY'
@@ -381,6 +390,10 @@ if [[ -n $fzf_bin ]]; then
   expect_widget 'cd **Tab requests directories and inserts without changing cwd' \
     'cd widget\ files/directory\ space/' "$fixture"
   zpty -w -n shell $'\x18\x12zle-test-command pending-sentinel\ec'
+  # The picker previews what the highlighted directory holds; Enter picks it
+  (( ++checks ))
+  wait_for 'previewed-file'
+  zpty -w -n shell $'\r'
   wait_for 'ZLE-READY'
   snapshot ''
   expect_widget 'Esc then c (fzf'\''s Alt+C) changes cwd and restores the unexecuted buffer at the next prompt' \
