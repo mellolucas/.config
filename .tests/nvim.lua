@@ -48,26 +48,6 @@ do
     api.nvim_buf_delete(buf, { force = true })
   end
 end
--- Without the file tree, - opens netrw on this file's folder, on this file's
--- line.
-do
-  local listing
-  api.nvim_create_user_command("Explore", function()
-    vim.cmd.enew()
-    listing = api.nvim_get_current_buf()
-    api.nvim_buf_set_lines(0, 0, -1, false, { "../", "./", "notes.md" })
-  end, {})
-  local file = api.nvim_create_buf(true, false)
-  api.nvim_buf_set_name(file, fn.tempname() .. "/notes.md")
-  api.nvim_set_current_buf(file)
-  press("-")
-  assert(api.nvim_get_current_buf() == listing and api.nvim_get_current_line() == "notes.md",
-    "- without the file tree lands on " .. api.nvim_get_current_line())
-  api.nvim_del_user_command("Explore")
-  vim.cmd.enew()
-  api.nvim_buf_delete(listing, { force = true })
-  api.nvim_buf_delete(file, { force = true })
-end
 
 -- Pane-edge Cmd+Option+arrows (<D-M-…>) move between windows in normal mode
 -- and do nothing otherwise: each, from mid-text, while typing or after an
@@ -382,20 +362,44 @@ do
     "language servers failure warning: " .. vim.inspect(said))
 end
 
+-- The setup's options from here on: netrw's tree view, grepprg.
+dofile("nvim/lua/config/options.lua")
+-- Without the file tree, - opens netrw on this file's folder, on this file's
+-- line.
+do
+  vim.cmd.packadd("netrw")
+  local folder = fn.tempname()
+  fn.mkdir(folder, "p")
+  for _, name in ipairs({ "a-notes.md", "notes.md", "notes.md.txt" }) do
+    fn.writefile({}, folder .. "/" .. name)
+  end
+  vim.cmd.edit(fn.fnameescape(folder .. "/notes.md"))
+  local file = api.nvim_get_current_buf()
+  press("-")
+  local listing = api.nvim_get_current_buf()
+  assert(vim.bo.filetype == "netrw" and api.nvim_get_current_line() == "| notes.md",
+    "- without the file tree lands on " .. api.nvim_get_current_line())
+  vim.cmd.enew()
+  api.nvim_buf_delete(listing, { force = true })
+  api.nvim_buf_delete(file, { force = true })
+  fn.delete(folder, "rf")
+end
+
 -- That first launch as a user makes it, Neovim reading its configuration from
 -- XDG_CONFIG_HOME with plugin downloads blocked: the file tree and the
--- language servers warn, no error interrupts startup, and the setup's keys
--- work, Cmd+S saving and - opening netrw. The configuration is a copy of the
--- tracked files, as vim.pack rewrites the lockfile without the plugins it
--- couldn't install.
+-- language servers warn, no error interrupts startup, the setup's keys work,
+-- Cmd+S saving and - opening netrw, and the lockfile keeps its pins byte for
+-- byte. The configuration is a copy of nvim/'s files Git doesn't ignore.
 do
   local home = fn.tempname()
   local config = home .. "/config"
-  local tracked = vim.system({ "git", "ls-files", "-z", "--", "nvim" }, { text = true }):wait().stdout
-  for _, file in ipairs(vim.split(tracked, "\0", { trimempty = true })) do
+  local files = vim.system({ "git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "nvim" },
+    { text = true }):wait().stdout
+  for _, file in ipairs(vim.split(files, "\0", { trimempty = true })) do
     fn.mkdir(config .. "/" .. fn.fnamemodify(file, ":h"), "p")
     assert(vim.uv.fs_copyfile(file, config .. "/" .. file))
   end
+  local lockfile = config .. "/nvim/nvim-pack-lock.json"
   local path = home .. "/notes.md"
   local launch = vim.system({ vim.v.progpath, "--headless", path, "-c",
     "lua vim.api.nvim_buf_set_lines(0, 0, -1, false, { 'saved' }) vim.api.nvim_feedkeys(vim.keycode('<D-s>-'), 'mx', false) io.stdout:write(vim.bo.filetype)",
@@ -418,7 +422,6 @@ end
 -- empty the results, and nested repositories' .git folders must stay out.
 local passed = "Markdown preview, DiffSaved, GitDiff, and focus background query tests passed"
 if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
-  dofile("nvim/lua/config/options.lua")
   vim.o.shell = "zsh"
   local cwd, tree = fn.getcwd(), fn.tempname()
   fn.mkdir(tree .. "/repo/.git", "p")

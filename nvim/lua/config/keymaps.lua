@@ -234,7 +234,8 @@ map("n", "-", function()
   local name = vim.fn.expand("%:t")
   vim.cmd.Explore()
   if name ~= "" then
-    vim.fn.search("\\V\\C\\^" .. vim.fn.escape(name, "\\") .. "\\[*@/=|]\\?\\$")
+    -- netrw's tree view (config.options) lists the folder's entries after "| "
+    vim.fn.search("\\V\\C\\^\\%(| \\)\\?" .. vim.fn.escape(name, "\\") .. "\\[*@/=|]\\?\\$")
   end
 end, { desc = "Up to this file's folder" })
 
