@@ -89,6 +89,7 @@ vim.pack = {
     end
   end,
 }
+package.loaded["config.pack"] = dofile(repo .. "/nvim/lua/config/pack.lua")
 vim.o.columns = 40
 dofile(repo .. "/nvim/lua/config/explorer.lua")
 vim.cmd("args " .. fn.fnameescape(project))

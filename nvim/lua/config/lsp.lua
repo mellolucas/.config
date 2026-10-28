@@ -1,5 +1,5 @@
 -- Source language server configs from nvim-lspconfig
-local ok, err = pcall(vim.pack.add, {
+local ok, err = require("config.pack").add({
   { src = "https://github.com/neovim/nvim-lspconfig" }
 })
 if not ok then

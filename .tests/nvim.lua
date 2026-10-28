@@ -346,14 +346,17 @@ assert(not vim.tbl_contains(required, "config.explorer") and not vim.tbl_contain
   "older Neovim: " .. vim.inspect(required))
 
 -- An offline first launch warns and keeps netrw on -; the language servers
--- warn too, rather than fail.
+-- warn too, rather than fail. XDG_CONFIG_HOME is an empty folder here,
+-- keeping the real lockfile out of reach.
+package.loaded["config.pack"] = dofile("nvim/lua/config/pack.lua")
 do
-  local real_pack, real_notify, said = vim.pack, vim.notify, {}
+  local real_pack, real_notify, real_config, said = vim.pack, vim.notify, vim.env.XDG_CONFIG_HOME, {}
   vim.pack = { add = function() error("offline") end }
   vim.notify = function(message, level) said[#said + 1] = { message, level } end
+  vim.env.XDG_CONFIG_HOME = fn.tempname()
   dofile("nvim/lua/config/explorer.lua")
   local loaded, err = pcall(dofile, "nvim/lua/config/lsp.lua")
-  vim.pack, vim.notify = real_pack, real_notify
+  vim.pack, vim.notify, vim.env.XDG_CONFIG_HOME = real_pack, real_notify, real_config
   local tree, servers = unpack(said)
   assert(tree and tree[1]:find("offline", 1, true), "file tree failure warning: " .. vim.inspect(said))
   assert(fn.maparg("-", "n", false, true).desc == "Up to this file's folder", "netrw stays on -")
@@ -415,6 +418,8 @@ do
     "offline launch warnings: " .. said)
   assert(fn.filereadable(path) == 1 and fn.readfile(path)[1] == "saved", "Cmd+S after an offline launch")
   assert(launch.stdout == "netrw", "- after an offline launch opened " .. tostring(launch.stdout))
+  assert(fn.readblob(lockfile) == fn.readblob("nvim/nvim-pack-lock.json"),
+    "the offline launch rewrote the lockfile: " .. fn.readblob(lockfile))
   fn.delete(home, "rf")
 end
 

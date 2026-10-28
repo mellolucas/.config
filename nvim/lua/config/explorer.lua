@@ -4,7 +4,7 @@
 -- the window (Cmd+Shift+Enter zooms the pane) switches between the two.
 -- Directory buffers stay Neovim's own (:edit DIR, :Explore); only starting on
 -- a directory opens it.
-local ok, err = pcall(vim.pack.add, {
+local ok, err = require("config.pack").add({
   { src = "https://github.com/nvim-tree/nvim-tree.lua" },
   { src = "https://github.com/nvim-mini/mini.icons" },
 })
