@@ -317,6 +317,10 @@ complete 'workspace option-like directory after terminator' 'workspace -- --pro'
 # help completes commands of every kind, not zsh's SCCS subcommands
 complete 'help command' 'help mv' 'help mv '
 complete 'help function' 'help zle-test-co' 'help zle-test-command '
+# but no parameter, and an alias's arguments as those of what it runs
+complete 'help leaves parameters out' 'help XDG_CACHE_HO' 'help XDG_CACHE_HO'
+complete 'help alias arguments' 'help dots doc' 'help dots doctor '
+complete 'help alias arguments after its own' 'help dotsup --dis' 'help dotsup --discard '
 # mdv offers Markdown files from the first Tab, never the other files beside them
 complete 'mdv Markdown file' 'mdv md/' 'mdv md/only.md '
 zpty -w -n shell $'\x18\x12builtin cd md\r'

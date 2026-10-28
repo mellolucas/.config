@@ -1,11 +1,25 @@
 #compdef help
 
-# First a command, whatever kind (alias, function, builtin, or program), then
-# that command's own arguments; zsh's SCCS completion claims help otherwise
+# First a command a person can ask about (a program, builtin, function, or
+# alias), then its arguments, an alias's as those of what it runs; zsh's SCCS
+# completion claims help otherwise
 if (( CURRENT == 2 )); then
-  _command_names
+  _alternative \
+    'commands:external command:_path_commands' \
+    'builtins:builtin command:compadd -Qk builtins' \
+    "functions:shell function:compadd -k 'functions[(I)[^_]*]'" \
+    'aliases:alias:compadd -Qk aliases'
 else
+  local -A seen
+  local -a expansion
   words=("${(@)words[2,-1]}")
   (( CURRENT-- ))
+  while (( ${+aliases[$words[1]]} && ! ${+seen[$words[1]]} )); do
+    seen[$words[1]]=1
+    expansion=("${(@z)aliases[$words[1]]}")
+    (( $#expansion )) || break
+    words=("${expansion[@]}" "${(@)words[2,-1]}")
+    (( CURRENT += $#expansion - 1 ))
+  done
   _normal
 fi
