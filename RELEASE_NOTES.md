@@ -6,18 +6,29 @@ Changes since `v0.0.1`.
 
 ### Changes
 
+- **Install in one command:** `get.sh` clones the repository and runs its
+  installer; running it again resumes after a failure. `install`, `update`,
+  and `bundle` carry on past failed downloads and list what they skipped, and
+  the README's Network access lists the hosts a managed network must allow.
 - **One setup command:** `dotfiles` installs, links, bundles, updates, and
   uninstalls; a week after the last full update, the first shell of each day
   reminds you to run `dotsup`. `dotfiles doctor` marks each check and names a
   fix for each problem, from a missing Git identity to a Homebrew that can't
   run, and notes stray hidden files in `$HOME`.
-- **A field guide:** `keys` browses the guide's pages with a preview and
-  searches every line as you type; `keys TOPIC` and `keys WORDS` work from the
-  prompt, and `help COMMAND` shows any command's help, even through an alias.
-- **Workspaces:** `workspace` lays out the editor, an agent, and a shell in a
-  Ghostty tab, or in the current tab when its shell is alone there.
-  `--layout lean` gives the editor and the agent half the width each.
-  Elsewhere, tmux lays out the same panes.
+- **A field guide:** `keys start` shows the essentials in a minute; `keys`
+  browses the guide's pages with a preview and searches every line as you
+  type; `keys TOPIC` and `keys WORDS` work from the prompt, and
+  `help COMMAND` shows any command's help, even through an alias.
+- **Workspaces:** `workspace` leads with the editor, on the left 60% of a
+  Ghostty tab, beside the agent above a shell; it lays out the current tab
+  when its shell is alone there. `--layout lean` puts the editor above the
+  shell, beside the agent. Elsewhere, tmux lays out the same panes.
+- **Tasks:** `workspace --task NAME` lays out a task in a worktree and branch
+  of its own beside the checkout, and reopens it with the agent's last
+  session; `workspace --done` removes the worktree, and the branch once
+  merged. `gg` lists a repository's tasks.
+- **One editor per workspace:** `v FILE:LINE`, `rgv`, and agents, through the
+  `edit` command, open files in the workspace's editor and bring you there.
 - **Mac keys for panes:** Ghostty's own keys split (`Cmd+D`), move
   (`Cmd+Option+arrows`), resize, zoom (`Cmd+Shift+Enter`), and close
   (`Cmd+W`) panes, and search and scroll their output, as Terminal does; where
@@ -25,11 +36,12 @@ Changes since `v0.0.1`.
   instead. Elsewhere tmux keeps its own keys behind `Ctrl+B`.
 - **The prompt:** it edits like any Mac text field, with zsh's emacs keys
   (`Ctrl+A`/`Ctrl+E`/`Ctrl+K`/`Ctrl+Y`), and the word and line keys
-  (`Option+←/→`, `Cmd+←/→`, `Option+Backspace`) work alike in Neovim. Option
-  types characters with either key; `Esc` then a key stands in for Alt.
-  `↑`/`↓` step through commands that start with what you typed, `Ctrl+X
-  Ctrl+E` edits in Neovim, and fzf adds `Ctrl+T`, `Ctrl+R`, and `Esc` then `c`
-  (which previews each directory).
+  (`Option+←/→`, `Cmd+←/→`, `Option+Backspace`) step as Mac text fields do,
+  keeping `_` and `.` inside words, also while typing in Neovim. Option types
+  characters with either key; `Esc` then a key stands in for Alt. `↑`/`↓`
+  step through commands that start with what you typed, `Ctrl+X Ctrl+E` edits
+  in Neovim, and fzf adds `Ctrl+T`, `Ctrl+R`, and `Esc` then `c` (which
+  previews each directory).
 - **Exploring code:** Neovim opens on a file tree that sits beside the code
   when there's room (`-` goes to it, `Esc` back; `?` lists its keys). As in
   Finder, `→`/`←` open and close folders and `Space` previews a file.
@@ -39,6 +51,9 @@ Changes since `v0.0.1`.
 - **Mac keys in Neovim:** in Ghostty, `Cmd+S` saves, `Cmd+O` opens a file by
   name, `Cmd+C`/`Cmd+X` copy and cut the selection to the clipboard, and
   `Cmd+/` comments, as in any Mac app.
+- **Review:** `gdv` reviews changes in Neovim, file by file, old beside new,
+  taking what `gd` takes; `Space t u` shows Neovim's undo tree, which brings
+  back any earlier version of a file.
 - **Pickers:** in every fzf picker, `Option+↑`/`Option+↓` scroll the preview
   (`Shift+↑`/`Shift+↓` by a line). `fzfv` picks a file with a preview.
 - **Git:** `gg` and `ggg` show a repository card, which also appears when you
@@ -47,7 +62,10 @@ Changes since `v0.0.1`.
 - **Documents:** `mdv` renders Markdown in the pager, and `Space t m` in
   Neovim (`q` leaves the rendered view).
 - **Agents:** OpenCode is the default; Claude Code, Copilot CLI, and Codex
-  are installed too. The guide lists each one's scroll, search, and copy keys.
+  are installed too, and all four read this setup's shared instructions,
+  `agents/instructions.md`. Agents notify you when they finish or need you out
+  of sight, as do shell commands of 10 s or more. The guide lists each one's
+  scroll, search, and copy keys.
 - **Colors:** Catppuccin Mocha in dark mode and Latte in light, following the
   system's appearance in Ghostty, Neovim (even while running), OpenCode, fzf,
   bat, Delta, Glow, and the prompt.
@@ -64,11 +82,22 @@ Changes since `v0.0.1`.
 - Keep the checkout outside `~/.config`; installation refuses a checkout in
   the configuration home or below it. Move local edits into a separate clone
   rather than moving the directory.
+- Update with `dotfiles update`, which relinks; after a plain `git pull`, run
+  `dotfiles link`. Either way, the `edit` command and the agents' instruction
+  links appear.
 - `dotfiles install` now links and installs packages, replacing `bootstrap`;
   `dotfiles link` is the former link-only `install`.
-- `dotfiles status` is gone: `gg` in the checkout shows its state.
+- `dotfiles status` is gone: `gg` in the checkout shows its state. So is
+  `dotfiles cleanup`: `dotfiles doctor` notes what lies outside the XDG layout
+  in `$HOME`.
 - Use `workspace` instead of `dotfiles workspace`, `dotfiles code`, or the
-  `dotsws` alias.
+  `dotsws` alias. One shell, below the agent, takes the place of the middle
+  column's two: set `DOTFILES_WORKSPACE_STATUS_CMD` and
+  `DOTFILES_WORKSPACE_SHELL_CMD`, which it runs in turn, instead of
+  `DOTFILES_WORKSPACE_MIDDLE_TOP_CMD` and
+  `DOTFILES_WORKSPACE_MIDDLE_BOTTOM_CMD`.
+- `v` opens files in the workspace's editor when there is one, and Neovim in
+  place elsewhere; `vi` and `vim` always open Neovim in place.
 - `l`, `ll`, and `lll` are the listings; add eza flags such as
   `ll --sort=age` or `ll --inode` (formerly `lli`). `ls` is the system's own
   again.
@@ -78,19 +107,22 @@ Changes since `v0.0.1`.
 - `g`, `gft`, `rgf`, `rgc`, `rgw`, `dotscode`, and `ghview` are gone: type
   `git`, `gf --tags`, `rg -l`, `rg -c`, `rg -w`, and `workspace`; `mdv
   README.md` renders a README, and `gh repo view` shows one on GitHub.
+- `gh:` remotes push over HTTPS with `gh`'s login rather than SSH: run
+  `gh auth login`.
 - Ghostty's own Mac keys run panes and scrollback (`keys panes`, `keys
   browse`) in place of the `Option+v` key table.
 - OpenCode keeps its own keys: `Ctrl+X` is its leader in place of
   `Ctrl+Space`, and `Ctrl+P` opens its palette.
 - In Neovim, `-` replaces `Space e e` (to the tree; `Esc` comes back, `q`
   hides it), and Vim's own `-` motion is `k^`. `Ctrl+^` replaces `Space b -`,
-  `:q` replaces `Space q q`, `ZQ` replaces `Space q q q`, and Neovim's own
-  `Ctrl+W` keys move between windows in place of `Space w`. Searches
-  highlight every match, as Neovim's do, until `Ctrl+L`; `Space t h` is gone.
-  `Cmd+S` saves in place of `Space b w w`, `ZZ` replaces `Space b w q`, and
-  `Ctrl+\` then `Ctrl+N` leaves terminal mode in place of `Esc Esc`. In
-  normal mode `Cmd+←`/`Cmd+→` (Vim's `Ctrl+A`/`Ctrl+E`) reach the line's
-  start and end: add 1 to a number with `g` then `Ctrl+A` on a selection.
+  `:q` replaces `Space q q`, and `ZQ` replaces `Space q q q`. The `Ctrl+W`
+  keys act on Neovim's own windows, not Ghostty's panes, and replace
+  `Space w`. Searches highlight every match, as Neovim's do, until `Ctrl+L`;
+  `Space t h` is gone. `Cmd+S` saves in place of `Space b w w`, `ZZ` replaces
+  `Space b w q`, and `Ctrl+\` then `Ctrl+N` leaves terminal mode in place of
+  `Esc Esc`. In normal mode `Cmd+←`/`Cmd+→` (Vim's `Ctrl+A`/`Ctrl+E`) reach
+  the line's start and end: add 1 to a number with `g` then `Ctrl+A` on a
+  selection.
 - The prompt uses zsh's emacs keys, as Terminal does, in place of vi mode;
   `Ctrl+X Ctrl+E` opens a long command in Neovim. Option types characters
   with either key, where Ghostty made it Alt on US layouts: press `Esc` then
@@ -137,4 +169,3 @@ Known limits:
 - In tmux, Command keys never arrive: its own keys follow its prefix,
   `Ctrl+B`, Neovim's windows are `Ctrl+W h/j/k/l`, and Neovim follows a
   light/dark switch once tmux rereads the terminal's colors.
-- Opening netrw files in neighboring Ghostty panes is future work.

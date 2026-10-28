@@ -1,6 +1,6 @@
 # Working here
 
-A field guide to the shortcuts this setup adds. Run `keys` to browse its pages with a preview of each, typing to search every line; `keys TOPIC` reads one page and `keys WORDS` searches; `help COMMAND` explains any command.
+A field guide to the shortcuts this setup adds, starting with the essentials in `keys start`. Run `keys` to browse its pages with a preview of each, typing to search every line; `keys TOPIC` reads one page and `keys WORDS` searches; `help COMMAND` explains any command.
 
 **Notation:** `Cmd+D` is a chord: hold Command and press d. Option types characters (ç, é) with either key, as in every Mac app; for a program's Alt key, press `Esc` then the key (Alt itself on Linux and WSL). `Space t m` is a sequence typed in Neovim normal mode. Case matters (`n` and `N` differ), except in Ctrl chords: `Ctrl+T` is Ctrl and t.
 
@@ -13,9 +13,11 @@ The essentials, each a door to the pages that follow.
 | Run or press | Result |
 | --- | --- |
 | `workspace` | This project's editor, agent, and a shell in one tab |
-| `v FILE` | Edit in Neovim: `Cmd+S` saves, `Cmd+/` comments, `-` shows the file tree |
+| `workspace --task NAME` | The same for a task, on a branch and worktree of its own |
+| `v FILE` | Edit in Neovim (in a workspace, its editor): `Cmd+S` saves, `Cmd+/` comments, `-` shows the file tree |
 | `Cmd+D` / `Cmd+Option+arrows` | Split the pane / move between panes and Neovim's windows |
 | `gg` | This repository at a glance: branch, changes, recent commits |
+| `gdv` | Review your changes in Neovim, file by file |
 | `fzfv` | Find a file by name, with a preview; Enter opens it |
 | `rgv TEXT` | Every matching line, file by file; Enter opens them in Neovim |
 | `cd **` then `Tab` | Fuzzy-pick a directory below here |
@@ -23,7 +25,7 @@ The essentials, each a door to the pages that follow.
 
 - `Esc` then a key stands in for Alt, since Option types characters: `Esc` then `c` picks a directory with a preview of each, and `Esc` then `.` inserts the last command's last word.
 - `help COMMAND` shows any command's help; for an alias, what it runs comes first.
-- When a week has passed since the last update, the first shell of the day says so: run `dotsup`.
+- A week after the last update, the first shell of the day says so: run `dotsup`.
 
 ## Workspace: Start a workspace
 
@@ -42,14 +44,14 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 | `workspace --help` | Every option and its default |
 | `v FILE:LINE` | From any of its panes, open the file in the workspace's editor at that line, and go there |
 
-- Run from a tab where your shell is the only pane, `workspace` lays out that tab around it: your shell becomes the workspace's shell, moves to the directory, and runs its commands there. It opens a new tab from a tab with other panes, or when Ghostty can't tell which pane you're in (a tab title you set by hand prevents it).
-- `workspace --task NAME` works from anywhere in a repository, a task included: the worktree sits beside the main checkout, in `~/code/OWNER/REPO.worktrees/NAME`, and its branch starts from the commit you're on. Rerun it to reopen the task: OpenCode, Claude Code, and Codex resume their last session there (Copilot CLI starts a new one); a task folder deleted by hand comes back from its branch. `gg` lists the repository's tasks.
-- `workspace --done` moves your shell to the main checkout, and the task's other panes can be closed. It won't remove a task with uncommitted or untracked changes, or with files Git ignores (an `.env`, a local database), naming the command that deletes those when they're disposable; and it keeps the branch until the main checkout's branch has its commits (`git branch -D task/NAME` deletes it anyway).
 - Focus starts in the editor (in the lean layout, in the shell); `Cmd+Option+arrows` move between the panes.
-- Files open in the workspace's one editor, which comes into focus: `v FILE` or `v FILE:LINE` from its shell (`v` alone goes to the editor), `rgv`'s Enter, and agents, with `edit FILE:LINE`, the command `v` runs. Outside a workspace, or while its editor is closed, `v` opens Neovim where you are, as `vi` always does; Neovim started again in the editor's pane takes the files once more.
-- For lasting defaults, set `DOTFILES_WORKSPACE_LAYOUT=lean` (on a laptop, say) or the commands in `zsh/local.zsh`.
+- Run from a tab where your shell is the only pane, `workspace` lays out that tab around it, and your shell becomes the workspace's shell. Otherwise it opens a new tab, as it does when Ghostty can't tell which pane you're in (after you set a tab title by hand).
+- `workspace --task NAME` works anywhere in a repository: the worktree sits beside the main checkout, as `REPO.worktrees/NAME`, and its branch starts from the commit you're on. Rerun it to reopen the task: OpenCode, Claude Code, and Codex resume their last session there (Copilot CLI starts a new one), and a task folder deleted by hand comes back from its branch. `gg` lists the repository's tasks.
+- `workspace --done` moves your shell to the main checkout; close the task's other panes. It refuses while the task holds uncommitted or untracked changes, or files Git ignores (an `.env`, a local database), naming the command that deletes those when they're disposable, and keeps the branch until the main checkout's branch has its commits (`git branch -D task/NAME` deletes it anyway).
+- Files open in the workspace's one editor, which takes the focus: `v FILE` or `v FILE:LINE` from its shell (`v` alone goes to the editor), `rgv`'s Enter, and agents through `edit FILE:LINE`, the command `v` runs. Outside a workspace, or while its editor is closed, `v` opens Neovim where you are, as `vi` and `vim` always do; Neovim started again in the editor's pane takes the files once more.
 - The editor opens on the project's file tree; `Cmd+Shift+Enter` zooms it to explore (`keys explore`).
-- Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux, windows take the place of tabs.
+- For lasting defaults, set `DOTFILES_WORKSPACE_LAYOUT=lean` (on a laptop, say) or the commands in `zsh/local.zsh`.
+- Outside Ghostty, or on Linux, the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux, windows take the place of tabs.
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
 - Tab completes `workspace`'s flags, directories, and task names.
 
@@ -94,7 +96,7 @@ Command keys do what they do in every Mac app. They reach Neovim through Ghostty
 | `Space d q` | Diagnostics into the quickfix list |
 | `:grep TEXT` | Search the project with rg into the quickfix list |
 | `]q` / `[q` / `:copen` / `:cclose` | Next / previous quickfix entry / show / hide the list |
-| `]` then `Ctrl+Q` / `[` then `Ctrl+Q` | First quickfix entry in the next / previous file |
+| `]` then `Ctrl+Q` / `[` then `Ctrl+Q` | First quickfix entry in the next file / last in the previous file |
 | `K` / `grn` / `gra` | Hover / rename / code actions |
 | `grr` / `gri` / `grt` | References / implementations / type definition |
 | `Ctrl+]` / `Ctrl+T` | Jump to the definition / back |
@@ -104,7 +106,7 @@ Command keys do what they do in every Mac app. They reach Neovim through Ghostty
 | `Ctrl+\` then `Ctrl+N` | Leave terminal mode |
 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
-- `Option+←` / `Option+→` jump words and `Cmd+←` / `Cmd+→` reach the line's start / end, in the text and on the command line; while typing and on the command line, `Option+Backspace` deletes a word. `Cmd+←` / `Cmd+→` arrive as Vim's `Ctrl+A` / `Ctrl+E`: to add 1 to a number, select it and press `g` then `Ctrl+A`. The file tree keeps its own keys (`?`).
+- While typing and on the command line, `Option+←` / `Option+→` step over words as Mac text fields do, keeping `_` and `.` inside words and crossing line breaks, and `Option+Backspace` deletes back to where `Option+←` goes; in normal mode they move by Vim's words (`b` / `w`). `Cmd+←` / `Cmd+→` reach the line's start / end, in the text and on the command line; they arrive as Vim's `Ctrl+A` / `Ctrl+E`, so to add 1 to a number, select it and press `g` then `Ctrl+A`. The file tree keeps its own keys (`?`).
 - Undo history survives closing and reopening a file.
 - In a workspace, files opened from its other panes (`v FILE:LINE`, `rgv`, an agent's `edit FILE:LINE`) open here, in the code beside the file tree or in its place, and bring you here.
 - The file tree has its own page: `keys explore`.
@@ -159,11 +161,10 @@ Agents run full screen and keep their own history; each scrolls, searches, and c
 | Codex | `PageUp` / `PageDown` / `Ctrl+Home` / `Ctrl+End` / `F3` / select with the mouse |
 
 - `Home` / `End` are `Fn+←` / `Fn+→` on Mac keyboards.
-
 - Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
-- When an agent finishes or needs you while you're in another pane or app, macOS notifies you (allow Ghostty's notifications when it first asks); Copilot CLI's start off, and the README shows how to turn them on. A shell command that ran 10 s or more notifies the same way when it finishes, and its bell marks the pane with a border until you return. Inside tmux, only panes in sight can notify.
+- When an agent finishes or needs you while you're in another pane or app, macOS notifies you (allow Ghostty's notifications when it first asks); Copilot CLI's start off, and the README shows how to turn them on. Shell commands of 10 s or more notify the same way when they finish, and their bell marks the pane with a border. Inside tmux, only panes in sight notify.
 - In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C`.
-- Agents read the repository's `AGENTS.md` (Claude Code too) and, in every repository, `~/.config/agents/instructions.md`: how to show you a file (`edit FILE:LINE`), the tools at hand, and no pushing or rewriting shared history unless you ask.
+- Agents read the repository's `AGENTS.md` and, in every repository, `~/.config/agents/instructions.md`: how to show you a file (`edit FILE:LINE`), the tools at hand, and no pushing or rewriting shared history unless you ask.
 - Set a different default in `zsh/local.zsh`: `export DOTFILES_WORKSPACE_AGENT_CMD='claude'`.
 
 ## Git: Understand Git state
@@ -172,7 +173,7 @@ Resume a repository, review your changes, and compare before sharing.
 
 | Run | Result |
 | --- | --- |
-| `gg` | Repository card: branch, upstream, worktree, recent commits |
+| `gg` | Repository card: branch, upstream, worktree, branches and tasks, recent commits |
 | `ggg` | The card plus a language summary |
 | `gs` | Status, including ignored files |
 | `gd` / `gds` / `gda` | Unstaged / staged / all tracked changes since the last commit |
@@ -233,12 +234,12 @@ List what is here, then find a file by name or by content.
 | `lll` | `ll` plus directory totals, line counts, and each repository's branch (slower) |
 | `llt` / `lld` | Two-level tree / directories only |
 | `lc` | Lines of code by language |
-| `v FILE` / `view FILE` | Edit / read-only in your editor |
+| `v FILE` / `view FILE` | Edit (in a workspace, in its editor) / read only, in place |
 | `fzfv` | Search names with a preview; Enter opens the file |
 | `Esc` then `c` | Pick a directory below here (directories only, each previewed) and change to it |
 | `rg TEXT` | Search contents, including hidden files |
 | `rga TEXT` | Also search files that Git ignores |
-| `rgv TEXT` | Browse the matching lines file by file, each file's in the preview; Enter opens Neovim at the first, with all of them in the quickfix list |
+| `rgv TEXT` | Browse the matching lines file by file, each file's in the preview; Enter opens Neovim (in a workspace, its editor) at the first, with all of them in the quickfix list |
 
 In every picker with a preview (`fzfv`, `rgv`, `keys`, `Esc` then `c`): `Option+↓` / `Option+↑` scroll it by half a page and `Shift+↓` / `Shift+↑` by a line, Esc cancels. `fzfv` previews a file's first 500 lines.
 
