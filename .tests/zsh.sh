@@ -801,6 +801,8 @@ if [[ -n $rg_bin ]]; then
     print -r -- 'a needle' > 'src/space name.txt'
     # Neovim's default 'errorformat' would read this line as other.c, line 9
     print -r -- 'see "other.c", line 9: needle' > 'src/time 12:30.txt'
+    # A match on an empty line has no text
+    print -rl -- before '' after > src/gap.txt
     print -r -- 'needle hidden' > .hidden/d.txt
     print -r -- 'needle in git' > .git/e.txt
     # Names with a tab or a newline stay off the list
@@ -862,7 +864,8 @@ if [[ -n $rg_bin ]]; then
     leftovers 'after Enter'
 
     # Neovim itself reads the list: each record's file and line, never what
-    # the matching text resembles, landing on the chosen file's first.
+    # the matching text resembles, nor whether there is any, landing on the
+    # chosen file's first.
     if [[ -n $nvim_bin ]]; then
       (
         /bin/mkdir -p "$test_root/rgv-nvim"
@@ -875,6 +878,9 @@ if [[ -n $rg_bin ]]; then
         rgv needle 2> /dev/null || fail 'rgv status with Neovim'
         expect $'src/time 12:30.txt:1 7 rgv\n.hidden/d.txt:1\nsrc/a.txt:2\nsrc/a.txt:8\nsrc/b.txt:5\nsrc/b.txt:6\nsrc/space name.txt:1\nsrc/time 12:30.txt:1' \
           "$(<$test_root/rgv-report)" 'rgv quickfix list as Neovim reads it'
+        pick=src/gap.txt
+        rgv '^$' src/gap.txt || fail 'rgv status for an empty line'
+        expect $'src/gap.txt:2 1 rgv\nsrc/gap.txt:2' "$(<$test_root/rgv-report)" 'rgv on an empty line'
         leftovers 'after Neovim'
       )
     else
@@ -1008,24 +1014,36 @@ if [[ -n $nvim_bin ]]; then
     expect "edit: can't focus the editor's pane from here" "$output" 'edit without a pane to focus'
     expect sub/a.txt:2 "$(shows)" 'edit without a pane to focus'
 
-    # rgv's Enter, from any folder, hands the editor the list of matching
-    # lines, at the chosen file's first, and edit focuses it.
+    # rgv's Enter, from any folder, has edit focus the editor, then hands it
+    # the list of matching lines, at the chosen file's first; the editor's
+    # errors are rgv's.
     if [[ -n $rg_bin ]]; then
       rm -f "$test_root/osascript-args"
       print -r -- ID-43 > "$run/ws.ghostty"
+      # Ghostty's stand-in, which also counts the editor's list as it focuses
+      mkdir -p "$test_root/rgv-bin"
+      print -rl -- '#!/bin/sh' "'$nvim_bin' --server '$socket' --remote-expr 'len(getqflist())' > '$test_root/rgv-focused'" \
+        "exec '$bin/osascript' \"\$@\"" > "$test_root/rgv-bin/osascript"
+      chmod +x "$test_root/rgv-bin/osascript"
       (
         export DOTFILES_EDITOR_SOCKET=$socket TMPDIR=$test_root/edit-tmp
         mkdir -p "$TMPDIR"
-        path=("$bin" "$repo/zsh/bin" "${rg_bin:h}" "${nvim_bin:h}" "${zsh_bin:h}" /usr/bin /bin)
+        path=("$test_root/rgv-bin" "$bin" "$repo/zsh/bin" "${rg_bin:h}" "${nvim_bin:h}" "${zsh_bin:h}" /usr/bin /bin)
         autoload -Uz rgv
-        fzf() { local -a menu=("${(@f)$(cat)}"); print -r -- "$menu[2]"; }
+        pick=2
+        fzf() { local -a menu=("${(@f)$(cat)}"); print -r -- "$menu[pick]"; }
         builtin cd -- "$files/sub"
         rgv needle .. || fail 'rgv in a workspace'
+        expect 0 "$(recorded rgv-focused)" 'rgv focuses the editor before the list'
+        expect 'sub/a.txt:5 rgv b.txt:3 sub/a.txt:5' \
+          "$(asked 'bufname() . ":" . line(".") . " " . getqflist({"title": 0}).title . " " . join(map(getqflist(), {_, item -> bufname(item.bufnr) . ":" . item.lnum}))')" \
+          'rgv in a workspace'
+        [[ $(recorded osascript-args) == *ID-43 ]] || fail 'rgv in a workspace focused no editor'
+        asked "execute('autocmd BufEnter * throw \"broken\"')" > /dev/null
+        pick=1 rc=0
+        rgv needle .. 2> "$test_root/rgv-error" || rc=$?
+        [[ $rc == 1 && $(recorded rgv-error) == 'rgv: '*broken* ]] || fail "rgv where the editor failed: $rc, $(recorded rgv-error)"
       )
-      expect 'sub/a.txt:5 rgv b.txt:3 sub/a.txt:5' \
-        "$(asked 'bufname() . ":" . line(".") . " " . getqflist({"title": 0}).title . " " . join(map(getqflist(), {_, item -> bufname(item.bufnr) . ":" . item.lnum}))')" \
-        'rgv in a workspace'
-      [[ $(recorded osascript-args) == *ID-43 ]] || fail 'rgv in a workspace focused no editor'
     else
       print -r -- 'SKIP: rgv in a workspace (rg missing)'
     fi

@@ -92,18 +92,20 @@ zf_mkdir -m 700 "$shelf" || return
   esac
 
   i=${${selection#*$'\t'}%%$'\t'*}
-  # Neovim reads the records with their own format: matching text parsed by
-  # 'errorformat' could name another file. Their whole paths, which the
-  # workspace's editor needs from any folder, show relative to Neovim's own
+  # Neovim reads the records with their own format (its second pattern for an
+  # empty line, as %m needs text): matching text parsed by 'errorformat' could
+  # name another file. Their whole paths, which the workspace's editor needs
+  # from any folder, show relative to Neovim's own
   local list=${${:-$shelf/quickfix}//\'/\'\'}
-  local load="call setqflist([], ' ', {'title': 'rgv', 'efm': \"%f\t%l\t%m\", 'lines': map(readfile('$list'), {_, record -> substitute(record, '^[^\t]*', '\\=fnamemodify(submatch(0), \":.\")', '')})}) | cc $firsts[i]"
+  local load="call setqflist([], ' ', {'title': 'rgv', 'efm': \"%f\t%l\t%m,%f\t%l\t\", 'lines': map(readfile('$list'), {_, record -> substitute(record, '^[^\t]*', '\\=fnamemodify(submatch(0), \":.\")', '')})}) | cc $firsts[i]"
   local quoted=${load//\'/\'\'} error
-  # In a workspace, its editor takes the list (config.workspace), and edit
-  # focuses it
-  if [[ -n ${DOTFILES_EDITOR_SOCKET-} ]] && (( $+commands[nvim] )) && error=$(nvim --server \
-      "$DOTFILES_EDITOR_SOCKET" --remote-expr "v:lua.require'config.workspace'.open(['$quoted'])" 2> /dev/null); then
-    [[ -z $error ]] || print -r -u2 -- "rgv: $error"
+  # In a workspace whose editor is running, edit focuses it, then it takes the
+  # list (config.workspace), as edit opens files
+  if [[ -n ${DOTFILES_EDITOR_SOCKET-} ]] && (( $+commands[nvim] )) &&
+      nvim --server "$DOTFILES_EDITOR_SOCKET" --remote-expr 1 > /dev/null 2>&1; then
     edit
+    error=$(nvim --server "$DOTFILES_EDITOR_SOCKET" --remote-expr "v:lua.require'config.workspace'.open(['$quoted'])") || return
+    [[ -z $error ]] || { print -r -u2 -- "rgv: $error"; return 1 }
   elif [[ ${editor[1]:t} == nvim ]]; then
     "${editor[@]}" -c "$load"
   else
