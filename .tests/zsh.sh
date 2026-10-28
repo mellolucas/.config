@@ -919,6 +919,95 @@ fi
   [[ $(recorded gh-error) == *'needs gh'* ]] || fail "github-open without gh: $(recorded gh-error)"
 )
 
+# gdv opens Git's changes in Neovim's difftool, through real Git and Neovim,
+# here headless and reporting what the difftool shows: each changed file as
+# its list names it, with its old and new text as they open side by side, the
+# first at once and the next with ]q. Unstaged changes by default, a file
+# marked with git add -N among them but no untracked one; with --staged, only
+# the staged change. Its usage runs neither, and without Neovim it says so.
+(
+  for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+  export GIT_AUTHOR_NAME=Tester GIT_AUTHOR_EMAIL=tester@example.com
+  export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=tester@example.com
+  autoload -Uz gdv
+  /bin/rm -f "$test_root/call"
+  git() { record git "$@"; }
+  for args in -h --help '--staged --help'; do
+    output=$(gdv ${=args}) || fail "gdv $args status"
+    [[ $output == 'usage: gdv '* ]] || fail "gdv $args: $output"
+  done
+  if gdv 2> "$test_root/gdv-error"; then fail 'gdv without Neovim succeeded'; fi
+  [[ $(recorded gdv-error) == *'needs Neovim'* ]] || fail "gdv without Neovim: $(recorded gdv-error)"
+  [[ ! -e $test_root/call ]] || fail "gdv ran git: $(recorded)"
+  unfunction git
+  if [[ -n $nvim_bin ]]; then
+    gdv_bin=$test_root/gdv-bin
+    /bin/mkdir -p "$gdv_bin"
+    /bin/ln -s "$git_bin" "$gdv_bin/git"
+    print -rl -- '#!/bin/sh' \
+      'exec "$GDV_NVIM" --clean --headless -n -i NONE "$@" -c "lua dofile(vim.env.GDV_REPORTER)" < /dev/null' \
+      > "$gdv_bin/nvim"
+    /bin/chmod +x "$gdv_bin/nvim"
+    /bin/cat > "$test_root/gdv-report.lua" <<'LUA'
+-- Once the difftool lists the changes, each file as the list names it, with
+-- the text of the two sides it opens beside each other; ]q opens the next
+vim.api.nvim_create_autocmd("VimEnter", {
+  nested = true, -- the difftool opens each file from its own window events
+  callback = function()
+    local report = {}
+    pcall(function()
+      if not vim.wait(5000, function() return vim.fn.getqflist({ title = 0 }).title == "DiffTool" end) then
+        return
+      end
+      local list = vim.fn.getqflist({ qfbufnr = 0 }).qfbufnr
+      for i, entry in ipairs(vim.api.nvim_buf_get_lines(list, 0, -1, false)) do
+        if i > 1 then
+          vim.api.nvim_feedkeys("]q", "mx", false)
+        end
+        local sides
+        vim.wait(5000, function()
+          sides = {}
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            if vim.wo[win].diff and vim.endswith(vim.api.nvim_buf_get_name(buf), "/" .. entry:sub(3)) then
+              sides[#sides + 1] = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), "\n")
+            end
+          end
+          return #sides == 2
+        end)
+        report[#report + 1] = entry .. ": " .. table.concat(sides, " → ")
+      end
+    end)
+    vim.fn.writefile(report, vim.env.GDV_REPORT)
+    vim.cmd("qall!")
+  end,
+})
+LUA
+    export GDV_NVIM=$nvim_bin GDV_REPORTER=$test_root/gdv-report.lua GDV_REPORT=$test_root/gdv-report
+    path=("$gdv_bin" /usr/bin /bin)
+    git init -q --template= "$test_root/gdv-repo"
+    builtin cd "$test_root/gdv-repo"
+    print -r -- one > a.txt
+    print -r -- two > b.txt
+    git add a.txt b.txt
+    git commit -q -m 'First commit'
+    print -r -- 'one changed' > a.txt
+    print -r -- 'two staged' > b.txt
+    git add b.txt
+    print -r -- new > new.txt
+    git add -N new.txt
+    print -r -- loose > loose.txt
+    gdv > "$test_root/gdv-output" 2>&1 || fail "gdv status: $(recorded gdv-output)"
+    expect $'M a.txt: one → one changed\nA new.txt:  → new' "$(recorded gdv-report)" 'gdv in Neovim'
+    /bin/rm -f "$test_root/gdv-report"
+    gdv --staged > "$test_root/gdv-output" 2>&1 || fail "gdv --staged status: $(recorded gdv-output)"
+    expect 'M b.txt: two → two staged' "$(recorded gdv-report)" 'gdv --staged in Neovim'
+  else
+    print -r -- 'SKIP: gdv in Neovim (nvim missing)'
+  fi
+)
+
 # Full startup without a terminal, as agents and editors start interactive
 # shells: .zshenv, .zprofile, and .zshrc from tracked files only, in a
 # throwaway home, print nothing but the command's output, though the last full

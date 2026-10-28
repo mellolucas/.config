@@ -1,0 +1,23 @@
+# vim: ft=zsh
+
+emulate -L zsh
+
+if (( ${argv[(I)(-h|--help)]} )); then
+  print -r -- 'usage: gdv [GIT DIFF ARGUMENTS...]'
+  print -r -- 'Review changes in Neovim, file by file, old beside new: unstaged ones, or'
+  print -r -- "those git diff's arguments pick, as gd's do (--staged, @, main...)."
+  print -r -- ']q / [q open the next / previous file, and :qa ends the review. Untracked'
+  print -r -- 'files appear in no diff until git add -N FILE marks them for adding.'
+  return 0
+fi
+
+command -v nvim >/dev/null 2>&1 || {
+  print -u2 -- 'gdv: needs Neovim (nvim); run: dotfiles bundle'
+  return 1
+}
+
+# Git fills a folder for each side; Neovim's difftool lists the files that
+# differ (:help difftool). With --dir-diff, Git takes all of --extcmd as one
+# program's name, so Neovim's command goes in as a tool of its own.
+git -c 'difftool.gdv.cmd=nvim -c "packadd nvim.difftool" -d "$LOCAL" "$REMOTE"' \
+  difftool --dir-diff --tool=gdv "$@"

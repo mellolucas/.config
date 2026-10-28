@@ -168,6 +168,7 @@ Resume a repository, review your changes, and compare before sharing.
 | `ggg` | The card plus a language summary |
 | `gs` | Status, including ignored files |
 | `gd` / `gds` / `gda` | Unstaged / staged / all tracked changes since the last commit |
+| `gdv` / `gdv --staged` / `gdv @` | The same in Neovim, file by file, old beside new |
 | `gdo` / `gdi` | Committed changes outgoing to / incoming from the upstream |
 | `gdm` | Committed changes since branching from `origin/HEAD` |
 | `gl` / `gls` | Log / log with file stats |
@@ -179,6 +180,7 @@ Resume a repository, review your changes, and compare before sharing.
 | `gcl owner/repo` | Clone into `~/code/owner/repo` |
 
 - Add `f` after `gd` to list files only (`gdf`, `gdfs`, `gdfo`…); add `t` for tip-to-tip comparisons (`gdot`, `gdit`, `gdmt`).
+- `gdv` takes what `gd` takes (`gdv main...`) and lists the changed files in Neovim's quickfix list: `]q` / `[q` open the next / previous one, and `:qa` ends the review. Untracked files appear in no diff until `git add -N FILE` marks them for adding.
 - Graphs take `s` for file stats too (`glgs`, `glgsa`).
 - Entering another repository prints its card; counts are as fresh as your last fetch.
 - `gcl` also takes GitHub URLs, and `gh:owner/repo` works wherever Git takes a URL.
