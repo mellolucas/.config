@@ -401,27 +401,6 @@ RUBY
   done
 )
 
-git() {
-  [[ $1 == -C ]] || fail "unexpected git invocation: $*"
-  shift 2
-  case "$*" in
-    'rev-parse --is-inside-work-tree') [[ $git_state != outside ]] ;;
-    'rev-parse --show-toplevel') print -r -- "$HOME/code/owner/repo" ;;
-    'rev-parse -q --verify HEAD') [[ $git_state != unborn ]] ;;
-    'symbolic-ref --short -q HEAD')
-      [[ $git_state != detached ]] || return 1
-      print -r -- "$branch"
-      ;;
-    'rev-parse --short HEAD') print -r -- abc1234 ;;
-    *) fail "unexpected git invocation: $*" ;;
-  esac
-}
-gh() {
-  print -r -l -- "$@" >> "$test_root/gh"
-  [[ $gh_state != fail ]] || { print -u2 -- 'gh unavailable'; return 1; }
-}
-open() { record browser "$@"; }
-xdg-open() { record browser "$@"; }
 glow() { record glow "$@"; }
 bat() { fail 'unexpected bat invocation'; }
 less() { fail 'unexpected less invocation'; }
@@ -687,53 +666,57 @@ else
   print -r -- 'SKIP: rgv (rg missing)'
 fi
 
-git_state=branch
-branch=$'feature/#&%\xc3\xa9'
-encoded_ref='feature%2F%23%26%25%C3%A9'
-encoded_rel='nested%20dir/file%20%23%26%25%C3%A9.md'
-gh_state=success
-: > "$test_root/gh"
-for flag in -h --help; do
-  output=$(github-open "$flag") || fail "github-open $flag status"
-  [[ $output == 'usage: github-open '* ]] || fail "github-open $flag usage"
-done
-# help COMMAND ARGS puts --help after the arguments.
-output=$(github-open "$root/$rel" --help) || fail 'github-open PATH --help status'
-[[ $output == 'usage: github-open '* ]] || fail 'github-open PATH --help usage'
-[[ ! -s $test_root/gh ]] || fail 'github-open usage invoked gh'
-github-open "$root/$rel"
-expect "browse
-$rel
---branch
-$branch" "$(recorded gh)" 'browse retains the branch and relative path'
+# github-open runs gh browse at the repository's root with the path from
+# there, at the current branch or the commit when detached; real Git, and a
+# stand-in gh that records where it ran and with what.
+(
+  for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+  export GIT_AUTHOR_NAME=Tester GIT_AUTHOR_EMAIL=tester@example.com
+  export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=tester@example.com
+  git() { "$git_bin" "$@"; }
+  gh() { print -r -l -- "$PWD" "$@" > "$test_root/gh"; }
+  builtin cd "$test_root/outside"
+  for flag in -h --help; do
+    output=$(github-open "$flag") || fail "github-open $flag status"
+    [[ $output == 'usage: github-open '* ]] || fail "github-open $flag usage"
+  done
+  # help COMMAND ARGS puts --help after the arguments.
+  output=$(github-open "$root/$rel" --help) || fail 'github-open PATH --help status'
+  [[ $output == 'usage: github-open '* ]] || fail 'github-open PATH --help usage'
+  [[ ! -e $test_root/gh ]] || fail 'github-open usage invoked gh'
 
-gh_state=fail
-github-open "$root/$rel"
-expect "browser
-https://github.com/owner/repo/blob/$encoded_ref/$encoded_rel" "$(recorded)" 'blob URL byte encoding'
-github-open "$root/${rel:h}"
-expect "browser
-https://github.com/owner/repo/tree/$encoded_ref/nested%20dir" "$(recorded)" 'tree URL and path separators'
-github-open "$root"
-expect "browser
-https://github.com/owner/repo/tree/$encoded_ref" "$(recorded)" 'repository branch URL'
+  # An unborn branch opens the repository's home page.
+  git init -q --template= "$root"
+  github-open "$root/$rel" || fail 'github-open status on an unborn branch'
+  expect "$root"$'\nbrowse' "$(recorded gh)" 'github-open on an unborn branch'
 
-git_state=detached
-github-open "$root/$rel"
-expect "browser
-https://github.com/owner/repo/blob/abc1234/$encoded_rel" "$(recorded)" 'detached commit URL'
+  branch=$'feature/#&%\xc3\xa9'
+  git -C "$root" commit -q --allow-empty -m 'First commit'
+  git -C "$root" checkout -q -b "$branch"
+  github-open "$root/$rel" || fail 'github-open status for a file'
+  expect "$root"$'\nbrowse\n'"$rel"$'\n--branch\n'"$branch" "$(recorded gh)" 'github-open a file at the current branch'
+  builtin cd "$root/${rel:h}"
+  github-open || fail 'github-open status for the current folder'
+  expect "$root"$'\nbrowse\n'"${rel:h}"$'\n--branch\n'"$branch" "$(recorded gh)" 'github-open the current folder at the current branch'
+  github-open "$root" || fail 'github-open status for the repository'
+  expect "$root"$'\nbrowse\n--branch\n'"$branch" "$(recorded gh)" 'github-open the repository at the current branch'
 
-git_state=unborn
-github-open "$root/$rel"
-expect $'browser\nhttps://github.com/owner/repo' "$(recorded)" 'unborn repository URL'
+  git -C "$root" checkout -q --detach
+  commit=$(git -C "$root" rev-parse --short HEAD)
+  github-open "$root/$rel" || fail 'github-open status on a detached HEAD'
+  expect "$root"$'\nbrowse\n'"$rel"$'\n--branch\n'"$commit" "$(recorded gh)" 'github-open on a detached HEAD'
 
-git_state=outside
-if github-open "$test_root/outside" 2>/dev/null; then
-  fail 'outside /code/ must not fabricate a URL'
-fi
-if github-open "$test_root/missing" 2>/dev/null; then
-  fail 'missing path must fail'
-fi
+  /bin/rm -f "$test_root/gh"
+  if github-open "$test_root/outside" 2> "$test_root/gh-error"; then fail 'github-open outside a repository succeeded'; fi
+  [[ $(recorded gh-error) == *'not in a Git repository'* ]] || fail "github-open outside a repository: $(recorded gh-error)"
+  if github-open "$root/missing" 2> /dev/null; then fail 'github-open of a missing path succeeded'; fi
+  [[ ! -e $test_root/gh ]] || fail 'github-open called gh for an outside or missing path'
+
+  unfunction gh
+  if github-open "$root/$rel" 2> "$test_root/gh-error"; then fail 'github-open without gh succeeded'; fi
+  [[ $(recorded gh-error) == *'needs gh'* ]] || fail "github-open without gh: $(recorded gh-error)"
+)
 
 # Full startup without a terminal, as agents and editors start interactive
 # shells: .zshenv, .zprofile, and .zshrc from tracked files only, in a
