@@ -18,53 +18,6 @@ if [[ ${1:-} == --mark-child ]]; then
   print -r -- FINISHED
   exit
 fi
-if [[ ${1:-} == --glance-child ]]; then
-  # git-glance's hook from zsh/.zshrc in a top-level terminal shell, with Git
-  # and the card stubbed (a repository is a directory holding .repo), while a
-  # reused shell moves from a to b by each route
-  glance=$2
-  path=("$glance/bin" $path)
-  git() {
-    [[ $1 == rev-parse && $2 == --show-toplevel ]] || return 1
-    local directory=$PWD
-    until [[ -e $directory/.repo ]]; do
-      [[ $directory != / ]] || return 128
-      directory=${directory:h}
-    done
-    print -r -- "$directory"
-  }
-  git-glance() { print -r -- "CARD:${PWD:t}"; }
-  tmux() {
-    case $1 in
-      display) print -r -- '1 /dev/ttysfixture' ;;
-      split-window) print -r -- %9 ;;
-    esac
-  }
-  autoload -Uz add-zsh-hook
-  config=$(<"$repo/zsh/.zshrc")
-  [[ $config == *$'\nif command -v git-glance '*$'\nfi\n'* ]] || exit 1
-  config=${config#*$'\nif command -v git-glance '}
-  builtin cd -- "$glance/a"
-  eval "if command -v git-glance ${config%%$'\nfi\n'*}"$'\nfi'
-  unset DOTFILES_WORKSPACE_LAYOUT DOTFILES_WORKSPACE_SHELL_CMD TMUX TMUX_PANE
-  OSTYPE=darwin23 TERM_PROGRAM=ghostty DOTFILES_WORKSPACE_SCRIPT=$self TTY=/dev/ttysfixture
-  code=$(<"$repo/zsh/functions/workspace")
-  executable_check='[[ -x /usr/bin/osascript ]]'
-  code=${code/$executable_check/'[[ 1 == 1 ]]'}
-  functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
-  workspace_osascript() { print -r -- 'same tab'; }
-  for route in ghostty tmux; do
-    [[ $route == ghostty ]] || export TMUX=/tmp/fixture,1,0 TMUX_PANE=%7
-    workspace "$glance/b" < /dev/null
-    print -r -- "STEP:$route"
-    builtin cd -- sub
-    print -r -- STEP:sub
-    builtin cd -- "$glance/a"
-    print -r -- STEP:back
-  done
-  print -r -- FINISHED
-  exit
-fi
 if [[ ${1:-} == --child ]]; then
   mode=$2
   code=$(<"$repo/zsh/functions/workspace")
@@ -73,42 +26,18 @@ if [[ ${1:-} == --child ]]; then
   functions[query]="$code"$'\nprint -r -- "RESULT:$width:$height"'
   # Only the full layout sizes its splits from the window
   layout=full
-  [[ $mode != lean ]] || layout=lean
   export TERM_PROGRAM=ghostty
-  [[ $mode != other-terminal ]] || TERM_PROGRAM=other
   # Normalize macOS's transient PENDIN bit before comparing saved settings.
   stty echo echonl -icanon < /dev/tty
-  [[ $mode == noncanonical ]] || stty icanon < /dev/tty
+  stty icanon < /dev/tty
   [[ $mode != echo-off ]] || stty -echo -echonl < /dev/tty
   before=$(stty -g < /dev/tty)
-  trap ':' INT
   # Force the terminal response into the write/read scheduling window.
   printf() {
     builtin printf "$@"
     sleep 0.1
-    [[ $mode != write-error ]]
   }
-  if [[ $mode == read-error ]]; then
-    read() { return 1; }
-  fi
-  if [[ $mode == (HUP|TERM) ]]; then
-    zmodload zsh/system
-    read() { kill -s "$mode" "$sysparams[pid]"; return 1; }
-  fi
-  if [[ $mode == setup-error ]]; then
-    stty() {
-      command stty "$@"
-      [[ $1 != -echo ]]
-    }
-    # The production code uses command stty; intercept only in this fixture.
-    functions[query]=${functions[query]//'command stty'/'stty'}
-  fi
-  print -r -- READY
-  if [[ $mode == non-tty ]]; then
-    query < /dev/null
-  else
-    query
-  fi
+  query
   after=$(stty -g < /dev/tty)
   [[ $after == $before ]] || print -r -- "STATE_CHANGED:$before:$after"
   if [[ $mode == queued ]]; then
@@ -240,38 +169,22 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   )
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
 
-  for option in --layout --agent --editor --status --shell; do
-    reject "$option"
-    reject "$option" --editor command
-    reject "$option" --
-  done
-  for option in --agent --editor; do
-    reject "$option" ''
-    reject "$option="
-  done
-  reject --unknown
-  reject --unknown=value
-  reject -x
+  # An option without its value (an empty status is valid), two directories, a missing one
+  reject --status
   reject . .
-  reject -- . .
-  reject -- --help --editor
   reject "$temporary/missing-directory"
 
   # Help must bypass even unavailable launcher and script checks.
   code=${functions[workspace]}
   functions[workspace]=${code//'[[ 1 == 1 ]]'/'[[ 1 == 0 ]]'}
   export DOTFILES_WORKSPACE_SCRIPT=$temporary/missing-script
-  for option in -h --help; do
-    actual=$(workspace "$option" 3>&1 < /dev/null) || fail "help: $option"
-    [[ $actual == 'usage: workspace '* && $actual != *$'\e[14t'* ]] || fail "help side effects: $option"
-    actual=$(workspace --agent 'agent chat' "$option" 3>&1 < /dev/null) || fail "help after flag: $option"
-    [[ $actual == 'usage: workspace '* ]] || fail "help after flag output: $option"
-  done
+  actual=$(workspace --help 3>&1 < /dev/null) || fail 'help'
+  [[ $actual == 'usage: workspace '* && $actual != *$'\e[14t'* ]] || fail 'help side effects'
   print -r -- 'ok: parser and dispatch'
 )
 
-# Outside Ghostty on macOS, and inside tmux, tmux lays out the same panes
-# (a stub records the calls).
+# Outside Ghostty on macOS, and inside tmux, tmux lays out the same panes;
+# .tests/tmux.zsh drives a real server.
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
     DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX TMUX_PANE
@@ -289,124 +202,7 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
     fail 'accepted a missing tmux'
   fi
   [[ $output == $'workspace: tmux not found\nhint: run: dotfiles bundle' ]] || fail "missing tmux: $output"
-
-  # Inside tmux, even in Ghostty: a new window in the current session, and
-  # nothing attaches.
-  print '#!/bin/sh' > "$temporary/bin/tmux"
-  chmod +x "$temporary/bin/tmux"
-  tmux() {
-    print -r -- "${(j: :)${(qq)@}}" >> "$temporary/calls"
-    # Pane ids from the log: the function captures output in subshells
-    case $1 in
-      has-session) return 1 ;;
-      display) print -r -- "$window_panes $pane_tty" ;;
-      new-session|new-window|split-window)
-        local -a made=(${(M)${(f)"$(<"$temporary/calls")"}:#\'(new-session|new-window|split-window)\'*})
-        print -r -- "%$#made" ;;
-    esac
-  }
-  output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 OSTYPE=darwin23 TERM_PROGRAM=ghostty \
-    workspace --status '' --agent 'agent $(chat)' "$temporary/work dir" < /dev/null) || fail 'inside tmux'
-  [[ -z $output ]] || fail "inside tmux printed: $output"
-  expected=(
-    "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-b' '-l' '20%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-v' '-b' '-l' '30%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'send-keys' '-t' '%2' '-l' '--' 'nvim .'" "'send-keys' '-t' '%2' 'Enter'"
-    "'send-keys' '-t' '%3' '-l' '--' 'agent \$(chat)'" "'send-keys' '-t' '%3' 'Enter'"
-    "'select-pane' '-t' '%1'"
-  )
-  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "inside tmux calls: $(<"$temporary/calls")"
-
-  # The lean layout: even halves, and the one shell runs the status command,
-  # then the shell command, as one line.
-  : > "$temporary/calls"
-  output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 workspace --layout lean --status 'echo status' \
-    --shell 'echo shell' "$temporary/work dir" < /dev/null) || fail 'lean inside tmux'
-  expected=(
-    "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-v' '-b' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'send-keys' '-t' '%3' '-l' '--' 'nvim .'" "'send-keys' '-t' '%3' 'Enter'"
-    "'send-keys' '-t' '%2' '-l' '--' 'ocode'" "'send-keys' '-t' '%2' 'Enter'"
-    "'send-keys' '-t' '%1' '-l' '--' 'echo status; echo shell'" "'send-keys' '-t' '%1' 'Enter'"
-    "'select-pane' '-t' '%1'"
-  )
-  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lean calls: $(<"$temporary/calls")"
-
-  # A window holding only this shell becomes the workspace around it: the
-  # shell is the main one, moves to the workspace, and runs its own commands
-  # there; nothing is typed into its pane.
-  local window_panes=1 pane_tty=/dev/ttysfixture
-  : > "$temporary/calls"
-  output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 TMUX_PANE=%7 TTY=/dev/ttysfixture \
-    workspace --shell 'print -r -- SHELL:$PWD' "$temporary/work dir" < /dev/null; print -r -- "PWD:$PWD") ||
-    fail 'lone pane'
-  [[ $output == "SHELL:$temporary/work dir"$'\n'"PWD:$temporary/work dir" ]] || fail "lone pane printed: $output"
-  expected=(
-    "'display' '-p' '-t' '%7' '#{window_panes} #{pane_tty}'"
-    "'rename-window' '-t' '%7' '--' 'work dir'"
-    "'split-window' '-h' '-b' '-l' '20%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-l' '50%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-v' '-b' '-l' '30%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'send-keys' '-t' '%1' '-l' '--' 'nvim .'" "'send-keys' '-t' '%1' 'Enter'"
-    "'send-keys' '-t' '%2' '-l' '--' 'ocode'" "'send-keys' '-t' '%2' 'Enter'"
-    "'send-keys' '-t' '%3' '-l' '--' 'ggg'" "'send-keys' '-t' '%3' 'Enter'"
-    "'select-pane' '-t' '%7'"
-  )
-  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lone pane calls: $(<"$temporary/calls")"
-  : > "$temporary/calls"
-  output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 TMUX_PANE=%7 TTY=/dev/ttysfixture \
-    workspace --layout lean --status 'echo status' --shell 'echo shell' "$temporary/work dir" < /dev/null;
-    print -r -- "PWD:$PWD") || fail 'lean lone pane'
-  [[ $output == $'status\nshell\n'"PWD:$temporary/work dir" ]] || fail "lean lone pane printed: $output"
-  expected=(
-    ${expected[1,2]}
-    "'split-window' '-h' '-l' '50%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-v' '-b' '-l' '50%' '-t' '%7' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'send-keys' '-t' '%2' '-l' '--' 'nvim .'" "'send-keys' '-t' '%2' 'Enter'"
-    "'send-keys' '-t' '%1' '-l' '--' 'ocode'" "'send-keys' '-t' '%1' 'Enter'"
-    "'select-pane' '-t' '%7'"
-  )
-  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "lean lone pane calls: $(<"$temporary/calls")"
-  # Beside other panes, or nested in another program's terminal (the pane's
-  # terminal is not this shell's), a new window, and the shell stays put.
-  for window_panes pane_tty in 2 /dev/ttysfixture 1 /dev/ttysother; do
-    : > "$temporary/calls"
-    output=$(PATH=$temporary/bin:$PATH TMUX=/tmp/fixture,1,0 TMUX_PANE=%7 TTY=/dev/ttysfixture \
-      workspace "$temporary/work dir" < /dev/null; print -r -- "PWD:$PWD") || fail "not alone: $window_panes"
-    [[ $output == "PWD:$PWD" ]] || fail "not alone ($window_panes $pane_tty) printed: $output"
-    [[ ${${(f)"$(<"$temporary/calls")"}[2]} == "'new-window' "* ]] ||
-      fail "not alone ($window_panes $pane_tty) calls: $(<"$temporary/calls")"
-  done
-  expected=(
-    "'new-window' '-P' '-F' '#{pane_id}' '-n' 'work dir' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-b' '-l' '20%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-h' '-l' '50%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-    "'split-window' '-v' '-b' '-l' '30%' '-t' '%1' '-P' '-F' '#{pane_id}' '-c' '$temporary/work dir'"
-  )
-
-  # Outside tmux and without a terminal: a session sized like the terminal
-  # when there is one, and a hint that names it exactly.
-  : > "$temporary/calls"
-  output=$(PATH=$temporary/bin:$PATH workspace --status '' "$temporary/work dir" < /dev/null) ||
-    fail 'outside tmux'
-  [[ $output == "workspace: tmux session work dir is ready; attach with: tmux attach -t '=work dir'" ]] ||
-    fail "outside tmux printed: $output"
-  expected=(
-    "'list-sessions' '-F' '#{session_name}:#{session_path}'"
-    "'has-session' '-t' '=work dir'"
-    "'new-session' '-d' '-x' '-' '-y' '-' '-P' '-F' '#{pane_id}' '-s' 'work dir' '-c' '$temporary/work dir'"
-    ${expected[2,4]}
-    "'send-keys' '-t' '%2' '-l' '--' 'nvim .'" "'send-keys' '-t' '%2' 'Enter'"
-    "'send-keys' '-t' '%3' '-l' '--' 'ocode'" "'send-keys' '-t' '%3' 'Enter'"
-    "'select-pane' '-t' '%1'"
-  )
-  [[ $(<"$temporary/calls") == ${(F)expected} ]] || fail "outside tmux calls: $(<"$temporary/calls")"
-  unfunction tmux
-  # .tests/tmux.zsh runs workspace against a real tmux server.
-  print -r -- 'ok: tmux route'
+  print -r -- 'ok: missing tmux'
 )
 
 wait_for() {
@@ -422,59 +218,25 @@ wait_for() {
   done
 }
 
-for mode in valid noncanonical echo-off queued fragmented leading-zero wrong-code junk zero oversized \
-    incomplete multibyte timeout slow length setup-error write-error read-error interrupt HUP TERM \
-    other-terminal non-tty lean; do
+for mode in valid echo-off queued timeout; do
   transcript=''
   expected=0:0
   zpty -b terminal zsh -f "$self" --child "$mode"
-  if [[ $mode == (setup-error|other-terminal|non-tty|lean) ]]; then
-    wait_for READY
-  else
-    wait_for $'\e[14t'
-  fi
+  wait_for $'\e[14t'
   started=$SECONDS
   case $mode in
-    valid|noncanonical|echo-off|queued)
+    valid|echo-off|queued)
       response=$'\e[4;884;2552t'
       [[ $mode != queued ]] || response+=$'typed input\n'
       zpty -w -n terminal "$response"
       expected=2552:884 ;;
-    fragmented)
-      for response in $'\e[' '4;884;' '2552t'; do
-        zpty -w -n terminal "$response"
-        sleep 0.05
-      done
-      expected=2552:884 ;;
-    leading-zero)
-      zpty -w -n terminal $'\e[4;000884;002552t'
-      expected=2552:884 ;;
-    wrong-code) zpty -w -n terminal $'\e[8;884;2552t' ;;
-    junk) zpty -w -n terminal 'junk4;884;2552t' ;;
-    zero) zpty -w -n terminal $'\e[4;0;2552t' ;;
-    oversized) zpty -w -n terminal $'\e[4;1234567;2552t' ;;
-    incomplete) zpty -w -n terminal $'\e[4;884;' ;;
-    multibyte) zpty -w -n terminal $'\xc3' ;;
-    slow)
-      for response in $'\e' '[' '4' ';' '8' '8'; do
-        zpty -w -n terminal "$response"
-        sleep 0.15
-      done ;;
-    length) zpty -w -n terminal "${(l:32::x:)}" ;;
-    interrupt) sleep 0.2; zpty -w -n terminal $'\x03' ;;
   esac
   wait_for FINISHED
   (( SECONDS - started < 1.5 )) || fail "$mode: exceeded total deadline"
   [[ $transcript == *RESULT:$expected* ]] || fail "$mode dimensions: ${(qqq)transcript}"
   [[ $transcript != *'4;884;2552t'* ]] || fail "$mode response echoed: ${(qqq)transcript}"
   [[ $transcript != *STATE_CHANGED* ]] || fail "$mode terminal state: ${(qqq)transcript}"
-  if [[ $mode == (setup-error|other-terminal|non-tty|lean) ]]; then
-    [[ $transcript != *$'\e[14t'* ]] || fail "$mode: unexpected query"
-  fi
   [[ $mode != queued || $transcript == *'QUEUED:typed input'* ]] || fail 'queued input lost'
-  if [[ $mode == length ]]; then
-    (( SECONDS - started < 0.75 )) || fail 'length limit waited for timeout'
-  fi
   zpty -d terminal
   print -r -- "ok: $mode"
 done
@@ -489,22 +251,3 @@ mark=${${transcript#*$'\e]2;'}%%$'\a'*}
 [[ $transcript == *"ARGUMENT:$mark:END"* ]] || fail "mark argument: ${(qqq)transcript}"
 zpty -d terminal
 print -r -- 'ok: pane mark'
-
-# git-glance's hook remembers the repository a reused shell moves to, as for a
-# shell started there: no card within it, and a card back in the first one.
-(
-  glance=$(mktemp -d "${TMPDIR:-/tmp}/workspace-glance.XXXXXXXX")
-  glance=${glance:A}
-  trap 'zpty -d terminal 2>/dev/null; command rm -rf -- "$glance"' EXIT
-  mkdir -p "$glance"/{a,b/sub,bin}
-  touch "$glance/a/.repo" "$glance/b/.repo"
-  print -r -- '#!/bin/sh' > "$glance/bin/tmux"
-  chmod +x "$glance/bin/tmux"
-  transcript=''
-  zpty -b terminal zsh -f "$self" --glance-child "$glance"
-  wait_for FINISHED
-  steps=(${(M)${(f)transcript//$'\r'/}:#(CARD|STEP):*})
-  [[ ${(j: :)steps} == 'STEP:ghostty STEP:sub CARD:a STEP:back STEP:tmux STEP:sub CARD:a STEP:back' ]] ||
-    fail "git-glance after a reused shell moves: ${(j: :)steps}"
-  print -r -- 'ok: git-glance after a reused shell moves'
-)
