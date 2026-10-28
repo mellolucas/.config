@@ -274,7 +274,8 @@ for operation in bundle install; do
   )
 done
 
-# A machine's own global npm config stays.
+# A machine's own global npm config stays; another account's Homebrew, which
+# this user can't write, gets none, and linking still succeeds.
 (
   export HOME="$test_root/own-npmrc" PATH="$test_root/package-bin:$PATH"
   export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
@@ -286,6 +287,19 @@ done
   check test "$(cat "$HOME/prefix/etc/npmrc")" = 'registry=https://registry.example.invalid/'
   check grep -Fq "kept $HOME/prefix/etc/npmrc" "$HOME/dispatch.log"
   if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail 'own npm config was backed up'; fi
+  if [ "$(id -u)" -eq 0 ]; then
+    printf "SKIP: another account's Homebrew (root writes anywhere)\n"
+  else
+    rm "$HOME/prefix/etc/npmrc"
+    chmod a-w "$HOME/prefix/etc" "$HOME/prefix"
+    rc=0
+    "$installer" link > "$HOME/dispatch.log" 2>&1 || rc=$?
+    # Writable again before any check can fail, so the test root can be removed.
+    chmod u+w "$HOME/prefix" "$HOME/prefix/etc"
+    [ "$rc" = 0 ] || fail "link with another account's Homebrew: $(cat "$HOME/dispatch.log")"
+    check test ! -e "$HOME/prefix/etc/npmrc"
+    check test ! -L "$HOME/prefix/etc/npmrc"
+  fi
 )
 
 # Fresh installs run brew from its prefix before Homebrew is on PATH; Bundle
@@ -542,14 +556,14 @@ check_update() {
   check test "$(git -C "$repo_dir" rev-parse HEAD)" = "$expected_head"
 }
 
-for scenario in equal ahead behind dirty-behind diverged \
+for scenario in equal equal-dirty ahead ahead-dirty behind dirty-behind diverged \
   detached no-upstream fetch-failed discard discard-unignored collision collision-discard; do
   initial=$base_commit incoming=$incoming_commit expected_head=$incoming_commit
   expected_rc=0 diagnostic='fast-forwarding to'
   set --
   case "$scenario" in
-    equal) incoming=$base_commit expected_head=$base_commit diagnostic='already up to date' ;;
-    ahead) initial=$local_commit incoming=$base_commit expected_head=$local_commit diagnostic='ahead of upstream' ;;
+    equal*) incoming=$base_commit expected_head=$base_commit diagnostic='already up to date' ;;
+    ahead*) initial=$local_commit incoming=$base_commit expected_head=$local_commit diagnostic='ahead of upstream' ;;
     dirty-behind) expected_rc=1 expected_head=$base_commit diagnostic='refusing to update' ;;
     diverged) initial=$local_commit expected_rc=1 expected_head=$local_commit diagnostic='histories have diverged' ;;
     detached) expected_rc=1 expected_head=$base_commit diagnostic='detached HEAD' ;;
@@ -576,7 +590,7 @@ for scenario in equal ahead behind dirty-behind diverged \
   printf 'private\n' > "$repo_dir/local.secret"
   printf 'cached\n' > "$repo_dir/runtime/data"
   case "$scenario" in
-    dirty-behind|discard*|collision-discard)
+    *-dirty|dirty-behind|discard*|collision-discard)
       printf 'staged\n' > "$repo_dir/tracked"
       git -C "$repo_dir" add tracked
       printf 'unstaged\n' > "$repo_dir/tracked"
@@ -607,7 +621,7 @@ for scenario in equal ahead behind dirty-behind diverged \
       check test "$(git -C "$repo_dir" write-tree)" = "$before_tree"
       check test "$(cat "$repo_dir/tracked")" = "$before_tracked"
       case "$scenario" in
-        dirty-behind|collision-discard) check test "$(cat "$repo_dir/scratch")" = untracked ;;
+        *-dirty|dirty-behind|collision-discard) check test "$(cat "$repo_dir/scratch")" = untracked ;;
       esac
       ;;
   esac
