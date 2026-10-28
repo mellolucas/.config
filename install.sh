@@ -840,16 +840,20 @@ doctor_dotfiles() {
   elif brew_error=$(HOMEBREW_NO_AUTO_UPDATE=1 "$brew" config 2>&1 >/dev/null); then
     doctor_ok Homebrew "$(tilde "$brew")"
   else
+    # Homebrew's own errors lead with an Error: headline and follow with
+    # advice; other failures end with their cause.
     # shellcheck disable=SC2016 # sed's $ is the last line
-    doctor_problem Homebrew "can't run: $(printf '%s\n' "$brew_error" | sed -n '/[^[:space:]]/h; ${x;p;}')"
+    doctor_problem Homebrew "can't run: $(printf '%s\n' "$brew_error" | sed -n '/^Error: /{p;q;}; /[^[:space:]]/h; ${x;p;}')"
     doctor_line ' ' '' 'if a download failed, see Network access in the README'
   fi
 
   brewfile="${HOMEBREW_BUNDLE_FILE_GLOBAL:-$xdg_config_home/homebrew/Brewfile}"
   if [ -f "$brewfile" ]; then
     doctor_ok Brewfile "$(tilde "$brewfile")"
+  elif [ -n "${HOMEBREW_BUNDLE_FILE_GLOBAL:-}" ]; then
+    doctor_problem Brewfile "missing at $(tilde "$brewfile"); check HOMEBREW_BUNDLE_FILE_GLOBAL, which selects it"
   else
-    doctor_problem Brewfile "missing at $(tilde "$brewfile")"
+    doctor_problem Brewfile "missing at $(tilde "$brewfile"); run: dotfiles link"
   fi
 
   if npmrc=$(npm_global_config); then

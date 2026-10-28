@@ -814,6 +814,7 @@ check doctor_says ✗ 'link retired' orphaned 'dotfiles link'
 check doctor_says ✗ 'login shell' /bin/bash chsh
 check doctor_says ✗ tmux 3.5 3.6 'brew upgrade tmux'
 check doctor_says ✗ 'Git identity' git/config.d/personal.example
+check doctor_says ✗ Brewfile missing 'dotfiles link'
 # Every problem marked counts.
 marked=$(grep -c '^✗ ' "$test_root/doctor.log")
 check grep -Fqx "$marked problems found" "$test_root/doctor.log"
@@ -826,14 +827,13 @@ check doctor_says ✗ 'link zsh' missing 'dotfiles link'
 # A complete setup reports no problems and exits 0; linking removes the
 # retired link.
 : > "$test_root/Brewfile"
-# brew config succeeds, or fails as Homebrew does when it can't download what
-# it runs on.
+# brew config succeeds, or fails with the error output it is given.
 cat > "$test_root/brew" <<'EOF'
 #!/bin/sh
 [ "$*" = config ] || exit 1
 printf 'HOMEBREW_VERSION: 4.6.0\n'
 [ -n "${BREW_CONFIG_ERROR-}" ] || exit 0
-printf 'curl: (6) Could not resolve host: ghcr.io\n%s\n \n' "$BREW_CONFIG_ERROR" >&2
+printf '%s\n \n' "$BREW_CONFIG_ERROR" >&2
 exit 1
 EOF
 chmod +x "$test_root/brew"
@@ -865,16 +865,35 @@ complete_doctor > "$test_root/doctor.log" 2>&1 || fail "doctor counted home clut
 check doctor_says ! home .copilot .zshrc
 check test "$(tail -n 1 "$test_root/doctor.log")" = 'no problems found'
 rm -r "$HOME/.zshrc" "$HOME/.copilot"
-# A Homebrew that can't run is a problem, named by its last error line.
+# A Homebrew that can't run, as when it can't download what it runs on, is a
+# problem named by the first Error: line of its output, not the advice after
+# it, or else by its last line.
 if (
-  export BREW_CONFIG_ERROR='Error: Failed to install Homebrew Portable Ruby'
+  export BREW_CONFIG_ERROR="curl: (6) Could not resolve host: ghcr.io
+Error: Failed to download https://ghcr.io/v2/homebrew/portable-ruby/portable-ruby/blobs/sha256:0
+Error: Failed to install Homebrew Portable Ruby and cannot find another Ruby 3.4!
+If there's no Homebrew Portable Ruby available for your processor:
+- try again"
   complete_doctor
 ) > "$test_root/doctor.log" 2>&1; then
   fail 'doctor passed a Homebrew that cannot run'
 fi
-check doctor_says ✗ Homebrew "can't run" 'Failed to install Homebrew Portable Ruby'
+check doctor_says ✗ Homebrew "can't run" 'Failed to download https://ghcr.io/'
 check grep -Fq 'Network access' "$test_root/doctor.log"
 check grep -Fqx '1 problem found' "$test_root/doctor.log"
+(
+  export BREW_CONFIG_ERROR='Warning: a warning first
+curl: (6) Could not resolve host: ghcr.io'
+  complete_doctor
+) > "$test_root/doctor.log" 2>&1 || :
+check doctor_says ✗ Homebrew "can't run" 'Could not resolve host: ghcr.io'
+# A missing Brewfile that HOMEBREW_BUNDLE_FILE_GLOBAL selects names the
+# variable; the default one names dotfiles link (above).
+rm "$test_root/Brewfile"
+if complete_doctor > "$test_root/doctor.log" 2>&1; then
+  fail 'doctor passed a missing Brewfile'
+fi
+check doctor_says ✗ Brewfile "$test_root/Brewfile" HOMEBREW_BUNDLE_FILE_GLOBAL
 
 # Codespaces and dev containers install unattended in bash: install switches
 # the login shell to zsh through passwordless sudo, and nowhere else.
