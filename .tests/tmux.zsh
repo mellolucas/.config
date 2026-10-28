@@ -148,10 +148,12 @@ press $'\x02%'
 wait_for 'Ctrl+B then % did not split' '[[ $(state "#{window_panes}") == 2 ]]'
 wait_for 'the new pane does not run zsh' '[[ $(state "#{pane_current_command}") == zsh ]]'
 [[ $(state '#{pane_current_path}') == $HOME/inner ]] || fail "the split opened in $(state '#{pane_current_path}')"
+(( $(state '#{pane_left}') > 0 && $(state '#{pane_top}') == 0 )) || fail 'Ctrl+B then % did not split to the right'
 press $'\x02"'
 wait_for 'Ctrl+B then " did not split' '[[ $(state "#{window_panes}") == 3 ]]'
 wait_for 'the pane below does not run zsh' '[[ $(state "#{pane_current_command}") == zsh ]]'
 [[ $(state '#{pane_current_path}') == $HOME/inner ]] || fail "the split below opened in $(state '#{pane_current_path}')"
+(( $(state '#{pane_top}') > 0 )) || fail 'Ctrl+B then " did not split below'
 print -r -- 'ok: keys reach programs through attached clients, and Ctrl+B splits in place'
 
 # workspace: a session per directory, reattached on rerun, with its commands
