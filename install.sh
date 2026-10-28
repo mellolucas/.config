@@ -234,6 +234,28 @@ link_npm_global_config() {
   link_path "$repo_dir/homebrew/npmrc" "$npmrc"
 }
 
+# Where each agent reads its user-wide instructions: a file of the name it
+# expects in its home (zsh/xdg.sh), linked to the shared agents/instructions.md.
+# OpenCode reads that file through opencode/opencode.jsonc instead.
+agent_instructions() {
+  "$@" Codex "$CODEX_HOME/AGENTS.md"
+  "$@" Claude "$CLAUDE_CONFIG_DIR/CLAUDE.md"
+  "$@" Copilot "$COPILOT_HOME/copilot-instructions.md"
+}
+
+# A plain file there is the user's own; links are this repo's to manage.
+link_agent_instructions() {
+  if [ -e "$2" ] && [ ! -L "$2" ]; then
+    printf 'kept %s: your own instructions\n' "$2"
+    return 0
+  fi
+  link_path "$repo_dir/agents/instructions.md" "$2"
+}
+
+unlink_agent_instructions() {
+  remove_owned_link "$2" "$repo_dir/agents/instructions.md"
+}
+
 # GitHub Codespaces and dev containers start users in bash and install
 # unattended; GitHub documents switching the login shell from dotfiles.
 use_zsh_login_shell() {
@@ -309,6 +331,7 @@ link_dotfiles() {
 
   link_path "$installer" "$user_bin_home/dotfiles"
   link_path "$repo_dir/zsh/bin/edit" "$user_bin_home/edit"
+  agent_instructions link_agent_instructions
   link_npm_global_config
 }
 
@@ -738,7 +761,7 @@ version_at_least() {
 
 # Doctor's report: a mark, an aligned label, then the finding and its fix.
 doctor_line() {
-  printf '%s %-18s %s\n' "$1" "$2" "$3"
+  printf '%s %-20s %s\n' "$1" "$2" "$3"
 }
 
 doctor_ok() {
@@ -776,6 +799,14 @@ doctor_link_problem() {
     'in place'*) doctor_problem "$1" "$2" ;;
     *) doctor_problem "$1" "$2; run: dotfiles link" ;;
   esac
+}
+
+doctor_agent_instructions() {
+  if [ -e "$2" ] && [ ! -L "$2" ]; then
+    doctor_ok "$1 instructions" "$(tilde "$2"), your own"
+  else
+    doctor_link "$1 instructions" "$repo_dir/agents/instructions.md" "$2"
+  fi
 }
 
 # Arguments: label, version, the oldest supported major and minor, and the fix.
@@ -824,6 +855,7 @@ doctor_dotfiles() {
   [ "$links" -eq 0 ] || doctor_ok links "$links in $(tilde "$xdg_config_home")"
 
   doctor_link 'zsh entrypoint' "$repo_dir/zsh/.zshenv" "$HOME/.zshenv"
+  agent_instructions doctor_agent_instructions
 
   shell=$(login_shell || true)
   case "$shell" in
@@ -965,6 +997,7 @@ uninstall_dotfiles() {
 
   remove_owned_link "$user_bin_home/dotfiles" "$installer"
   remove_owned_link "$user_bin_home/edit" "$repo_dir/zsh/bin/edit"
+  agent_instructions unlink_agent_instructions
   if npmrc=$(npm_global_config); then
     remove_owned_link "$npmrc" "$repo_dir/homebrew/npmrc"
   fi

@@ -42,12 +42,13 @@ with() {
 }
 
 check 'installer syntax' sh -c 'sh -n install.sh && sh -n get.sh'
-with shellcheck 'shellcheck' shellcheck install.sh get.sh zsh/homebrew.sh zsh/xdg.sh .tests/run .tests/install.sh .tests/git.sh
+with shellcheck 'shellcheck' shellcheck install.sh get.sh zsh/homebrew.sh zsh/xdg.sh .tests/run .tests/install.sh .tests/git.sh .tests/opencode.sh
 # shellcheck disable=SC2016 # zsh, not sh, expands the loop
 with zsh 'zsh syntax' zsh -fc 'for f in zsh/.zshenv zsh/.zprofile zsh/.zshrc zsh/*.sh zsh/functions/* zsh/bin/*; do zsh -n "$f" || exit 1; done'
 with git 'git config' git config --file git/config --list
 with ghostty 'ghostty config' ghostty +validate-config --config-file=ghostty/config.ghostty
 with biome 'opencode config' biome lint opencode/opencode.jsonc opencode/cli.json
+with 'opencode python3' 'opencode instructions' sh .tests/opencode.sh
 # Both package sets parse, and the workstation keeps every essential.
 # shellcheck disable=SC2016 # the inner shell expands these
 with brew 'brewfile' sh -c 'export HOMEBREW_NO_AUTO_UPDATE=1; full=$(brew bundle list --file=homebrew/Brewfile --all) && core=$(brew bundle list --file=homebrew/core.Brewfile --all) || exit 1; for entry in $core; do printf "%s\n" "$full" | grep -qxF "$entry" || { printf "core entry missing from the Brewfile: %s\n" "$entry"; exit 1; }; done'

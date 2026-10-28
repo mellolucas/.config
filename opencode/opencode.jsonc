@@ -1,4 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "update": "notify"
+  "update": "notify",
+  "instructions": ["{env:XDG_CONFIG_HOME}/agents/instructions.md"]
 }

@@ -28,9 +28,12 @@ unset $xdg_vars
 mkdir -p "$HOME" "$test_root/repo/zsh" "$test_root/bin"
 cp "$repo/install.sh" "$test_root/repo/install.sh"
 cp "$repo/zsh/.zshenv" "$repo/zsh/homebrew.sh" "$repo/zsh/xdg.sh" "$test_root/repo/zsh/"
-mkdir -p "$test_root/repo/homebrew" "$test_root/repo/zsh/bin"
+mkdir -p "$test_root/repo/homebrew" "$test_root/repo/zsh/bin" "$test_root/repo/agents"
 cp "$repo/homebrew/npmrc" "$test_root/repo/homebrew/npmrc"
 cp "$repo/zsh/bin/edit" "$test_root/repo/zsh/bin/edit"
+cp "$repo/agents/instructions.md" "$test_root/repo/agents/instructions.md"
+# Where each agent reads its user-wide instructions, under XDG_DATA_HOME
+agent_files='codex/AGENTS.md claude/CLAUDE.md copilot/copilot-instructions.md'
 
 # Load function definitions without the CLI dispatcher.
 test "$(grep -c '^# CLI dispatcher\.$' "$repo/install.sh")" = 1
@@ -172,6 +175,9 @@ check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
 check test -L "$HOME/.local/bin/dotfiles"
 check test "$(readlink "$HOME/.local/bin/edit")" = "$repo_dir/zsh/bin/edit"
+for file in $agent_files; do
+  check test "$(readlink "$XDG_DATA_HOME/$file")" = "$repo_dir/agents/instructions.md"
+done
 check test -d "$XDG_DATA_HOME/codex"
 check test -d "$XDG_STATE_HOME/codex"
 with_layout install_dotfiles >> "$test_root/install.log"
@@ -183,12 +189,15 @@ ln -s "$test_root/foreign" "$XDG_CONFIG_HOME/foreign"
 ln -s "$repo_dir/retired" "$XDG_CONFIG_HOME/retired"
 ln -s "$test_root/elsewhere/retired" "$XDG_CONFIG_HOME/elsewhere"
 ln -s "$repo_dir/other-name" "$XDG_CONFIG_HOME/renamed"
-uninstall_dotfiles > "$test_root/uninstall.log"
+with_layout uninstall_dotfiles > "$test_root/uninstall.log"
 check test ! -L "$XDG_CONFIG_HOME/zsh"
 check test ! -L "$HOME/.zshenv"
 check test ! -e "$HOME/.zshenv"
 check test ! -L "$HOME/.local/bin/dotfiles"
 check test ! -L "$HOME/.local/bin/edit"
+for file in $agent_files; do
+  check test ! -L "$XDG_DATA_HOME/$file"
+done
 check test -L "$XDG_CONFIG_HOME/foreign"
 check test -f "$test_root/foreign"
 check test ! -L "$XDG_CONFIG_HOME/retired"
@@ -196,7 +205,7 @@ check grep -Fqx "removed orphaned link $XDG_CONFIG_HOME/retired" "$test_root/uni
 check test -L "$XDG_CONFIG_HOME/elsewhere"
 check test -L "$XDG_CONFIG_HOME/renamed"
 rm "$XDG_CONFIG_HOME/elsewhere" "$XDG_CONFIG_HOME/renamed"
-uninstall_dotfiles >> "$test_root/uninstall.log"
+with_layout uninstall_dotfiles >> "$test_root/uninstall.log"
 
 # Links at managed names that point elsewhere belong to someone else.
 mkdir -p "$test_root/other/zsh"
@@ -204,15 +213,17 @@ ln -s "$test_root/other/zsh" "$XDG_CONFIG_HOME/zsh"
 ln -s "$test_root/other/dotfiles" "$HOME/.local/bin/dotfiles"
 ln -s "$test_root/other/edit" "$HOME/.local/bin/edit"
 ln -s "$test_root/other/zshenv" "$HOME/.zshenv"
-uninstall_dotfiles > "$test_root/uninstall.log"
+ln -s "$test_root/other/instructions.md" "$XDG_DATA_HOME/codex/AGENTS.md"
+with_layout uninstall_dotfiles > "$test_root/uninstall.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.local/bin/dotfiles"
 check test -L "$HOME/.local/bin/edit"
 check test -L "$HOME/.zshenv"
-for path in "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin/edit" "$HOME/.zshenv"; do
+check test -L "$XDG_DATA_HOME/codex/AGENTS.md"
+for path in "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin/edit" "$HOME/.zshenv" "$XDG_DATA_HOME/codex/AGENTS.md"; do
   check grep -Fqx "skip: not owned by this repo: $path" "$test_root/uninstall.log"
 done
-rm "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin/edit" "$HOME/.zshenv"
+rm "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin/edit" "$HOME/.zshenv" "$XDG_DATA_HOME/codex/AGENTS.md"
 
 # Exercise native dispatch without invoking real Homebrew or npm.
 mkdir "$test_root/package-bin"
@@ -284,9 +295,14 @@ $npm_update"
       check test -L "$HOME/.local/bin/dotfiles"
       check test -L "$HOME/.local/bin/edit"
       # shellcheck disable=SC2012 # fixture names are plain words
-      check test "$(ls -A "$XDG_CONFIG_HOME" | tr '\n' ' ')" = 'homebrew zsh '
+      check test "$(ls -A "$XDG_CONFIG_HOME" | tr '\n' ' ')" = 'agents homebrew zsh '
       check test -d "$XDG_DATA_HOME/codex"
       check test -d "$XDG_STATE_HOME/codex"
+      # Each agent's instructions link the shared file, and the rerun left them.
+      for file in $agent_files; do
+        check test "$(readlink "$XDG_DATA_HOME/$file")" = "$repo_dir/agents/instructions.md"
+        check grep -Fqx "ok: $XDG_DATA_HOME/$file already linked" "$HOME/dispatch.log"
+      done
     fi
     if [ "$operation" = link ]; then
       "$installer" uninstall >> "$HOME/dispatch.log" 2>&1
@@ -424,6 +440,33 @@ fi
     check test ! -e "$HOME/prefix/etc/npmrc"
     check test ! -L "$HOME/prefix/etc/npmrc"
   fi
+)
+
+# Instructions of the user's own in an agent's home stay byte for byte, never
+# backed up, through link and uninstall; the other agents get the shared file,
+# and uninstall removes only those links.
+(
+  export HOME="$test_root/own-instructions" PATH="$test_root/package-bin:$PATH"
+  export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+  export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+  own="$XDG_DATA_HOME/claude/CLAUDE.md"
+  mkdir -p "$HOME/prefix" "${own%/*}"
+  printf '# Mine\n\nKeep these.\n' > "$own"
+  cp "$own" "$HOME/own.md"
+  "$installer" link > "$HOME/dispatch.log" 2>&1
+  check grep -Fqx "kept $own: your own instructions" "$HOME/dispatch.log"
+  check test ! -L "$own"
+  check cmp "$own" "$HOME/own.md"
+  for file in codex/AGENTS.md copilot/copilot-instructions.md; do
+    check test "$(readlink "$XDG_DATA_HOME/$file")" = "$repo_dir/agents/instructions.md"
+  done
+  "$installer" uninstall >> "$HOME/dispatch.log" 2>&1
+  for file in codex/AGENTS.md copilot/copilot-instructions.md; do
+    check test ! -L "$XDG_DATA_HOME/$file"
+  done
+  check test ! -L "$own"
+  check cmp "$own" "$HOME/own.md"
+  if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail 'own instructions were backed up'; fi
 )
 
 # Fresh installs run brew from its prefix before Homebrew is on PATH; Bundle
@@ -775,7 +818,7 @@ run_doctor() (
   tmux() { printf 'tmux 3.5a\n'; }
   login_shell() { printf '/bin/bash\n'; }
   git_identity() { return 1; }
-  doctor_dotfiles
+  with_layout doctor_dotfiles
 )
 # Whether doctor.log has a line with this mark and label whose finding holds
 # each of the remaining words.
@@ -804,6 +847,10 @@ mkdir -p "$XDG_CONFIG_HOME"
 rm -rf "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/edit"
 ln -s "$test_root/missing" "$XDG_CONFIG_HOME/zsh"
 ln -s "$repo_dir/retired" "$XDG_CONFIG_HOME/retired"
+# Codex's instructions stay linked; Claude's become the user's own, and
+# Copilot's go missing.
+rm "$XDG_DATA_HOME/claude/CLAUDE.md" "$XDG_DATA_HOME/copilot/copilot-instructions.md"
+printf '# Mine\n' > "$XDG_DATA_HOME/claude/CLAUDE.md"
 if (
   # A hidden custom XDG home is part of the layout; the default name is not.
   # shellcheck disable=SC2034 # read by the sourced doctor_dotfiles
@@ -824,6 +871,9 @@ check doctor_says ✗ tmux 3.5 3.6 'brew upgrade tmux'
 check doctor_says ✗ 'Git identity' git/config.d/personal.example
 check doctor_says ✗ Brewfile missing 'dotfiles link'
 check doctor_says ✗ 'edit command' missing 'dotfiles link'
+check doctor_says ✓ 'Codex instructions' data/codex/AGENTS.md
+check doctor_says ✓ 'Claude instructions' data/claude/CLAUDE.md 'your own'
+check doctor_says ✗ 'Copilot instructions' missing 'dotfiles link'
 # Every problem marked counts.
 marked=$(grep -c '^✗ ' "$test_root/doctor.log")
 check grep -Fqx "$marked problems found" "$test_root/doctor.log"
@@ -861,12 +911,14 @@ complete_doctor() (
   nvim() { printf 'NVIM v0.12.5\n'; }
   tmux() { printf 'tmux 3.7c\n'; }
   git_identity() { :; }
-  doctor_dotfiles
+  with_layout doctor_dotfiles
 )
 complete_doctor > "$test_root/doctor.log" 2>&1 || fail "doctor found problems in a complete setup: $(cat "$test_root/doctor.log")"
 check test "$(tail -n 1 "$test_root/doctor.log")" = 'no problems found'
-check doctor_says ✓ links '2 in'
+check doctor_says ✓ links '3 in'
 check doctor_says ✓ 'edit command' .local/bin/edit
+check doctor_says ✓ 'Copilot instructions' data/copilot/copilot-instructions.md
+check doctor_says ✓ 'Claude instructions' 'your own'
 check doctor_says ✓ 'Git identity'
 # Clutter in $HOME alone is a note, not a problem.
 : > "$HOME/.zshrc"
