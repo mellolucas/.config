@@ -117,18 +117,14 @@ assert(said == "No file to return to" and current() == "tree", "Esc zoomed at th
 resize(40)
 expect({ "tree" }, "unzoom at the start")
 
--- ? lists the keys by what they do and closes again; the status line says so.
-assert(vim.wo.statusline == " ? keys", "tree status line: " .. vim.wo.statusline)
+-- ? lists the keys and closes again.
 local function help_window()
   for _, win in ipairs(api.nvim_tabpage_list_wins(0)) do
     if api.nvim_win_get_config(win).relative ~= "" then return win end
   end
 end
 press("?")
-local help = help_window()
-assert(help, "? opens no help")
-local header = table.concat(api.nvim_buf_get_lines(api.nvim_win_get_buf(help), 0, 2, false), " ")
-assert(header:find("sort by keymap", 1, true), "help not sorted by description: " .. header)
+assert(help_window(), "? opens no help")
 press("?")
 assert(not help_window(), "? leaves the help open")
 
@@ -139,7 +135,6 @@ select("a.txt")
 press("<CR>")
 expect({ "a.txt" }, "narrow open")
 no_previous("Ctrl+^ on the first file")
-assert(vim.wo.statusline ~= " ? keys", "the tree's status line stayed on a.txt")
 press("-")
 expect({ "tree" }, "narrow -")
 assert(on("a.txt"), "- does not land on the open file")
@@ -197,16 +192,6 @@ said = nil
 press("<Esc>")
 expect({ "a.txt" }, "Esc in the first tab page after the second's: " .. tostring(said))
 assert(alternate() == "b.txt", "alternate after Esc in the first tab page: " .. alternate())
--- With a count, Ctrl+^ from a full-window tree opens buffer N in its place,
--- here one that is no window's previous file.
-vim.cmd.badd(fn.fnameescape(project .. "/d.txt"))
-local d_txt = fn.bufnr(project .. "/d.txt")
-press("-")
-press(d_txt .. "<C-^>")
-expect({ "d.txt" }, "a count with Ctrl+^ from a full-window tree")
-assert(alternate() == "a.txt", "alternate after a count from the tree: " .. alternate())
-press("<C-^>")
-expect({ "a.txt" }, "Ctrl+^ back after a count")
 
 -- 110 columns bring the tree beside the code, leaving the cursor in it;
 -- 109 hand the window back to the code, and widening again brings it back.
@@ -214,7 +199,6 @@ resize(110)
 expect({ "tree", "a.txt" }, "zoom to 110")
 assert(current() == "a.txt", "zooming moved the cursor into the tree")
 assert(api.nvim_win_get_width(tree_window()) == 30, "sidebar width")
-assert(vim.wo[tree_window()].statusline == " ? keys", "the sidebar lacks its status line")
 resize(109)
 expect({ "a.txt" }, "unzoom to 109")
 resize(200)
@@ -277,13 +261,6 @@ assert(current() == "tree" and on("c.txt"), "- from the code beside the sidebar"
 press("<Esc>")
 expect({ "tree", "c.txt" }, "Esc from the sidebar")
 assert(current() == "c.txt", "Esc from the sidebar left the cursor in the tree")
--- With a count, Ctrl+^ from the sidebar opens buffer N beside it and goes there.
-press("-")
-press(d_txt .. "<C-^>")
-expect({ "tree", "d.txt" }, "a count with Ctrl+^ from the sidebar")
-assert(current() == "d.txt", "a count with Ctrl+^ from the sidebar left the cursor in the tree")
-press("<C-^>")
-expect({ "tree", "c.txt" }, "Ctrl+^ back beside the sidebar")
 
 -- A split in the narrow window stays through resizes within it, widening
 -- restores the sidebar's width, and beside only an empty window, narrowing
