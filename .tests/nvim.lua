@@ -508,10 +508,12 @@ do
   fn.delete(home, "rf")
 end
 
--- In a workspace, which names the socket in DOTFILES_EDITOR_SOCKET, the first
--- Neovim serves it: a second leaves it to the first, logging no failed start,
--- one outside a workspace serves none, and one after a crash takes over the
--- socket the crash left.
+-- In a workspace, which names the socket in DOTFILES_EDITOR_SOCKET, the
+-- Neovim in its editor's pane, which alone has DOTFILES_EDITOR_SERVE=1, serves
+-- it, also when restarted there: a second there leaves it to the first,
+-- logging no failed start, and one after a crash takes over the socket the
+-- crash left. One in another pane of the workspace (v while the editor is
+-- closed, Git's commit editor) or outside a workspace serves none.
 do
   local dir = fn.tempname()
   fn.mkdir(dir, "p")
@@ -537,10 +539,17 @@ do
     fn.chanclose(channel)
     return pid
   end
-  local env = { DOTFILES_EDITOR_SOCKET = socket }
-  assert(not vim.tbl_contains(servers({}), socket) and not vim.tbl_contains(servers({ DOTFILES_EDITOR_SOCKET = "" }), socket)
+  local pane = { DOTFILES_EDITOR_SOCKET = socket }
+  local env = { DOTFILES_EDITOR_SOCKET = socket, DOTFILES_EDITOR_SERVE = "1" }
+  -- Nor the flag of an editor's pane these checks may run in
+  vim.env.DOTFILES_EDITOR_SERVE = nil
+  assert(not vim.tbl_contains(servers({}), socket)
+    and not vim.tbl_contains(servers({ DOTFILES_EDITOR_SOCKET = "", DOTFILES_EDITOR_SERVE = "1" }), socket)
     and not vim.uv.fs_stat(socket), "a Neovim outside a workspace served its socket")
-  assert(vim.tbl_contains(servers(env), socket), "the first Neovim in a workspace serves no socket")
+  assert(not vim.tbl_contains(servers(pane), socket) and not vim.uv.fs_stat(socket),
+    "a Neovim in another pane of the workspace served its socket")
+  assert(vim.tbl_contains(servers(env), socket), "the Neovim in the editor's pane serves no socket")
+  assert(vim.tbl_contains(servers(env), socket), "a Neovim restarted in the editor's pane serves no socket")
   local first = neovim(env)
   -- The first one ends as a crash would, whatever the checks find
   local checked, failure = pcall(function()
@@ -554,6 +563,7 @@ do
   first:wait()
   assert(checked, failure)
   assert(vim.uv.fs_stat(socket), "the crash left no socket to take over")
+  assert(not vim.tbl_contains(servers(pane), socket), "a Neovim in another pane took over the socket a crash left")
   assert(vim.tbl_contains(servers(env), socket), "no Neovim took over the socket a crash left")
   fn.delete(dir, "rf")
 end

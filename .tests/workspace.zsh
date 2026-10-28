@@ -53,7 +53,7 @@ zmodload zsh/zpty
 typeset -F SECONDS=0
 # The editor's socket and the id beside it stay here, apart from Neovim's own
 # folder, and no workspace this runs in is the one under test
-unset XDG_RUNTIME_DIR DOTFILES_EDITOR_SOCKET
+unset XDG_RUNTIME_DIR DOTFILES_EDITOR_SOCKET DOTFILES_EDITOR_SERVE
 export TMPDIR=$(mktemp -d "${${TMPDIR:-/tmp}%/}/ws.XXXXXX")
 run_folder=$TMPDIR
 trap 'zpty -d 2>/dev/null || true; command rm -rf -- "$run_folder"' EXIT
@@ -188,27 +188,35 @@ socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cks
     workspace "$temporary/path with spaces" < /dev/null > /dev/null || fail 'new tab'
     [[ ${PWD:A} == ${temporary:A} ]] || fail "a new tab moved the shell to $PWD"
   )
-  # The shell a workspace is laid out around takes its editor's socket, one
-  # that opens a new tab doesn't; the editor's terminal id, which the script
-  # prints first, goes beside the socket for edit, unless an editor serves
-  # that socket already.
+  # The shell a workspace is laid out around takes its editor's socket, but
+  # not an editor pane's flag to serve it; one that opens a new tab takes
+  # neither. The editor's terminal id, which the script prints first, goes
+  # beside the socket for edit, unless an editor serves that socket already,
+  # however long its path: here past the 104 bytes of a socket's address on
+  # macOS.
   (
+    export TMPDIR=$TMPDIR/${(l:64::x:)}
     socket=$(socket_for "${temporary:A}/path with spaces")
+    (( ${#socket} > 104 )) || fail "a socket path of ${#socket} bytes"
     rm -f -- ${socket%.sock}.ghostty
     workspace_osascript() { print -r -- 'same tab'; }
     workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket without an id'
     [[ ! -e ${socket%.sock}.ghostty ]] || fail "a script printing no id left one: $(<${socket%.sock}.ghostty)"
     workspace_osascript() { print -rl -- EDITOR-ONE 'same tab'; }
+    export DOTFILES_EDITOR_SERVE=1
     workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket in the same tab'
     [[ $DOTFILES_EDITOR_SOCKET == $socket ]] || fail "the workspace's shell took ${(qqq)DOTFILES_EDITOR_SOCKET-}"
+    (( ! ${+DOTFILES_EDITOR_SERVE} )) || fail "the workspace's shell kept the flag to serve: $DOTFILES_EDITOR_SERVE"
     [[ $(<${socket%.sock}.ghostty) == EDITOR-ONE ]] || fail "the editor's id: $(<${socket%.sock}.ghostty)"
     unset DOTFILES_EDITOR_SOCKET
     workspace_osascript() { print -rl -- EDITOR-TWO 'new tab'; }
     workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket in a new tab'
     (( ! ${+DOTFILES_EDITOR_SOCKET} )) || fail "a shell beside a new tab took ${(qqq)DOTFILES_EDITOR_SOCKET}"
     [[ $(<${socket%.sock}.ghostty) == EDITOR-TWO ]] || fail "the new tab's editor id: $(<${socket%.sock}.ghostty)"
+    # Listening from its folder, as zsocket cuts a longer path
     zmodload -F zsh/net/socket b:zsocket
-    zsocket -l $socket || fail 'listening on the socket'
+    builtin cd -q -- ${socket:h}
+    zsocket -l ${socket:t} || fail 'listening on the socket'
     workspace_osascript() { print -rl -- EDITOR-THREE 'new tab'; }
     workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket served'
     [[ $(<${socket%.sock}.ghostty) == EDITOR-TWO ]] || fail "a served socket's editor id: $(<${socket%.sock}.ghostty)"
@@ -302,6 +310,20 @@ socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cks
   git commit -q --allow-empty -m 'fix work'
   laid_out "$tasks/next" ocode --task next
   [[ $(git -C "$tasks/next" rev-parse HEAD) == $(git rev-parse HEAD) ]] || fail 'task/next starts elsewhere'
+  # A name beyond ASCII, a task's or a folder's above the checkout, works as
+  # any other.
+  laid_out "$tasks/café" ocode --task café
+  laid_out "$tasks/café" 'ocode --continue' --task café
+  git init -q -b main "$temporary/código/repo"
+  (
+    builtin cd -- "$temporary/código/repo"
+    git commit -q --allow-empty -m one
+    laid_out "$temporary/código/repo.worktrees/fix" ocode --task fix
+    laid_out "$temporary/código/repo.worktrees/fix" 'ocode --continue' --task fix
+    builtin cd -- ../repo.worktrees/fix
+    workspace --done > "$temporary/output" 2>&1 || fail "--done below código: $(<"$temporary/output")"
+    [[ $PWD == $temporary/código/repo && ! -e ../repo.worktrees/fix ]] || fail '--done below código left the task'
+  )
 
   # Names Git rejects in a branch, or that are not one plain folder name, a
   # directory beside a task, and a task outside a repository change nothing.
@@ -323,6 +345,49 @@ socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cks
     builtin cd -- "$temporary/outside"
     rejected 'workspace: --task works inside a Git repository' --task fix
   )
+  # A task's worktree switched to another branch, or detached, isn't laid
+  # out: the message says how to switch it back.
+  git -C "$tasks/fix" switch -q -c other
+  known=$(state)
+  rejected "workspace: task fix's worktree is on other, not on task/fix; to switch it back: git -C $tasks/fix switch task/fix" \
+    --task fix
+  git -C "$tasks/fix" switch -q --detach
+  known=$(state)
+  rejected "workspace: task fix's worktree is detached, not on task/fix; to switch it back: git -C $tasks/fix switch task/fix" \
+    --task fix
+  git -C "$tasks/fix" switch -q task/fix
+  git -C "$tasks/fix" branch -q -D other
+  # Without its launcher, a task changes nothing: tmux outside Ghostty on
+  # macOS, and osascript or the script in it.
+  known=$(state)
+  mkdir -p "$temporary/without-tmux"
+  ln -s "$commands[git]" "$commands[rm]" "$temporary/without-tmux/"
+  TERM_PROGRAM=fixture PATH=$temporary/without-tmux rejected $'workspace: tmux not found\nhint: run: dotfiles bundle' \
+    --task launcher
+  DOTFILES_WORKSPACE_SCRIPT=$temporary/missing-script \
+    rejected "workspace: missing script: $temporary/missing-script"$'\nhint: run: dotfiles link' --task launcher
+  functions[workspace]=${functions[workspace]/'[[ 1 == 1 ]]'/'[[ 1 == 0 ]]'}
+  rejected 'workspace: workspace_osascript not found' --task launcher
+  functions[workspace]=${functions[workspace]/'[[ 1 == 0 ]]'/'[[ 1 == 1 ]]'}
+  # A task's folder deleted by hand comes back from its branch, the agent
+  # starting anew; Git drops that registration alone, another missing
+  # worktree's stays.
+  git -C "$checkout" worktree add -q --detach "$temporary/code/owner/deleted"
+  rm -rf -- "$temporary/code/owner/deleted" "$tasks/fresh"
+  laid_out "$tasks/fresh" ocode --task fresh
+  [[ $(git -C "$tasks/fresh" rev-parse --symbolic-full-name HEAD) == refs/heads/task/fresh ]] ||
+    fail "the recreated task is on $(git -C "$tasks/fresh" rev-parse --symbolic-full-name HEAD)"
+  [[ $(state) == *"worktree $temporary/code/owner/deleted"$'\n'* ]] || fail "recreating a task dropped another worktree: $(state)"
+  # Unless another worktree has the branch: then the message says what to
+  # run.
+  git -C "$tasks/fresh" switch -q --detach
+  rm -rf -- "$tasks/fresh"
+  git -C "$checkout" switch -q task/fresh
+  known=$(state)
+  rejected "workspace: task fresh's folder is gone, and task/fresh is checked out in $checkout; to free the branch: git -C $checkout switch --detach" \
+    --task fresh
+  git -C "$checkout" switch -q main
+  laid_out "$tasks/fresh" ocode --task fresh
   print -r -- 'ok: tasks open in worktrees beside the main checkout, and reopen resuming the agent'
 
   # --done works alone, in a task's worktree only: not in the main checkout,
@@ -349,27 +414,61 @@ socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cks
     fail "uncommitted work: $(<"$temporary/output")"
   [[ $PWD == $tasks/next && -e draft && $(state) == $known ]] || fail 'refusing changed something'
   rm draft
-  # Merged, the branch goes too, Git prunes what a deleted folder left, and
-  # the shell moves to the main checkout, leaving the task's editor.
+  # Files Git ignores (an .env, dependencies) would go with the worktree:
+  # they stay, and so does everything else; the hint names the command that
+  # deletes them when they're disposable.
+  print -rl -- .env node_modules/ > .gitignore
+  git add .gitignore
+  git commit -q -m 'ignore files'
+  print -r -- SECRET=1 > .env
+  mkdir -p node_modules/dependency
+  print -r -- code > node_modules/dependency/index.js
+  known=$(state)
+  if workspace --done > "$temporary/output" 2>&1; then fail 'removed a task holding ignored files'; fi
+  [[ $(<"$temporary/output") == "workspace: task next stays as it was: removing its worktree would delete files Git ignores: .env, node_modules/"$'\n'"hint: if they're disposable (node_modules and the like), delete them with: git -C $tasks/next clean -fdX" ]] ||
+    fail "ignored files: $(<"$temporary/output")"
+  [[ $PWD == $tasks/next && $(<.env) == SECRET=1 && -e node_modules/dependency/index.js && $(state) == $known ]] ||
+    fail 'refusing over ignored files changed something'
+  eval "${$(<"$temporary/output")##*: }" > /dev/null
+  [[ ! -e .env && ! -e node_modules && $(state) == $known ]] || fail "the hint's command left the ignored files"
+  # Merged, the branch goes too, and the shell moves to the main checkout,
+  # leaving the task's editor; another worktree, its folder missing, stays
+  # registered.
   git -C "$checkout" merge -q --no-edit task/fix
-  git -C "$checkout" worktree add -q --detach "$temporary/code/owner/deleted"
-  rm -rf -- "$temporary/code/owner/deleted"
   builtin cd -- "$tasks/fix"
-  export DOTFILES_EDITOR_SOCKET=$(socket_for "$tasks/fix")
+  export DOTFILES_EDITOR_SOCKET=$(socket_for "$tasks/fix") DOTFILES_EDITOR_SERVE=1
   workspace --done > "$temporary/output" 2>&1 || fail "merged: $(<"$temporary/output")"
   [[ $(<"$temporary/output") == "workspace: removed task fix's worktree; its other panes can be closed"$'\n''Deleted branch task/fix '* ]] ||
     fail "merged: $(<"$temporary/output")"
   [[ $PWD == $checkout && ! -e $tasks/fix ]] || fail 'the merged worktree stayed'
-  (( ! ${+DOTFILES_EDITOR_SOCKET} )) || fail "the shell kept the task's editor: $DOTFILES_EDITOR_SOCKET"
-  [[ $(state) != *task/fix* && $(state) != *deleted* ]] || fail "merged: $(state)"
+  (( ! ${+DOTFILES_EDITOR_SOCKET} && ! ${+DOTFILES_EDITOR_SERVE} )) ||
+    fail "the shell kept the task's editor: ${DOTFILES_EDITOR_SOCKET-} ${DOTFILES_EDITOR_SERVE-}"
+  [[ $(state) != *task/fix* ]] || fail "merged: $(state)"
+  [[ $(state) == *"worktree $temporary/code/owner/deleted"$'\n'* ]] || fail "--done dropped another worktree: $(state)"
   # An unmerged branch stays, with how to delete it.
   builtin cd -- "$tasks/next"
   git commit -q --allow-empty -m 'next work'
   workspace --done > "$temporary/output" 2>&1 || fail "unmerged: $(<"$temporary/output")"
-  [[ $(<"$temporary/output") == "workspace: removed task next's worktree; its other panes can be closed"$'\n'*$'\n''workspace: kept branch task/next; to delete it anyway: git branch -D task/next' ]] ||
+  [[ $(<"$temporary/output") == "workspace: removed task next's worktree; its other panes can be closed"$'\n''workspace: kept branch task/next, not merged into main; to delete it anyway: git branch -D task/next' ]] ||
     fail "unmerged: $(<"$temporary/output")"
   [[ $PWD == $checkout && ! -e $tasks/next && $(state) != *"worktree $tasks/next"* ]] || fail 'the unmerged worktree stayed'
   git show-ref -q --verify refs/heads/task/next || fail 'the unmerged branch went'
+  # Pushed, a branch is merged into its upstream, which git branch -d takes
+  # for merged: unmerged here, it stays all the same.
+  git init -q --bare "$temporary/origin.git"
+  git remote add origin "$temporary/origin.git"
+  laid_out "$tasks/pushed" ocode --task pushed
+  builtin cd -- "$tasks/pushed"
+  git commit -q --allow-empty -m 'pushed work'
+  git push -q -u origin task/pushed
+  workspace --done > "$temporary/output" 2>&1 || fail "pushed: $(<"$temporary/output")"
+  [[ $(<"$temporary/output") == *$'\n''workspace: kept branch task/pushed, not merged into main; to delete it anyway: git branch -D task/pushed' ]] ||
+    fail "pushed: $(<"$temporary/output")"
+  git show-ref -q --verify refs/heads/task/pushed || fail 'the pushed, unmerged branch went'
+  # A task named beyond ASCII ends as any other.
+  builtin cd -- "$tasks/café"
+  workspace --done > "$temporary/output" 2>&1 || fail "café: $(<"$temporary/output")"
+  [[ $PWD == $checkout && ! -e $tasks/café && $(state) != *café* ]] || fail "café's task stayed: $(state)"
   print -r -- 'ok: tasks end with their worktree, and their branch once merged'
 )
 

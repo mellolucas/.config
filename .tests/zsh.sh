@@ -989,7 +989,8 @@ if [[ -n $nvim_bin ]]; then
     server=''
     trap '[[ -z $server ]] || kill $server 2> /dev/null' EXIT
     serve() {
-      ( builtin cd -- "$files" && exec /usr/bin/env -i HOME="$HOME" PATH=/usr/bin:/bin DOTFILES_EDITOR_SOCKET="$socket" "$@" \
+      ( builtin cd -- "$files" && exec /usr/bin/env -i HOME="$HOME" PATH=/usr/bin:/bin DOTFILES_EDITOR_SOCKET="$socket" \
+          DOTFILES_EDITOR_SERVE=1 "$@" \
           "$nvim_bin" --headless -u NONE -i NONE -n --cmd "set rtp^=$repo/nvim" -c "lua require('config.workspace')" \
           < /dev/null > /dev/null 2>&1 ) &
       server=$!

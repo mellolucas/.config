@@ -46,11 +46,12 @@ Tasks (in a Git repository):
                  the main checkout, on branch task/NAME from the commit
                  checked out here. Rerun to reopen it: the agent resumes its
                  last session there (OpenCode, Claude Code, and Codex; other
-                 agents start anew).
+                 agents start anew). A folder deleted by hand comes back from
+                 the branch.
   --done         Alone, in a task's worktree: move this shell to the main
-                 checkout and remove the worktree, which Git refuses while it
-                 holds uncommitted or untracked changes, then the branch,
-                 which Git keeps until it is merged.
+                 checkout and remove the worktree, refused while it holds
+                 uncommitted or untracked changes or files Git ignores, then
+                 the branch once the main checkout's branch has its commits.
 
 Layouts:
   full   editor left (60% width); on the right (40% width), the agent above
@@ -130,9 +131,20 @@ if (( finish )); then
     print -u2 -- "workspace: --done works in a task's worktree, which workspace --task NAME opens"
     return 1
   fi
-  local branch=${ref#refs/heads/} checkout
+  local branch=${ref#refs/heads/} checkout listed
+  local -a ignored
   # The main checkout is the first worktree Git lists
-  checkout=${${(f)"$(git worktree list --porcelain)"}[1]#worktree }
+  checkout=${${(0)"$(git worktree list --porcelain -z)"}[1]#worktree }
+  # Git doesn't count the files it ignores (an .env, a local database) as
+  # work, and would delete them with the worktree
+  ignored=(${(0)"$(git -C "$top" ls-files -z --others --ignored --exclude-standard --directory --no-empty-directory)"})
+  if (( $#ignored )); then
+    listed=${(j:, :)ignored[1,3]}
+    (( $#ignored <= 3 )) || listed+=", and $(( $#ignored - 3 )) more"
+    print -r -u2 -- "workspace: task ${branch#task/} stays as it was: removing its worktree would delete files Git ignores: $listed"
+    print -r -u2 -- "hint: if they're disposable (node_modules and the like), delete them with: git -C ${(q-)top} clean -fdX"
+    return 1
+  fi
   if ! git -C "$checkout" worktree remove "$top"; then
     print -r -u2 -- "workspace: task ${branch#task/} stays as it was"
     return 1
@@ -142,11 +154,16 @@ if (( finish )); then
   # This shell leaves the task's editor too
   builtin cd -q -- "$checkout" || return
   (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2> /dev/null)
-  unset DOTFILES_EDITOR_SOCKET
+  unset DOTFILES_EDITOR_SOCKET DOTFILES_EDITOR_SERVE
   print -r -- "workspace: removed task ${branch#task/}'s worktree; its other panes can be closed"
-  git -c advice.forceDeleteBranch=false branch -d "$branch" ||
-    print -r -- "workspace: kept branch $branch; to delete it anyway: git branch -D $branch"
-  git worktree prune
+  # The branch goes once the main checkout's branch has its commits: git
+  # branch -d would also take one whose upstream alone has them, as once
+  # pushed
+  if git merge-base --is-ancestor "$ref" HEAD 2> /dev/null; then
+    git branch -D "$branch"
+  else
+    print -r -- "workspace: kept branch $branch, not merged into ${$(git symbolic-ref --short -q HEAD):-HEAD}; to delete it anyway: git branch -D $branch"
+  fi
   return 0
 fi
 
@@ -165,6 +182,28 @@ if (( ${#directories} > 1 )); then
 fi
 dir=${directories[1]:-$PWD}
 
+# The launcher, found before a task changes Git: tmux outside Ghostty on
+# macOS, and inside tmux; else Ghostty's script
+local script=''
+if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
+  (( $+commands[tmux] )) || {
+    print -u2 -- 'workspace: tmux not found'
+    print -u2 -- 'hint: run: dotfiles bundle'
+    return 1
+  }
+else
+  [[ -x /usr/bin/osascript ]] || {
+    print -u2 -- 'workspace: /usr/bin/osascript not found'
+    return 1
+  }
+  script=${DOTFILES_WORKSPACE_SCRIPT:-${XDG_CONFIG_HOME:-$HOME/.config}/ghostty/workspace.applescript}
+  [[ -r $script ]] || {
+    print -r -u2 -- "workspace: missing script: $script"
+    print -u2 -- 'hint: run: dotfiles link'
+    return 1
+  }
+fi
+
 if [[ -n $task ]]; then
   if (( ${#directories} )); then
     print -u2 -- 'workspace: --task takes no directory: the task has its own'
@@ -175,17 +214,32 @@ if [[ -n $task ]]; then
     print -r -u2 -- "workspace: invalid task name: $task (a branch name, without / or a leading -)"
     return 1
   fi
-  local -a worktrees
-  worktrees=(${(f)"$(git worktree list --porcelain 2> /dev/null)"})
-  if (( ! $#worktrees )); then
+  # Each worktree's branch by its folder, empty when detached; the main
+  # checkout comes first
+  local line folder checkout=''
+  local -A branches
+  for line in ${(0)"$(git worktree list --porcelain -z 2> /dev/null)"}; do
+    case $line in
+      'worktree '*)
+        folder=${line#worktree }
+        branches[$folder]=''
+        checkout=${checkout:-$folder} ;;
+      'branch '*) branches[$folder]=${line#branch } ;;
+    esac
+  done
+  if [[ -z $checkout ]]; then
     print -u2 -- 'workspace: --task works inside a Git repository'
     return 1
   fi
-  # Beside the main checkout, the first worktree Git lists
-  local checkout=${worktrees[1]#worktree }
+  # Beside the main checkout
   dir=$checkout.worktrees/$task
-  local registered="worktree $dir"
-  if (( ${worktrees[(Ie)$registered]} )) && [[ -d $dir ]]; then
+  local own=refs/heads/task/$task
+  if (( ${+branches[$dir]} )) && [[ -d $dir ]]; then
+    if [[ $branches[$dir] != $own ]]; then
+      local now=${branches[$dir]:+on ${branches[$dir]#refs/heads/}}
+      print -r -u2 -- "workspace: task $task's worktree is ${now:-detached}, not on task/$task; to switch it back: git -C ${(q-)dir} switch task/$task"
+      return 1
+    fi
     # Reopened, the agent resumes its last session in this folder, by the
     # flags that ask for this folder's alone (Copilot CLI's --continue falls
     # back to another folder's)
@@ -194,10 +248,23 @@ if [[ -n $task ]]; then
       ocode|opencode|claude) agent="$program --continue${agent#$program}" ;;
       codex) agent="$program resume --last${agent#$program}" ;;
     esac
-  elif git show-ref -q --verify "refs/heads/task/$task"; then
-    git worktree add -q "$dir" "task/$task" || return
   else
-    git worktree add -q -b "task/$task" "$dir" || return
+    # A folder deleted by hand leaves its worktree registered: Git drops that
+    # registration alone and the branch comes back there, unless another
+    # worktree has it checked out
+    if (( ${+branches[$dir]} )); then
+      for folder in ${(k)branches}; do
+        [[ $folder != $dir && $branches[$folder] == $own ]] || continue
+        print -r -u2 -- "workspace: task $task's folder is gone, and task/$task is checked out in $folder; to free the branch: git -C ${(q-)folder} switch --detach"
+        return 1
+      done
+      git worktree remove "$dir" || return
+    fi
+    if git show-ref -q --verify "$own"; then
+      git worktree add -q "$dir" "task/$task" || return
+    else
+      git worktree add -q -b "task/$task" "$dir" || return
+    fi
   fi
 fi
 
@@ -216,14 +283,12 @@ local -a private=($run(N/Uf:go-rwx:))
 (( ! $#private )) || socket=$run/ws-${"$(print -rn -- $dir | cksum)"%% *}.sock
 
 # Outside Ghostty on macOS, and inside tmux, tmux lays out the same panes.
-if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
-  (( $+commands[tmux] )) || {
-    print -u2 -- 'workspace: tmux not found'
-    print -u2 -- 'hint: run: dotfiles bundle'
-    return 1
-  }
+if [[ -z $script ]]; then
   local name line main here='' agent_pane editor_pane focus pane command
+  # The editor's pane alone also gets the flag for its Neovim to serve the
+  # socket (config.workspace)
   local -a with_socket=(${socket:+-e} ${socket:+DOTFILES_EDITOR_SOCKET=$socket})
+  local -a serving=(${socket:+-e} ${socket:+DOTFILES_EDITOR_SERVE=1})
   if [[ -z $TMUX ]]; then
     for line in ${(f)"$(tmux list-sessions -F '#{session_name}:#{session_path}' 2>/dev/null)"}; do
       [[ ${line#*:} == "$dir" ]] && name=${line%%:*} && break
@@ -250,17 +315,23 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
       done
       # Sized like this terminal: tmux keeps no shares when attaching resizes it
       main=$(tmux new-session -d $with_socket -x - -y - -P -F '#{pane_id}' -s "$name" -c "$dir") || return
+      # The first pane keeps the socket, the session's environment doesn't:
+      # every pane opened later would take it
+      tmux set-environment -t "=$name" -u DOTFILES_EDITOR_SOCKET || return
     fi
+    # The window keeps the socket for the panes tmux's keys split from it
+    # later (tmux/tmux.conf)
+    tmux set-option -w -t "$main" @dotfiles_editor_socket "$socket" || return
     # The other panes split from the shell, each taking a share of it.
     if [[ $layout == lean ]]; then
       # Even halves: the agent right, the editor above the shell
       agent_pane=$(tmux split-window $with_socket -h -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      editor_pane=$(tmux split-window $with_socket -v -b -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      editor_pane=$(tmux split-window $with_socket $serving -v -b -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
       focus=$main
     else
       # The editor left at 60% of the width, the agent above the shell at 65%
       # of the height
-      editor_pane=$(tmux split-window $with_socket -h -b -l 60% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+      editor_pane=$(tmux split-window $with_socket $serving -h -b -l 60% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
       agent_pane=$(tmux split-window $with_socket -v -b -l 65% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
       focus=$editor_pane
     fi
@@ -282,6 +353,7 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
         (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2>/dev/null)
       fi
       export DOTFILES_EDITOR_SOCKET=$socket
+      unset DOTFILES_EDITOR_SERVE
       [[ -z $shell_cmd ]] || eval "$shell_cmd"
     fi
   fi
@@ -293,18 +365,6 @@ if [[ -n $TMUX || $OSTYPE != darwin* || ${(L)TERM_PROGRAM} != ghostty ]]; then
   fi
   return
 fi
-
-[[ -x /usr/bin/osascript ]] || {
-  print -u2 -- 'workspace: /usr/bin/osascript not found'
-  return 1
-}
-
-local script=${DOTFILES_WORKSPACE_SCRIPT:-${XDG_CONFIG_HOME:-$HOME/.config}/ghostty/workspace.applescript}
-[[ -r $script ]] || {
-  print -r -u2 -- "workspace: missing script: $script"
-  print -u2 -- 'hint: run: dotfiles link'
-  return 1
-}
 
 # Window text area in pixels (CSI 14 t) for the full layout's ratio-based split
 # sizing. Measured from the invoking pane: exact from an unsplit tab, undersized
@@ -355,10 +415,12 @@ if [[ -t 0 ]]; then
   print -rn -- $'\e]2;'"$mark"$'\a' 2>/dev/null > /dev/tty || mark=''
 fi
 # Nor can it tell edit which pane the editor runs in: the script prints its
-# id, which goes beside the socket, unless an editor serves this folder already
-if [[ -n $socket ]] && zmodload -F zsh/net/socket b:zsocket 2>/dev/null && zsocket $socket 2>/dev/null; then
+# id, which goes beside the socket, unless an editor serves this folder
+# already. zsocket silently cuts a path longer than a socket address holds
+# (104 bytes on macOS), so it connects from the socket's folder
+if [[ -n $socket ]] && zmodload -F zsh/net/socket b:zsocket 2>/dev/null &&
+    ( builtin cd -q -- ${socket:h} && zsocket ${socket:t} ) 2>/dev/null; then
   served=1
-  exec {REPLY}>&-
 fi
 output=$(
   /usr/bin/osascript "$script" "$dir" \
@@ -385,6 +447,7 @@ if [[ ${output##*$'\n'} == 'same tab' ]]; then
     (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2>/dev/null)
   fi
   export DOTFILES_EDITOR_SOCKET=$socket
+  unset DOTFILES_EDITOR_SERVE
   if [[ -n $shell_cmd ]]; then
     [[ -z $mark ]] || print -rn -- $'\e]2;'"$shell_cmd"$'\a' 2>/dev/null > /dev/tty
     eval "$shell_cmd"

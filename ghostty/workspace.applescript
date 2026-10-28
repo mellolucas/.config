@@ -7,7 +7,9 @@
 -- pane) and it is its tab's only pane, lays out that tab, the pane becoming
 -- the shell; otherwise opens a new tab in the frontmost Ghostty window
 -- (new window when none). Prints the editor's terminal id, then "same tab" or
--- "new tab". The panes it starts get DOTFILES_EDITOR_SOCKET=SOCKET, when given.
+-- "new tab". The panes it starts get DOTFILES_EDITOR_SOCKET=SOCKET, when given,
+-- and the editor's pane DOTFILES_EDITOR_SERVE=1 too, for its Neovim to serve
+-- it (config.workspace).
 -- CONTENT_WIDTH/CONTENT_HEIGHT are the window text area in pixels (CSI 14 t);
 -- when missing or 0 the full layout's splits stay even. LAYOUT is full (the
 -- default) or lean.
@@ -76,7 +78,11 @@ on run argv
 
 		set cfg to new surface configuration
 		set initial working directory of cfg to workspaceDir
-		if editorSocket is not "" then set environment variables of cfg to {"DOTFILES_EDITOR_SOCKET=" & editorSocket}
+		set editorCfg to new surface configuration from cfg
+		if editorSocket is not "" then
+			set environment variables of cfg to {"DOTFILES_EDITOR_SOCKET=" & editorSocket}
+			set environment variables of editorCfg to {"DOTFILES_EDITOR_SOCKET=" & editorSocket, "DOTFILES_EDITOR_SERVE=1"}
+		end if
 
 		-- Ghostty applies a new title within about 75 ms
 		set mainShell to missing value
@@ -110,10 +116,10 @@ on run argv
 		if layoutName is "lean" then
 			-- Splits halve the pane they divide, so no resizing
 			set rightAgent to split mainShell direction right with configuration cfg
-			set leftEditor to split mainShell direction up with configuration cfg
+			set leftEditor to split mainShell direction up with configuration editorCfg
 			set focusPane to mainShell
 		else
-			set leftEditor to split mainShell direction left with configuration cfg
+			set leftEditor to split mainShell direction left with configuration editorCfg
 			set rightAgent to split mainShell direction up with configuration cfg
 			if widthDelta > 0 and heightDelta > 0 then
 				perform action ("resize_split:right," & widthDelta) on leftEditor

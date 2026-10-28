@@ -160,12 +160,22 @@ wait_for 'the pane below does not run zsh' '[[ $(state "#{pane_current_command}"
 print -r -- 'ok: keys reach programs through attached clients, and Ctrl+B splits in place'
 
 # Agents wrap their notifications (OSC 9) in tmux's passthrough, which hands
-# them to the terminal even from a pane out of sight, in another window.
-tmux new-window -d -t test 'printf "\033Ptmux;\033\033]9;agent done\007\033\\\\"; exec cat'
+# them to the terminal from a pane in sight, never from one out of sight, in
+# another window, which could set the clipboard or have the terminal type
+# into the focused pane. The pane in sight notifies once drawn, as an agent
+# does.
+hidden=$(tmux new-window -d -P -F '#{pane_id}' -t test \
+  'printf "\033Ptmux;\033\033]9;out of sight\007\033\\\\"; echo SENT; exec cat')
+wait_for 'the pane out of sight did not run' 'shows $hidden SENT'
+shown=$(tmux new-window -P -F '#{pane_id}' -t test \
+  'echo READY; read -r; printf "\033Ptmux;\033\033]9;agent done\007\033\\\\"; exec cat')
+wait_for 'the pane in sight was not drawn' '[[ $received[fixture] == *READY* ]]'
+tmux send-keys -t $shown Enter
 notification=$'\e]9;agent done\a'
-wait_for 'a notification from a pane out of sight did not reach the terminal' \
+wait_for 'a notification from a pane in sight did not reach the terminal' \
   '[[ $received[fixture] == *$notification* ]]'
-print -r -- 'ok: agent notifications reach the terminal through tmux, also from panes out of sight'
+[[ $received[fixture] != *'out of sight'* ]] || fail 'a notification from a pane out of sight reached the terminal'
+print -r -- 'ok: agent notifications reach the terminal through tmux from panes in sight only'
 
 # workspace: a session per directory, reattached on rerun, with its commands
 # run in the right panes (harmless ones: never an editor or an agent).
@@ -256,18 +266,21 @@ near 'lean editor height' $(tmux display -p -t $lean[editor] '#{pane_height}') 5
 print -r -- 'ok: workspace sessions, commands, and proportions'
 
 # Every pane the workspace starts gets the socket its editor serves, one per
-# workspace folder (zsh/functions/workspace).
+# workspace folder (zsh/functions/workspace); the editor's pane alone gets the
+# flag for its Neovim to serve it.
 socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cksum)"%% *}.sock"; }
 mkdir -p "$HOME/sockets"
 builtin cd -- "$HOME/sockets"
-DOTFILES_WORKSPACE_EDITOR_CMD='echo E:$DOTFILES_EDITOR_SOCKET' DOTFILES_WORKSPACE_AGENT_CMD='echo A:$DOTFILES_EDITOR_SOCKET' \
-  DOTFILES_WORKSPACE_STATUS_CMD='echo S:$DOTFILES_EDITOR_SOCKET' DOTFILES_WORKSPACE_SHELL_CMD= workspace < /dev/null > /dev/null
+DOTFILES_WORKSPACE_EDITOR_CMD='echo E:$DOTFILES_EDITOR_SOCKET:$DOTFILES_EDITOR_SERVE' \
+  DOTFILES_WORKSPACE_AGENT_CMD='echo A:$DOTFILES_EDITOR_SOCKET:$DOTFILES_EDITOR_SERVE' \
+  DOTFILES_WORKSPACE_STATUS_CMD='echo S:$DOTFILES_EDITOR_SOCKET:$DOTFILES_EDITOR_SERVE' DOTFILES_WORKSPACE_SHELL_CMD= \
+  workspace < /dev/null > /dev/null
 roles sockets
 # A line a pane printed, however the pane wraps it
 printed() { (( ${${(f)"$(tmux capture-pane -pJ -t "$1")"}[(Ie)$2]} )); }
-for role output in editor E agent A shell S; do
-  wait_for "the $role pane did not get the editor's socket" \
-    "printed $pane[$role] ${(q):-$output:$(socket_for $HOME/sockets)}"
+socket=$(socket_for $HOME/sockets)
+for role output in editor E:$socket:1 agent A:$socket: shell S:$socket:; do
+  wait_for "the $role pane did not get $output" "printed $pane[$role] ${(q)output}"
 done
 print -r -- "ok: workspace hands every pane its editor's socket"
 
@@ -315,6 +328,37 @@ for line in ${(f)"$(tmux list-panes -s -t '=solo' -F '#{window_name} #{pane_id}'
     "printed $id ${(q):-SOCK:$(socket_for $HOME/$window)}"
 done
 print -r -- 'ok: workspace builds around a shell alone in its window, else opens one'
+
+# Panes tmux's keys open later take their window's socket, never the
+# session's: here in two workspaces of one session, the second run inside
+# the first's, and none in another window of it or in a plain session. Each
+# opens from the window the attached client shows.
+roles sockets
+mkdir -p "$HOME/second"
+type_line $pane[shell] "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; \
+workspace --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status '' ${(q)HOME}/second"
+wait_for 'the second workspace opened no window' '[[ $(tmux list-windows -t "=sockets" -F "#{window_name}") == *second* ]]'
+client=$(tmux list-clients -t '=test' -F '#{client_name}')
+# What a pane Ctrl+B then KEY opens from window $1 has: the socket, or none,
+# and the flag to serve it
+opened() {
+  local -i panes
+  tmux switch-client -c "$client" -t "$1"
+  panes=$(tmux list-panes -s -t "$1" | wc -l)
+  press $'\x02'"$2"
+  wait_for "Ctrl+B then $2 opened no pane from $1" "(( \$(tmux list-panes -s -t $1 | wc -l) > panes ))"
+  local id=$(tmux display -p -c "$client" '#{pane_id}')
+  type_line $id 'echo "OPENED:${DOTFILES_EDITOR_SOCKET:-none}:$DOTFILES_EDITOR_SERVE"'
+  wait_for "Ctrl+B then $2 from $1 opened a pane without $3" "printed $id ${(q):-OPENED:$3:}"
+}
+first=$(tmux display -p -t $pane[shell] '#{window_id}')
+second=$(tmux display -p -t '=sockets:second' '#{window_id}')
+opened $first % $(socket_for $HOME/sockets)
+opened $second '"' $(socket_for $HOME/second)
+opened $first c none
+opened $(tmux display -p -t '=test:' '#{window_id}') % none
+tmux switch-client -c "$client" -t '=test:'
+print -r -- "ok: panes split later take their workspace window's socket, and other panes none"
 
 # workspace --task lays out a task's worktree, through real Git, in a session
 # named after the task.
