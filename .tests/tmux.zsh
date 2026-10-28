@@ -290,6 +290,25 @@ wait_for 'beside other panes, workspace did not open a new window' \
 wait_for 'a new window moved the shell' "ran $solo STAYED"
 print -r -- 'ok: workspace builds around a shell alone in its window, else opens one'
 
+# workspace --task lays out a task's worktree, through real Git, in a session
+# named after the task.
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=Tester \
+  GIT_AUTHOR_EMAIL=tester@example.com GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=tester@example.com
+git init -q -b main "$HOME/code/owner/repo"
+git -C "$HOME/code/owner/repo" commit -q --allow-empty -m first
+builtin cd -- "$HOME/code/owner/repo"
+output=$(workspace --task fix < /dev/null)
+[[ $output == *' fix is ready;'* ]] || fail "task: $output"
+roles fix
+for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM; do
+  wait_for "the task's $role pane did not run $output" "ran $pane[$role] $output"
+done
+for role in editor agent shell; do
+  [[ $(tmux display -p -t $pane[$role] '#{pane_current_path}') == $HOME/code/owner/repo.worktrees/fix ]] ||
+    fail "the task's $role pane is in $(tmux display -p -t $pane[$role] '#{pane_current_path}')"
+done
+print -r -- "ok: workspace --task lays out the task's worktree"
+
 # keys through the real fzf, with tmux as the screen: at 120 columns every page
 # sits beside the preview, whatever FZF_DEFAULT_OPTS holds, and Enter reads the
 # page under the cursor.

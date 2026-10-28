@@ -8,7 +8,8 @@ local agent=${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}
 # An empty status or shell command is skipped.
 local status_cmd=${DOTFILES_WORKSPACE_STATUS_CMD-gg}
 local shell_cmd=${DOTFILES_WORKSPACE_SHELL_CMD:-}
-local dir=$PWD option value
+local dir=$PWD option value task=''
+local -i finish=0 arguments=$#
 local -a directories=()
 
 while (( $# )); do
@@ -16,6 +17,8 @@ while (( $# )); do
     -h|--help)
       cat <<'EOF'
 usage: workspace [OPTIONS] [--] [DIR]
+       workspace --task NAME [OPTIONS]
+       workspace --done
 
 Lay out a coding workspace: an editor, an agent, and a shell, which runs the
 status command, then the shell command, as one command line. In Ghostty on
@@ -36,6 +39,17 @@ Options (override environment; also accept --option=VALUE):
   --shell CMD    Command the shell runs after the status command. Empty skips.
   -h, --help     Show this help without launching a workspace.
   --             Treat remaining arguments as the directory.
+
+Tasks (in a Git repository):
+  --task NAME    Lay out the task's own worktree, REPO.worktrees/NAME beside
+                 the main checkout, on branch task/NAME from the commit
+                 checked out here. Rerun to reopen it: the agent resumes its
+                 last session there (OpenCode, Claude Code, and Codex; other
+                 agents start anew).
+  --done         Alone, in a task's worktree: move this shell to the main
+                 checkout and remove the worktree, which Git refuses while it
+                 holds uncommitted or untracked changes, then the branch,
+                 which Git keeps until it is merged.
 
 Layouts:
   full   editor left (60% width); on the right (40% width), the agent above
@@ -63,7 +77,7 @@ Environment (set lasting defaults in zsh/local.zsh):
       Override the Ghostty AppleScript implementation path.
 EOF
       return 0 ;;
-    --layout|--agent|--editor|--status|--shell|--layout=*|--agent=*|--editor=*|--status=*|--shell=*)
+    --layout|--agent|--editor|--status|--shell|--task|--layout=*|--agent=*|--editor=*|--status=*|--shell=*|--task=*)
       option=${1%%=*}
       if [[ $1 == *=* ]]; then
         value=${1#*=}
@@ -79,19 +93,59 @@ EOF
         print -r -u2 -- "workspace: $option requires a nonempty command"
         return 1
       fi
+      if [[ $option == --task && -z $value ]]; then
+        print -u2 -- 'workspace: --task requires a name'
+        return 1
+      fi
       case $option in
         --layout) layout=$value ;;
         --agent) agent=$value ;;
         --editor) editor=$value ;;
         --status) status_cmd=$value ;;
         --shell) shell_cmd=$value ;;
+        --task) task=$value ;;
       esac ;;
+    --done) finish=1 ;;
     --) shift; directories+=("$@"); break ;;
     -*) print -r -u2 -- "workspace: unknown option: $1"; return 1 ;;
     *) directories+=("$1") ;;
   esac
   shift
 done
+
+# Finishing a task, from its worktree: Git removes the worktree, refusing
+# while there is uncommitted work, then the branch once it is merged
+if (( finish )); then
+  if (( arguments > 1 )); then
+    print -u2 -- 'workspace: --done takes no other arguments'
+    return 1
+  fi
+  # A task's worktree is a linked one (its Git directory isn't the common one)
+  # on a task/ branch
+  local top git_dir common_dir ref
+  { read -r top; read -r git_dir; read -r common_dir; read -r ref } <<< "$(git rev-parse --show-toplevel \
+    --absolute-git-dir --path-format=absolute --git-common-dir --symbolic-full-name HEAD 2> /dev/null)"
+  if [[ $ref != refs/heads/task/* || $git_dir == $common_dir ]]; then
+    print -u2 -- "workspace: --done works in a task's worktree, which workspace --task NAME opens"
+    return 1
+  fi
+  local branch=${ref#refs/heads/} checkout
+  # The main checkout is the first worktree Git lists
+  checkout=${${(f)"$(git worktree list --porcelain)"}[1]#worktree }
+  if ! git -C "$checkout" worktree remove "$top"; then
+    print -r -u2 -- "workspace: task ${branch#task/} stays as it was"
+    return 1
+  fi
+  # Quietly, so the repository's card doesn't push what follows out of sight;
+  # git-glance's hook (zsh/.zshrc) then remembers the repository, as below
+  builtin cd -q -- "$checkout" || return
+  (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2> /dev/null)
+  print -r -- "workspace: removed task ${branch#task/}'s worktree; its other panes can be closed"
+  git -c advice.forceDeleteBranch=false branch -d "$branch" ||
+    print -r -- "workspace: kept branch $branch; to delete it anyway: git branch -D $branch"
+  git worktree prune
+  return 0
+fi
 
 if [[ $layout != (full|lean) ]]; then
   print -r -u2 -- "workspace: unknown layout: $layout (full or lean)"
@@ -107,6 +161,42 @@ if (( ${#directories} > 1 )); then
   return 1
 fi
 dir=${directories[1]:-$PWD}
+
+if [[ -n $task ]]; then
+  if (( ${#directories} )); then
+    print -u2 -- 'workspace: --task takes no directory: the task has its own'
+    return 1
+  fi
+  # One segment of a branch name, which also names the worktree's folder
+  if [[ $task == (-*|*/*) ]] || ! git check-ref-format --branch "task/$task" > /dev/null 2>&1; then
+    print -r -u2 -- "workspace: invalid task name: $task (a branch name, without / or a leading -)"
+    return 1
+  fi
+  local -a worktrees
+  worktrees=(${(f)"$(git worktree list --porcelain 2> /dev/null)"})
+  if (( ! $#worktrees )); then
+    print -u2 -- 'workspace: --task works inside a Git repository'
+    return 1
+  fi
+  # Beside the main checkout, the first worktree Git lists
+  local checkout=${worktrees[1]#worktree }
+  dir=$checkout.worktrees/$task
+  local registered="worktree $dir"
+  if (( ${worktrees[(Ie)$registered]} )) && [[ -d $dir ]]; then
+    # Reopened, the agent resumes its last session in this folder, by the
+    # flags that ask for this folder's alone (Copilot CLI's --continue falls
+    # back to another folder's)
+    local program=${agent%%[[:space:]]*}
+    case $program in
+      ocode|opencode|claude) agent="$program --continue${agent#$program}" ;;
+      codex) agent="$program resume --last${agent#$program}" ;;
+    esac
+  elif git show-ref -q --verify "refs/heads/task/$task"; then
+    git worktree add -q "$dir" "task/$task" || return
+  else
+    git worktree add -q -b "task/$task" "$dir" || return
+  fi
+fi
 
 [[ -d $dir ]] || {
   print -r -u2 -- "workspace: not a directory: $dir"

@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
-# Exercise argument dispatch and the terminal query, never launch applications.
+# Exercise argument dispatch, tasks through real Git, and the terminal query;
+# never launch applications.
 emulate -LR zsh
 setopt errexit pipefail
 
@@ -181,6 +182,148 @@ fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
   actual=$(workspace --help 3>&1 < /dev/null) || fail 'help'
   [[ $actual == 'usage: workspace '* && $actual != *$'\e[14t'* ]] || fail 'help side effects'
   print -r -- 'ok: parser and dispatch'
+)
+
+# Tasks through real Git, in a fixture repository at code/owner/repo:
+# --task lays out the task's worktree beside the main checkout, created once,
+# then reopened with the agent resuming there; --done removes it, and its
+# branch once merged. The script runner is stubbed as above.
+(
+  unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
+    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX TMUX_PANE
+  for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
+  # Git's own messages, untranslated
+  export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null LC_ALL=C
+  export GIT_AUTHOR_NAME=Tester GIT_AUTHOR_EMAIL=tester@example.com
+  export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=tester@example.com
+  OSTYPE=darwin23 TERM_PROGRAM=ghostty
+  export DOTFILES_WORKSPACE_SCRIPT=$self
+  code=$(<"$repo/zsh/functions/workspace")
+  local executable_check='[[ -x /usr/bin/osascript ]]'
+  code=${code/$executable_check/'[[ 1 == 1 ]]'}
+  functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
+  local temporary
+  temporary=$(mktemp -d "${TMPDIR:-/tmp}/workspace-tasks.XXXXXXXX")
+  temporary=${temporary:A}
+  trap 'command rm -rf -- "$temporary"' EXIT
+  # Git looks for no repository above the fixtures
+  export GIT_CEILING_DIRECTORIES=$temporary
+  mkdir -p "$temporary/outside"
+  checkout=$temporary/code/owner/repo tasks=$temporary/code/owner/repo.worktrees
+  git init -q -b main "$checkout"
+  builtin cd -- "$checkout"
+  git commit -q --allow-empty -m one
+  first=$(git rev-parse HEAD)
+  # Every worktree and branch, and where each points
+  state() {
+    git -C "$checkout" worktree list --porcelain
+    git -C "$checkout" for-each-ref --format='%(refname) %(objectname)' refs/heads
+  }
+  # The script records the folder it lays out and the agent command.
+  workspace_osascript() { print -rl -- "$2" "$4" > "$temporary/layout"; print -r -- 'new tab'; }
+  laid_out() {
+    local folder=$1 agent=$2
+    shift 2
+    rm -f -- "$temporary/layout"
+    workspace "$@" < /dev/null || fail "workspace $*"
+    [[ $(<"$temporary/layout") == "$folder"$'\n'"$agent" ]] || fail "workspace $* laid out: $(<"$temporary/layout")"
+  }
+
+  # Created from the commit checked out here, on its own branch
+  laid_out "$tasks/fix" ocode --task fix
+  [[ $(git -C "$tasks/fix" rev-parse --symbolic-full-name HEAD) == refs/heads/task/fix ]] ||
+    fail "the task's worktree is on $(git -C "$tasks/fix" rev-parse --symbolic-full-name HEAD)"
+  [[ $(git -C "$tasks/fix" rev-parse HEAD) == $first ]] || fail 'task/fix starts elsewhere'
+  # Reopened, it is the same worktree and branch, and the agents that can ask
+  # for their last session in that folder alone do
+  known=$(state)
+  for agent resumed in ocode 'ocode --continue' opencode 'opencode --continue' \
+    'claude --model opus' 'claude --continue --model opus' 'codex -m o3' 'codex resume --last -m o3' \
+    copilot copilot 'env agent chat' 'env agent chat'; do
+    laid_out "$tasks/fix" "$resumed" --task fix --agent "$agent"
+  done
+  DOTFILES_WORKSPACE_AGENT_CMD=claude laid_out "$tasks/fix" 'claude --continue' --task=fix
+  [[ $(state) == $known ]] || fail "reopening changed Git's state: $(state)"
+  # A first creation starts the agent anew.
+  laid_out "$tasks/fresh" claude --task fresh --agent claude
+  # A task branch without a worktree gets one, where the branch points.
+  git commit -q --allow-empty -m two
+  git branch task/old "$first"
+  laid_out "$tasks/old" ocode --task old
+  [[ $(git -C "$tasks/old" rev-parse HEAD) == $first ]] || fail 'task/old moved'
+  # From a linked worktree, the new task still sits beside the main checkout,
+  # starting from that worktree's commit.
+  builtin cd -- "$tasks/fix"
+  git commit -q --allow-empty -m 'fix work'
+  laid_out "$tasks/next" ocode --task next
+  [[ $(git -C "$tasks/next" rev-parse HEAD) == $(git rev-parse HEAD) ]] || fail 'task/next starts elsewhere'
+
+  # Names Git rejects in a branch, or that are not one plain folder name, a
+  # directory beside a task, and a task outside a repository change nothing.
+  known=$(state)
+  rejected() {
+    local expected=$1
+    shift
+    rm -f -- "$temporary/layout"
+    if output=$(workspace "$@" 2>&1 < /dev/null); then fail "accepted workspace ${(qqq)@}"; fi
+    [[ $output == ${~expected} ]] || fail "workspace ${(qqq)@}: $output"
+    [[ ! -e $temporary/layout && $(state) == $known ]] || fail "workspace ${(qqq)@} changed something"
+  }
+  for name in a/b -x 'a b' .hidden a..b x.lock 'a~b'; do
+    rejected "workspace: invalid task name: $name"' (*)' --task "$name"
+  done
+  rejected 'workspace: --task requires a name' --task ''
+  rejected 'workspace: --task takes no directory: the task has its own' --task fix .
+  (
+    builtin cd -- "$temporary/outside"
+    rejected 'workspace: --task works inside a Git repository' --task fix
+  )
+  print -r -- 'ok: tasks open in worktrees beside the main checkout, and reopen resuming the agent'
+
+  # --done works alone, in a task's worktree only: not in the main checkout,
+  # even on a task branch, a worktree on another branch, or outside a
+  # repository.
+  git -C "$checkout" worktree add -q -b feature "$temporary/code/owner/feature"
+  git -C "$checkout" checkout -q -b task/main
+  known=$(state)
+  for place in "$checkout" "$temporary/code/owner/feature" "$temporary/outside"; do
+    (
+      builtin cd -- "$place"
+      rejected "workspace: --done works in a task's worktree, which workspace --task NAME opens" --done
+    )
+  done
+  rejected 'workspace: --done takes no other arguments' --done --layout lean
+  git -C "$checkout" checkout -q main
+  # Uncommitted work: Git refuses, and everything stays as it was, this
+  # shell too.
+  builtin cd -- "$tasks/next"
+  print -r -- draft > draft
+  known=$(state)
+  if workspace --done > "$temporary/output" 2>&1; then fail 'removed a task with uncommitted work'; fi
+  [[ $(<"$temporary/output") == fatal:*$'\n''workspace: task next stays as it was' ]] ||
+    fail "uncommitted work: $(<"$temporary/output")"
+  [[ $PWD == $tasks/next && -e draft && $(state) == $known ]] || fail 'refusing changed something'
+  rm draft
+  # Merged, the branch goes too, Git prunes what a deleted folder left, and
+  # the shell moves to the main checkout.
+  git -C "$checkout" merge -q --no-edit task/fix
+  git -C "$checkout" worktree add -q --detach "$temporary/code/owner/deleted"
+  rm -rf -- "$temporary/code/owner/deleted"
+  builtin cd -- "$tasks/fix"
+  workspace --done > "$temporary/output" 2>&1 || fail "merged: $(<"$temporary/output")"
+  [[ $(<"$temporary/output") == "workspace: removed task fix's worktree; its other panes can be closed"$'\n''Deleted branch task/fix '* ]] ||
+    fail "merged: $(<"$temporary/output")"
+  [[ $PWD == $checkout && ! -e $tasks/fix ]] || fail 'the merged worktree stayed'
+  [[ $(state) != *task/fix* && $(state) != *deleted* ]] || fail "merged: $(state)"
+  # An unmerged branch stays, with how to delete it.
+  builtin cd -- "$tasks/next"
+  git commit -q --allow-empty -m 'next work'
+  workspace --done > "$temporary/output" 2>&1 || fail "unmerged: $(<"$temporary/output")"
+  [[ $(<"$temporary/output") == "workspace: removed task next's worktree; its other panes can be closed"$'\n'*$'\n''workspace: kept branch task/next; to delete it anyway: git branch -D task/next' ]] ||
+    fail "unmerged: $(<"$temporary/output")"
+  [[ $PWD == $checkout && ! -e $tasks/next && $(state) != *"worktree $tasks/next"* ]] || fail 'the unmerged worktree stayed'
+  git show-ref -q --verify refs/heads/task/next || fail 'the unmerged branch went'
+  print -r -- 'ok: tasks end with their worktree, and their branch once merged'
 )
 
 # Outside Ghostty on macOS, and inside tmux, tmux lays out the same panes;

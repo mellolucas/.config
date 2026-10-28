@@ -157,6 +157,20 @@ if [[ -n $rg_completion ]]; then
 else
   print -r -- 'SKIP: rgv completion (_rg not found in original fpath)'
 fi
+git_bin=${commands[git]-}
+if [[ -n $git_bin ]]; then
+  # workspace --task offers a repository's tasks, by their task/ branches,
+  # through the real Git
+  ln -s "$git_bin" "$HOME/bin/git"
+  (
+    export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+    git init -q "$HOME/tasks-repo"
+    git -C "$HOME/tasks-repo" -c user.name=Tester -c user.email=tester@example.com commit -q --allow-empty -m first
+    for branch in task/fix-login task/docs task/nested/name; do git -C "$HOME/tasks-repo" branch "$branch"; done
+  )
+else
+  print -r -- 'SKIP: workspace task names (git not installed)'
+fi
 fixture="$HOME/fixtures"
 mkdir -p "$fixture"/{prefix,case,partial,substring,hidden,dirs,all,glob,md}
 touch "$fixture/prefix/alpha" "$fixture/prefix/xalpha" \
@@ -318,6 +332,17 @@ complete 'workspace flags after directory' 'workspace dirs/visible --edi' 'works
 complete 'workspace directory after command' "workspace --agent 'zle-test-command arg' dirs/sec" "workspace --agent 'zle-test-command arg' dirs/.xxsecretxx/"
 complete 'workspace command argument' "workspace --editor 'mv prefix/al" "workspace --editor 'mv prefix/alpha"
 complete 'workspace option-like directory after terminator' 'workspace -- --pro' 'workspace -- --project/'
+complete 'workspace task flag' 'workspace --ta' 'workspace --task='
+complete 'workspace done flag' 'workspace --do' 'workspace --done '
+if [[ -n $git_bin ]]; then
+  zpty -w -n shell $'\x18\x12builtin cd ../tasks-repo\r'
+  wait_for 'ZLE-READY'
+  complete 'workspace task name' 'workspace --task fi' 'workspace --task fix-login '
+  complete 'workspace task name after =' 'workspace --task=do' 'workspace --task=docs '
+  complete 'workspace task names are one segment' 'workspace --task ne' 'workspace --task ne'
+  zpty -w -n shell $'\x18\x12builtin cd ../fixtures\r'
+  wait_for 'ZLE-READY'
+fi
 # help completes commands of every kind, not zsh's SCCS subcommands
 complete 'help command' 'help mv' 'help mv '
 complete 'help function' 'help zle-test-co' 'help zle-test-command '

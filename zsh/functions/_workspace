@@ -1,10 +1,15 @@
 #compdef workspace
 
+# Existing tasks, by their task/ branches
+local -a tasks=(${${(f)"$(git for-each-ref --format='%(refname:strip=3)' refs/heads/task/ 2>/dev/null)"}:#*/*})
+
 _arguments -S \
   '*--layout=[pane layout]:layout:(full lean)' \
   '*--agent=[command for the agent pane]:command:_cmdstring' \
   '*--editor=[command for the editor pane]:command:_cmdstring' \
   '*--status=[status command the shell starts with]:command:_cmdstring' \
   '*--shell=[command the shell runs after the status command]:command:_cmdstring' \
+  '(1)*--task=[lay out a task in its own worktree and branch]:task:compadd -a tasks' \
+  '(- *)--done[remove this task'\''s worktree, and its branch once merged]' \
   '(- *)'{-h,--help}'[show help]' \
-  '1:workspace directory:_directories'
+  '(--task)1:workspace directory:_directories'

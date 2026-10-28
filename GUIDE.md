@@ -33,6 +33,8 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 | --- | --- |
 | `workspace` | Lay out the current directory |
 | `workspace DIR` | Lay out another directory |
+| `workspace --task NAME` | Start or reopen task NAME in a worktree of its own, on branch `task/NAME` |
+| `workspace --done` | In a task, remove its worktree, and its branch once merged |
 | `workspace --layout lean` | Editor above the shell on the left, agent right, in even halves |
 | `workspace --agent CMD` | Start a different agent in the agent pane |
 | `workspace --status ggg` | The card with the code summary in the shell |
@@ -40,12 +42,14 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 | `workspace --help` | Every option and its default |
 
 - Run from a tab where your shell is the only pane, `workspace` lays out that tab around it: your shell becomes the workspace's shell, moves to the directory, and runs its commands there. It opens a new tab from a tab with other panes, or when Ghostty can't tell which pane you're in (a tab title you set by hand prevents it).
+- `workspace --task NAME` works from anywhere in a repository, a task included: the worktree sits beside the main checkout, in `~/code/OWNER/REPO.worktrees/NAME`, and its branch starts from the commit you're on. Rerun it to reopen the task: OpenCode, Claude Code, and Codex resume their last session there (Copilot CLI starts a new one). `gg` lists the repository's tasks.
+- `workspace --done` moves your shell to the main checkout, and the task's other panes can be closed. Git won't remove a task with uncommitted or untracked changes, and keeps its branch until it's merged (`git branch -D task/NAME` deletes it anyway).
 - Focus starts in the editor (in the lean layout, in the shell); `Cmd+Option+arrows` move between the panes.
 - For lasting defaults, set `DOTFILES_WORKSPACE_LAYOUT=lean` (on a laptop, say) or the commands in `zsh/local.zsh`.
 - The editor opens on the project's file tree; `Cmd+Shift+Enter` zooms it to explore (`keys explore`).
 - Elsewhere (outside Ghostty, or on Linux) the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux, windows take the place of tabs.
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
-- Tab completes `workspace`'s flags and directories.
+- Tab completes `workspace`'s flags, directories, and task names.
 
 ## Panes: Move between panes
 
