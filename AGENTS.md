@@ -150,13 +150,15 @@ Deliberate duplication that must stay behavior-identical across copies:
   a replacement before removing what is installed, never interrupt a package
   transaction with a timeout, and never use `--zap`.
 - **Scale verification to risk.** Lifecycle, data, and Git-state changes
-  (anything that installs, updates, links, moves, or deletes) get tests through
-  the real tools, each shown to fail without its change. Daily interactions
-  (keys, helpers, layouts) get checks of what the user sees, never of how code
-  or docs are spelled. Cosmetic details and rare edge cases get none: live with
-  them, and fix what bothers. Another model reviews at the end of each phase of
-  work, not after every fix; give it the full diff and room to challenge
-  earlier decisions, and report every finding and its disposition to the user.
+  (anything that installs, updates, links, moves, or deletes) get tests
+  through the real tools, each shown to fail without its change. Daily
+  interactions (keys, helpers, layouts) get checks of what the user sees,
+  never of how code or docs are spelled; settings whose effect no test can
+  observe, such as Ghostty's, are checked as written. Cosmetic details and
+  rare edge cases get none: live with them, and fix what bothers. Another
+  model reviews at the end of each phase of work, not after every fix; give it
+  the full diff and room to challenge earlier decisions, and report every
+  finding and its disposition to the user.
 - Report-first (user approves before execution): anything that replaces or
   deletes a deliberate artifact, changes a daily interaction, or crosses
   domain boundaries. Everything else: decide autonomously, report rationale.
