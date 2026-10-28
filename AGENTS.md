@@ -99,10 +99,13 @@ these waits.
   personal/project-specific choices remain local.
 - `zsh/homebrew.sh` and `zsh/xdg.sh` are shared by shell startup and
   `install.sh`; keep them POSIX sh so both can source them.
+- `get.sh` is the one-command installer: standalone POSIX sh that runs before
+  any checkout exists, clones the repository, and hands off to its
+  `install.sh`, using nothing else from the repository.
 - Commit style: small, cohesive conventional commits,
   `type(scope): lowercase summary`, scope = domain directory
-  (e.g. `chore(zsh): ...`, `fix(ghostty): ...`), `install` for `install.sh`,
-  and `repo` for root documents, tests, and CI.
+  (e.g. `chore(zsh): ...`, `fix(ghostty): ...`), `install` for `install.sh`
+  and `get.sh`, and `repo` for root documents, tests, and CI.
 
 ## Parity contracts
 

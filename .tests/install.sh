@@ -918,4 +918,247 @@ check doctor_says ✗ Brewfile "$test_root/Brewfile" HOMEBREW_BUNDLE_FILE_GLOBAL
   check grep -Fqx "skip: could not switch the login shell; run: sudo chsh -s $zsh $user" "$test_root/shell.log"
 )
 
+# get.sh runs as its one-liner does, from zsh, bash, or sh, and from dash,
+# Debian's sh. Git's own URL rewriting points its clone at a local seed, and
+# stand-ins answer for curl (serving Homebrew's installer), brew, npm,
+# xcode-select, uname (Darwin unless a check says Linux), and git, which asks
+# for the Command Line Tools until they are there, as macOS's /usr/bin/git does.
+get="$repo/get.sh"
+get_url=https://github.com/mellolucas/.config
+seed="$test_root/get-seed"
+git init -q --template= "$seed"
+# A default branch other than main shows the clone takes the remote's.
+git -C "$seed" symbolic-ref HEAD refs/heads/trunk
+mkdir "$seed/zsh" "$seed/homebrew"
+cp "$repo/install.sh" "$seed/install.sh"
+cp "$repo/zsh/.zshenv" "$repo/zsh/xdg.sh" "$repo/zsh/homebrew.sh" "$seed/zsh/"
+printf '# fixture\n' > "$seed/homebrew/Brewfile"
+first_commit=$(fixture_commit trunk)
+printf 'second\n' > "$seed/history"
+second_commit=$(fixture_commit trunk -p "$first_commit")
+
+mkdir "$test_root/get-bin"
+cat > "$test_root/get-bin/curl" <<'EOF'
+#!/bin/sh
+[ -z "${FAIL_CURL-}" ] || exit 22
+# Homebrew's installer records its input, then adds the Command Line Tools.
+cat <<'INSTALLER'
+IFS= read -r line || line=
+printf 'stdin=%s NONINTERACTIVE=%s\n' "$line" "${NONINTERACTIVE-unset}" >> "$HOME/homebrew-installer.log"
+mkdir -p "$CLT/usr/bin" && ln -s "$REAL_GIT" "$CLT/usr/bin/git"
+INSTALLER
+EOF
+cat > "$test_root/get-bin/xcode-select" <<'EOF'
+#!/bin/sh
+if [ "$*" != -p ] || [ ! -d "$CLT" ]; then
+  printf 'xcode-select: error: unable to get active developer directory\n' >&2
+  exit 2
+fi
+printf '%s\n' "$CLT"
+EOF
+cat > "$test_root/get-bin/git" <<'EOF'
+#!/bin/sh
+[ ! -x "$CLT/usr/bin/git" ] || exec "$CLT/usr/bin/git" "$@"
+printf '%s\n' "$*" >> "$HOME/clt-dialog.log"
+printf 'xcode-select: note: No developer tools were found, requesting install.\n' >&2
+exit 1
+EOF
+cat > "$test_root/get-bin/brew" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >> "$HOME/brew.log"
+case "$*" in
+  'bundle --global') [ -z "${FAIL_BUNDLE-}" ] || exit 1 ;;
+  'bundle list --global --npm') ;;
+  *) exit 1 ;;
+esac
+EOF
+cat > "$test_root/get-bin/uname" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$UNAME"
+EOF
+chmod +x "$test_root/get-bin/curl" "$test_root/get-bin/xcode-select" \
+  "$test_root/get-bin/git" "$test_root/get-bin/brew" "$test_root/get-bin/uname"
+ln -s "$test_root/package-bin/npm" "$test_root/get-bin/npm"
+mkdir -p "$test_root/get-clt/usr/bin"
+ln -s "$REAL_GIT" "$test_root/get-clt/usr/bin/git"
+
+# Runs get.sh as SHELL -c 'sh -c "$(curl ...)" ARGS' does, with cat for curl
+# and a line of typed input on stdin; leading NAME=VALUE arguments join its
+# environment. dash runs the script itself, as Debian's sh.
+run_get() (
+  unset DOTFILES_DIR XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME \
+    FAIL_BUNDLE FAIL_CURL HOMEBREW_BUNDLE_NO_UPGRADE NONINTERACTIVE BASH_ENV ENV
+  export GET="$get" UNAME=Darwin CLT="$test_root/get-clt" PATH="$test_root/get-bin:$PATH" \
+    GIT_ALLOW_PROTOCOL=file GIT_CONFIG_COUNT=1 \
+    GIT_CONFIG_KEY_0="url.file://$seed.insteadOf" GIT_CONFIG_VALUE_0="$get_url"
+  # shellcheck disable=SC2163 # each is NAME=VALUE
+  while :; do
+    case "$1" in
+      *=*) export "$1"; shift ;;
+      *) break ;;
+    esac
+  done
+  mkdir -p "$HOME"
+  shell=$1
+  shift
+  # shellcheck disable=SC2016 # the shell that runs it expands these
+  case "$shell" in
+    dash) set -- dash -c "$(cat "$GET")" "$@" ;;
+    zsh) set -- zsh -fc 'sh -c "$(cat "$GET")" "$@"' zsh "$@" ;;
+    *) set -- "$shell" -c 'sh -c "$(cat "$GET")" "$@"' "$shell" "$@" ;;
+  esac
+  printf 'typed\n' | "$@"
+)
+# How many times install.sh applied the Brewfile in a home.
+bundles() {
+  if [ -e "$1/brew.log" ]; then grep -c '^bundle --global$' "$1/brew.log" || :; else printf '0\n'; fi
+}
+
+# A fresh Mac: Homebrew's installer, reading the terminal for its prompts,
+# adds the Command Line Tools before anything runs git; the clone takes the
+# default branch with its history, tracking origin; install runs from it.
+home="$test_root/get-mac"
+checkout="$home/code/mellolucas/.config"
+run_get HOME="$home" CLT="$home.clt" zsh > "$home.log" 2>&1 || fail "get.sh on a fresh Mac: $(cat "$home.log")"
+check test "$(cat "$home/homebrew-installer.log")" = 'stdin=typed NONINTERACTIVE=unset'
+check test ! -e "$home/clt-dialog.log"
+check test "$(git -C "$checkout" rev-parse --abbrev-ref HEAD '@{upstream}' | tr '\n' ' ')" = 'trunk origin/trunk '
+check test "$(git -C "$checkout" config --get remote.origin.url)" = "$get_url"
+check test "$(git -C "$checkout" rev-list --count HEAD)" = 2
+check test "$(readlink "$home/.local/bin/dotfiles")" = "$checkout/install.sh"
+check test "$(bundles "$home")" = 1
+
+# A failed install keeps its exit status and says that rerunning the same
+# command resumes; the rerun reuses the checkout, neither cloning nor
+# fetching, and installs again.
+rc=0
+run_get HOME="$home" CLT="$home.clt" FAIL_BUNDLE=1 sh > "$home.log" 2>&1 || rc=$?
+check test "$rc" = 1
+check grep -Fq 'run the same command again' "$home.log"
+printf 'third\n' > "$seed/history"
+fixture_commit trunk -p "$second_commit" > /dev/null
+run_get HOME="$home" CLT="$home.clt" bash > "$home.log" 2>&1 || fail "get.sh rerun: $(cat "$home.log")"
+check test "$(git -C "$checkout" rev-parse HEAD)" = "$second_commit"
+check test "$(bundles "$home")" = 3
+check test "$(grep -c '' "$home/homebrew-installer.log")" = 1
+
+# Each form of this repository's URL is the origin get.sh expects; another
+# warns, and the install carries on.
+for origin in "$get_url" "$get_url.git" git@github.com:mellolucas/.config.git \
+  ssh://git@github.com/mellolucas/.config https://github.com/fork/.config; do
+  git -C "$checkout" remote set-url origin "$origin"
+  run_get HOME="$home" sh > "$home.log" 2>&1 || fail "get.sh with origin $origin: $(cat "$home.log")"
+  if [ "$origin" = https://github.com/fork/.config ]; then
+    check grep -q '^warning: .*fork' "$home.log"
+  elif grep -q '^warning: ' "$home.log"; then
+    fail "get.sh warned about origin $origin"
+  fi
+done
+check test "$(bundles "$home")" = 8
+
+# DOTFILES_DIR chooses the folder; later runs find it through the dotfiles
+# link, also when DOTFILES_DIR names it again, a trailing slash included.
+# Another folder is refused before anything changes.
+home="$test_root/get-custom"
+custom="$home/src/dots"
+inner=dash
+command -v dash >/dev/null 2>&1 || inner='sh'
+run_get HOME="$home" DOTFILES_DIR="$custom/" "$inner" > "$home.log" 2>&1 || fail "get.sh into DOTFILES_DIR: $(cat "$home.log")"
+check test "$(readlink "$home/.local/bin/dotfiles")" = "$custom/install.sh"
+run_get HOME="$home" bash > "$home.log" 2>&1 || fail "get.sh through the dotfiles link: $(cat "$home.log")"
+run_get HOME="$home" DOTFILES_DIR="$custom/" zsh > "$home.log" 2>&1 || fail "get.sh with the same DOTFILES_DIR: $(cat "$home.log")"
+check test ! -e "$home/code"
+check test "$(bundles "$home")" = 3
+rc=0
+run_get HOME="$home" DOTFILES_DIR="$home/elsewhere" sh > "$home.log" 2>&1 || rc=$?
+check test "$rc" = 1
+check test ! -e "$home/elsewhere"
+check test "$(bundles "$home")" = 3
+
+# The checkout can't be XDG_CONFIG_HOME or inside it, wherever that is, and
+# get.sh says so before installing anything.
+home="$test_root/get-xdg"
+for setting in default-itself default-inside custom; do
+  case "$setting" in
+    default-itself) set -- '' "$home/.config" ;;
+    default-inside) set -- '' "$home/.config/dotfiles" ;;
+    custom) set -- "$home/xdg" "$home/xdg/dotfiles" ;;
+  esac
+  rc=0
+  run_get HOME="$home" CLT="$home.clt" XDG_CONFIG_HOME="$1" DOTFILES_DIR="$2" sh > "$home.log" 2>&1 || rc=$?
+  [ "$rc" = 1 ] || fail "get.sh into XDG_CONFIG_HOME ($setting) exited $rc: $(cat "$home.log")"
+  check test -z "$(ls -A "$home")"
+done
+
+# A folder there with other files in it is refused before anything is
+# installed; an empty one takes the clone.
+home="$test_root/get-occupied"
+checkout="$home/code/mellolucas/.config"
+mkdir -p "$checkout"
+printf 'mine\n' > "$checkout/notes"
+rc=0
+run_get HOME="$home" CLT="$home.clt" bash > "$home.log" 2>&1 || rc=$?
+check test "$rc" = 1
+check test "$(ls -A "$home")" = code
+check test "$(ls -A "$checkout")" = notes
+rm "$checkout/notes"
+run_get HOME="$home" bash > "$home.log" 2>&1 || fail "get.sh into an empty folder: $(cat "$home.log")"
+check test -d "$checkout/.git"
+
+# Arguments after -- reach install.sh: -- link, as on a root server or
+# Alpine, links the configuration without Homebrew.
+home="$test_root/get-link"
+run_get HOME="$home" UNAME=Linux zsh -- link > "$home.log" 2>&1 || fail "get.sh -- link: $(cat "$home.log")"
+check test "$(readlink "$home/.local/bin/dotfiles")" = "$home/code/mellolucas/.config/install.sh"
+check test "$(bundles "$home")" = 0
+
+# Elsewhere, a missing git or zsh is named, with apt's line for them and
+# Homebrew's needs, before anything changes.
+mkdir "$test_root/get-bare-bin"
+for tool in sh cat mkdir readlink; do
+  ln -s "$(command -v "$tool")" "$test_root/get-bare-bin/$tool"
+done
+ln -s "$test_root/get-bin/uname" "$test_root/get-bare-bin/uname"
+ln -s "$REAL_GIT" "$test_root/get-bare-bin/git"
+home="$test_root/get-bare"
+for missing in zsh 'git and zsh'; do
+  [ "$missing" = zsh ] || rm "$test_root/get-bare-bin/git"
+  rc=0
+  run_get HOME="$home" UNAME=Linux PATH="$test_root/get-bare-bin" sh > "$home.log" 2>&1 || rc=$?
+  check test "$rc" = 1
+  check grep -Fqx "error: install $missing first" "$home.log"
+  check grep -Fq 'sudo apt install zsh build-essential procps curl file git' "$home.log"
+  check test -z "$(ls -A "$home")"
+done
+
+# A download that fails, of Homebrew's installer or of the clone, points to
+# the README's Network access, and nothing is installed; Homebrew's names its
+# URL, as Git does for the clone.
+home="$test_root/get-offline"
+rc=0
+run_get HOME="$home" CLT="$home.clt" FAIL_CURL=1 zsh > "$home.log" 2>&1 || rc=$?
+check test "$rc" = 1
+check grep -q '^error: .*https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh' "$home.log"
+check grep -Fq "$get_url#network-access" "$home.log"
+check test -z "$(ls -A "$home")"
+rc=0
+run_get HOME="$home" GIT_ALLOW_PROTOCOL= sh > "$home.log" 2>&1 || rc=$?
+check test "$rc" = 1
+check grep -Fq "$get_url#network-access" "$home.log"
+check test ! -e "$home/code/mellolucas/.config"
+check test ! -e "$home/.local"
+
+# A download cut short runs nothing: cut before the last line, it only
+# defines functions; cut within that line, it is a syntax error.
+home="$test_root/get-cut"
+cut="$test_root/get-cut.sh"
+size=$(($(wc -c < "$get")))
+bytes=$((size - $(tail -n 1 "$get" | wc -c)))
+while [ "$bytes" -lt "$((size - 1))" ]; do
+  head -c "$bytes" "$get" > "$cut"
+  run_get HOME="$home" GET="$cut" sh > "$home.log" 2>&1 || :
+  [ -z "$(ls -A "$home")" ] || fail "get.sh cut after $bytes bytes ran: $(cat "$home.log")"
+  bytes=$((bytes + 1))
+done
+
 printf 'ok: lifecycle regression checks\n'

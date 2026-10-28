@@ -6,9 +6,18 @@ Colors follow Catppuccin: Mocha in dark mode and Latte in light. Ghostty switche
 
 ## Get started
 
-macOS is the primary platform. Linux, WSL, and GitHub Codespaces are supported best-effort, with tmux where Ghostty is absent (see [Without Ghostty](#without-ghostty)). You need Git and zsh: macOS ships zsh, and its `git` offers to install the Command Line Tools on first use. The installer adds Homebrew, and the Brewfile adds Ghostty 1.3+ (on macOS), Neovim 0.12+, and the rest.
+macOS is the primary platform. Linux, WSL, and GitHub Codespaces are supported best-effort, with tmux where Ghostty is absent (see [Without Ghostty](#without-ghostty)). A Mac needs nothing first; on Linux and WSL, install Git and zsh (on Ubuntu, `sudo apt install zsh build-essential procps curl file git` covers Homebrew's needs too). The installer adds Homebrew, and the Brewfile adds Ghostty 1.3+ (on macOS), Neovim 0.12+, and the rest.
 
-Clone anywhere outside `$XDG_CONFIG_HOME` (normally `~/.config`), which the installer links into, then install:
+Install with one command, then start a login shell:
+
+```sh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/mellolucas/.config/HEAD/get.sh)"
+exec zsh -l
+```
+
+It clones this repository to `~/code/mellolucas/.config` and runs its installer; a Mac without the Command Line Tools gets them, Git included, from Homebrew's installer first. To clone elsewhere, start the command with `DOTFILES_DIR=~/path/to/checkout`: anywhere outside `$XDG_CONFIG_HOME` (normally `~/.config`), which the installer links into. Arguments after `--` go to the installer: as root on a server, or on Alpine, end the command with `-- link` to set up only the configuration. If something fails, run the same command again; it reuses the checkout. Keep the `sh -c` form: piping the script into `sh` would leave Homebrew's installer no terminal to ask for your password.
+
+Or clone anywhere outside `$XDG_CONFIG_HOME` yourself (on a Mac, `git` first offers to install the Command Line Tools), then install:
 
 ```sh
 git clone https://github.com/mellolucas/.config ~/code/mellolucas/.config
@@ -48,7 +57,7 @@ Homebrew owns package installs and upgrades: Ghostty's updater is off, OpenCode 
 
 Neovim plugins are the one thing Homebrew does not update: run `:lua vim.pack.update()` in Neovim, read the pending changes, `:write` to apply them (or `:quit` to skip), then commit the changed `nvim/nvim-pack-lock.json`.
 
-Two package sets share one lifecycle. `homebrew/core.Brewfile` holds the essentials on every platform: Git, Neovim, the shell tools, tmux, gh, and OpenCode. `homebrew/Brewfile` adds the workstation: the language servers, the Go, Node, Bun, and Python runtimes, the other agents, the App Store CLI (when signed in to an Apple Account) and Obsidian on macOS, and Apple's Container on Apple silicon with macOS 26+. Containers bring their own toolchains (GitHub Codespaces, dev containers, and Docker or Podman containers), so there Homebrew installs only the core set; anywhere else, export `HOMEBREW_BUNDLE_FILE_GLOBAL="$XDG_CONFIG_HOME/homebrew/core.Brewfile"` (in `zsh/local.zsh`, and before the first install) to choose it. Brewfile `npm` entries install tools published on npm; Homebrew Bundle never upgrades them, so `update` and `bundle` do, without install scripts and only to releases at least a day old, as Bundle installs them.
+Two package sets share one lifecycle. `homebrew/core.Brewfile` holds the essentials on every platform: Git, Neovim, the shell tools, tmux, gh, and OpenCode. `homebrew/Brewfile` adds the workstation: the language servers, the Go, Node, Bun, and Python runtimes, the other agents, the App Store CLI (when signed in to an Apple Account) and Obsidian on macOS, and Apple's Container on Apple silicon with macOS 26+. Containers bring their own toolchains (GitHub Codespaces, dev containers, and Docker or Podman containers), so there Homebrew installs only the core set; anywhere else, export `HOMEBREW_BUNDLE_FILE_GLOBAL="${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/core.Brewfile"` (in `zsh/local.zsh`, and before the first install) to choose it. Brewfile `npm` entries install tools published on npm; Homebrew Bundle never upgrades them, so `update` and `bundle` do, without install scripts and only to releases at least a day old, as Bundle installs them.
 
 Agents: OpenCode (the workspace default) and Claude Code are installed through Homebrew; Claude Code reads `AGENTS.md` directly. Copilot CLI and Codex come from npm through Brewfile entries, because their Homebrew casks are unnotarized and macOS blocks them; `gh copilot` runs the same `copilot`. Each agent keeps its home under `~/.local/share` (see [Where files live](#where-files-live)). Copilot CLI is the one agent whose notifications start off, in settings this repository doesn't track: run `copilot config notifications on`, and `copilot config terminalNotifications on` so Ghostty shows them as it does the others'.
 
@@ -107,7 +116,7 @@ On a managed network, these are the hosts to ask for:
 
 | When | Hosts |
 | --- | --- |
-| Install | `raw.githubusercontent.com` (Homebrew's installer), `github.com` (this repository, Homebrew, Neovim's plugins), and on macOS `swscan.apple.com` and `swcdn.apple.com` (the Command Line Tools) |
+| Install | `raw.githubusercontent.com` (`get.sh` and Homebrew's installer), `github.com` (this repository, Homebrew, Neovim's plugins), and on macOS `swscan.apple.com` and `swcdn.apple.com` (the Command Line Tools) |
 | Install and update | `formulae.brew.sh` and `api.github.com` (Homebrew's package lists), `ghcr.io` and `pkg-containers.githubusercontent.com` (Homebrew's packages and its own Ruby), `registry.npmjs.org` (Copilot CLI, Codex), `release.files.ghostty.org` (Ghostty), `downloads.claude.ai` (Claude Code), `release-assets.githubusercontent.com` (Obsidian) |
 | Daily | Each agent's own service (its documentation lists the hosts), `www.schemastore.org` and `json.schemastore.org` (YAML schemas), `proxy.golang.org` and `sum.golang.org` (Go modules) |
 
