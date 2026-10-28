@@ -850,47 +850,80 @@ startup_errors=$(<"$test_root/startup-errors")
 [[ -z $startup_errors ]] || fail "startup wrote to stderr: $startup_errors"
 # An image that exports SHELL=/bin/bash (Codespaces) still gets zsh tmux panes
 expect "$startup_home/.config/zsh 1 zsh" "$startup_out" 'full startup loads .zshrc'
-# On a terminal, a week after the last full update, the first shell of each
-# day says so in one line before the command's output; startup prints nothing
-# else.
+# On a terminal, a week after the last full update, the first shell a person
+# opens each day says so in one line, before anything else; a shell run for a
+# command (zsh -lic, as agents and editors start them) stays silent and leaves
+# the day to the person.
 zmodload zsh/zpty zsh/zselect
-on_terminal() {
-  local chunk deadline=$(( SECONDS + 10 ))
-  local -a shell=(/usr/bin/env -i HOME="$startup_home" TERM=xterm-256color \
-    PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" -lic 'print -r -- READY')
-  zpty -b startup "builtin cd ${(q)startup_home} && ${(@q)shell}"
-  terminal_out=''
-  while (( SECONDS < deadline )); do
-    if zpty -r startup chunk; then
-      terminal_out+=$chunk
-    elif ! zpty -t startup; then
-      break
-    else
-      zselect -t 1 || true
-    fi
+# A person's shell reads commands from the terminal; this one says READY and
+# leaves as startup ends (zsh reads .zlogin last).
+print -r -- '(( ${+ZSH_EXECUTION_STRING} )) || { print -r -- READY; exit }' > "$startup_home/.config/zsh/.zlogin"
+# Starts login shells at once, each on a terminal of its own, and collects what
+# each prints in terminal_outs: a person's for an empty argument, one running
+# the command for any other.
+on_terminals() {
+  local chunk i
+  local -i deadline=$(( SECONDS + 10 ))
+  local -a shell running
+  terminal_outs=()
+  for (( i = 1; i <= $#; i++ )); do
+    shell=(/usr/bin/env -i HOME="$startup_home" TERM=xterm-256color \
+      PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" -l)
+    [[ -z ${argv[i]} ]] || shell+=(-ic "${argv[i]}")
+    zpty -b startup$i "builtin cd ${(q)startup_home} && ${(@q)shell}"
+    terminal_outs[i]=''
+    running+=($i)
   done
-  zpty -d startup
-  (( SECONDS < deadline )) || fail "startup on a terminal timed out: ${(qqqq)terminal_out}"
-  terminal_out=${${terminal_out//$'\r'/}%$'\n'}
+  while (( $#running && SECONDS < deadline )); do
+    for i in $running; do
+      while zpty -r startup$i chunk; do terminal_outs[i]+=$chunk; done
+      zpty -t startup$i && continue
+      while zpty -r startup$i chunk; do terminal_outs[i]+=$chunk; done
+      zpty -d startup$i
+      running=(${running:#$i})
+    done
+    zselect -t 1 || true
+  done
+  for i in $running; do zpty -d startup$i; done
+  (( ! $#running )) || fail "startup on a terminal timed out: ${(qqqq)terminal_outs}"
+  terminal_outs=("${(@)${(@)terminal_outs//$'\r'/}%$'\n'}")
 }
 expect_reminder() {
-  [[ $terminal_out == *'8 days ago'*dotsup*$'\nREADY' && $terminal_out != *$'\n'*$'\n'* ]] ||
-    fail "$1: ${(qqqq)terminal_out}"
+  [[ $1 == *'8 days ago'*dotsup*$'\nREADY' && $1 != *$'\n'*$'\n'* ]] || fail "$2: ${(qqqq)1}"
 }
-on_terminal
-expect_reminder 'reminder on a terminal'
-on_terminal
-expect READY "$terminal_out" 'one reminder a day'
-age "$reminder_state/reminded" 1
-on_terminal
-expect_reminder 'reminder the next day'
+strftime -s today %F $EPOCHSECONDS
+on_terminals 'print -r -- READY'
+expect READY "$terminal_outs[1]" 'no reminder for a command run on a terminal'
+markers=($reminder_state/reminded-*(N:t))
+expect '' "$markers" 'a command run on a terminal leaves the day unclaimed'
+on_terminals ''
+expect_reminder "$terminal_outs[1]" 'reminder on a terminal'
+on_terminals ''
+expect READY "$terminal_outs[1]" 'one reminder a day'
+/bin/mv "$reminder_state/reminded-$today" "$reminder_state/reminded-2000-01-01"
+on_terminals ''
+expect_reminder "$terminal_outs[1]" 'reminder after a marker from an earlier day'
+markers=($reminder_state/reminded-*(N:t))
+expect "reminded-$today" "$markers" 'only the day claimed last keeps its marker'
+/bin/rm -f "$reminder_state/reminded-$today"
+on_terminals '' ''
+reminders=(${(M)terminal_outs:#*dotsup*})
+(( $#reminders == 1 )) || fail "two shells opened at once: ${(qqqq)terminal_outs}"
+expect_reminder "$reminders[1]" 'reminder in one of two shells opened at once'
+silent=(${terminal_outs:#*dotsup*})
+expect READY "$silent" 'the other shell opened at once stays silent'
+/bin/rm -f "$reminder_state/reminded-$today"
+/bin/chmod 555 "$reminder_state"
+on_terminals ''
+/bin/chmod 755 "$reminder_state"
+expect READY "$terminal_outs[1]" 'no reminder or error where the day cannot be claimed'
 /usr/bin/touch "$reminder_state/updated"
-/bin/rm -f "$reminder_state/reminded"
-on_terminal
-expect READY "$terminal_out" 'no reminder after a recent update'
+on_terminals ''
+expect READY "$terminal_outs[1]" 'no reminder after a recent update'
 /bin/rm -f "$reminder_state/updated"
-on_terminal
-expect READY "$terminal_out" 'no reminder before a first full update'
+on_terminals ''
+expect READY "$terminal_outs[1]" 'no reminder before a first full update'
+/bin/rm -f "$startup_home/.config/zsh/.zlogin"
 # In a container (here Codespaces), login and other interactive shells alike
 # get the lean Brewfile.
 for flags in -lic -ic; do

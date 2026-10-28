@@ -131,16 +131,22 @@ if command -v git-glance >/dev/null 2>&1; then
 fi
 
 # A week after the last full update (dotfiles install, update, or bundle), the
-# first shell of each day says so; nothing checks in the background
+# first shell a person opens each day says so; nothing checks in the
+# background. A shell run for a command (zsh -c, as agents and editors start
+# them) or a script stays silent; shin_stdin can't tell, as zsh turns it off
+# while it reads startup files.
 () {
-  [[ -t 1 ]] || return 0
-  setopt local_options extended_glob
-  local state=${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles
-  [[ -n $state/updated(#qN.md+6) && -z $state/reminded(#qN.mh-20) ]] || return 0
-  zmodload -F zsh/stat b:zstat && zmodload -F zsh/datetime p:EPOCHSECONDS || return 0
+  (( ! ${+ZSH_EXECUTION_STRING} && ! ${+ZSH_SCRIPT} )) && [[ -t 0 && -t 1 ]] || return 0
+  setopt local_options extended_glob no_clobber
+  local state=${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles today
+  [[ -n $state/updated(#qN.md+6) ]] || return 0
+  zmodload -F zsh/stat b:zstat && zmodload -F zsh/datetime p:EPOCHSECONDS b:strftime || return 0
   local -a updated
   zstat -A updated +mtime -- $state/updated || return 0
-  : >| $state/reminded
+  strftime -s today %F $EPOCHSECONDS
+  # no_clobber lets one shell alone create the day's marker: the one that says so
+  { : > $state/reminded-$today } 2> /dev/null || return 0
+  rm -f -- $state/reminded-*~*-$today(N) 2> /dev/null
   print -r -- "Last full update $(( (EPOCHSECONDS - updated[1]) / 86400 )) days ago: dotsup updates the setup and its packages."
 }
 
