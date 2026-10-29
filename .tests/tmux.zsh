@@ -28,11 +28,14 @@ if [[ ${1:-} != --fixture ]]; then
 fi
 
 zmodload zsh/zpty zsh/datetime
-# Panes exit, saving their history, before the fixture home goes.
+zmodload -F zsh/net/socket b:zsocket
+# Panes exit, saving their history, before the fixture home goes, as does a
+# stand-in editor (serve, below).
 stop() {
   local -a pids=(${(f)"$(tmux list-panes -a -F '#{pane_pid}' 2>/dev/null)"})
   local pid
   local -F deadline=$(( EPOCHREALTIME + 5 ))
+  [[ -z ${stand_in-} ]] || kill $stand_in 2>/dev/null
   zpty -d 2>/dev/null
   tmux kill-server 2>/dev/null
   for pid in $pids; do
@@ -360,6 +363,57 @@ opened $(tmux display -p -t '=test:' '#{window_id}') % none
 tmux switch-client -c "$client" -t '=test:'
 print -r -- "ok: panes split later take their workspace window's socket, and other panes none"
 
+# A stand-in for an editor serving socket $1, accepting each connection as
+# Neovim does, from the socket's folder, as zsocket cuts a longer path
+stand_in=''
+serve() {
+  rm -f -- $1
+  ( builtin cd -q -- ${1:h} && zsocket -l ${1:t} || exit
+    integer listener=$REPLY
+    while zsocket -a $listener; do exec {REPLY}>&-; done ) &
+  stand_in=$!
+  wait_for "the stand-in editor did not serve $1" "( builtin cd -q -- ${(q)1:h} && zsocket ${(q)1:t} ) 2>/dev/null"
+}
+unserve() { kill $stand_in; wait $stand_in 2>/dev/null || :; stand_in=''; }
+# While its editor serves the socket, a folder's workspace comes forward in
+# place of another: from outside tmux, its session reattaches at the window
+# keeping the socket, here one opened inside tmux; from inside, the client
+# switches there. Nothing opens, nor where no window keeps the socket.
+serve $(socket_for $HOME/second)
+integer panes=$(tmux list-panes -a | wc -l)
+tmux select-window -t $first
+output=$(workspace $HOME/second < /dev/null)
+[[ $output == "workspace: tmux session sockets is ready; attach with: tmux attach -t '=sockets'" &&
+  $(tmux display -p -t '=sockets:' '#{window_id}') == $second ]] ||
+  fail "outside tmux, workspace for a folder whose editor runs: $output, at $(tmux display -p -t '=sockets:' '#{window_id}')"
+inside=$(tmux new-window -P -F '#{pane_id}' -t '=test' 'zsh -f')
+type_line $inside "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; \
+workspace --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status '' ${(q)HOME}/second"
+wait_for 'inside tmux, workspace did not switch to the window keeping the served socket' \
+  '[[ $(tmux display -p -c "$client" "#{window_id}") == $second ]]'
+(( $(tmux list-panes -a | wc -l) == panes + 1 )) || fail 'workspace for a folder whose editor runs opened panes'
+unserve
+mkdir -p "$HOME/nowhere"
+serve $(socket_for $HOME/nowhere)
+if output=$(workspace $HOME/nowhere 2>&1 < /dev/null); then fail 'laid out a folder whose editor runs out of reach'; fi
+[[ $output == "workspace: an editor for $HOME/nowhere is running already, where workspace can't bring it forward; quit it to lay out a new workspace" ]] ||
+  fail "an editor out of reach: $output"
+(( $(tmux list-panes -a | wc -l) == panes + 1 )) || fail 'workspace for a folder whose editor runs out of reach opened panes'
+unserve
+# While no editor serves it, the workspace laid out inside tmux takes the
+# socket from the window that kept it, which comes forward no more.
+type_line $inside "workspace --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status '' ${(q)HOME}/second"
+wait_for 'inside tmux, workspace laid out nothing for a folder whose editor is gone' \
+  '(( $(tmux list-panes -t $inside | wc -l) == 3 ))'
+serve $(socket_for $HOME/second)
+output=$(workspace $HOME/second < /dev/null)
+[[ $output == "workspace: tmux session test is ready; attach with: tmux attach -t '=test'" &&
+  $(tmux display -p -t '=test:' '#{window_id}') == $(tmux display -p -t $inside '#{window_id}') ]] ||
+  fail "the socket's new workspace: $output"
+unserve
+tmux switch-client -c "$client" -t '=test:'
+print -r -- 'ok: workspace brings forward the workspace whose editor runs, from outside and inside tmux, and opens nothing'
+
 # workspace --task lays out a task's worktree, through real Git, in a session
 # named after the task.
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=Tester \
@@ -368,7 +422,7 @@ git init -q -b main "$HOME/code/owner/repo"
 git -C "$HOME/code/owner/repo" commit -q --allow-empty -m first
 builtin cd -- "$HOME/code/owner/repo"
 output=$(workspace --task fix < /dev/null)
-[[ $output == *' fix is ready;'* ]] || fail "task: $output"
+[[ $output == "workspace: tmux session fix is ready; attach with: tmux attach -t '=fix'" ]] || fail "task: $output"
 roles fix
 for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM; do
   wait_for "the task's $role pane did not run $output" "ran $pane[$role] $output"
@@ -378,6 +432,42 @@ for role in editor agent shell; do
     fail "the task's $role pane is in $(tmux display -p -t $pane[$role] '#{pane_current_path}')"
 done
 print -r -- "ok: workspace --task lays out the task's worktree"
+
+# workspace --done, from the task's shell, leaves nothing in tmux tied to the
+# task: a pane tmux's keys open in its window takes no socket, and the task
+# made anew gets a session of its own.
+type_line $pane[shell] "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace --done && echo FIN''ISHED"
+wait_for 'workspace --done did not finish the task' "printed $pane[shell] FINISHED"
+opened $(tmux display -p -t $pane[shell] '#{window_id}') % none
+tmux switch-client -c "$client" -t '=test:'
+output=$(workspace --task fix < /dev/null)
+[[ $output == "workspace: tmux session fix-2 is ready; attach with: tmux attach -t '=fix-2'" ]] ||
+  fail "the task made anew: $output"
+print -r -- 'ok: workspace --done leaves nothing in tmux tied to the task'
+
+# A server started from a shell holding a workspace's socket and the flag to
+# serve it (as from a pane of that workspace; here workspace starts it) hands
+# neither on: its workspace's panes get what workspace hands them alone, and
+# panes opened later, in that session or another, get neither.
+(
+  export TMUX_TMPDIR=$HOME/server DOTFILES_EDITOR_SOCKET=$HOME/elsewhere.sock DOTFILES_EDITOR_SERVE=1
+  mkdir -p "$TMUX_TMPDIR" "$HOME/started"
+  trap 'tmux kill-server 2>/dev/null' EXIT
+  DOTFILES_WORKSPACE_EDITOR_CMD='echo E:$DOTFILES_EDITOR_SOCKET:$DOTFILES_EDITOR_SERVE' \
+    DOTFILES_WORKSPACE_AGENT_CMD='echo A:$DOTFILES_EDITOR_SOCKET:$DOTFILES_EDITOR_SERVE' \
+    DOTFILES_WORKSPACE_STATUS_CMD='echo S:$DOTFILES_EDITOR_SOCKET:$DOTFILES_EDITOR_SERVE' DOTFILES_WORKSPACE_SHELL_CMD= \
+    workspace "$HOME/started" < /dev/null > /dev/null
+  roles started
+  socket=$(socket_for $HOME/started)
+  for role output in editor E:$socket:1 agent A:$socket: shell S:$socket:; do
+    wait_for "the $role pane of a server started with a socket did not get $output alone" "printed $pane[$role] ${(q)output}"
+  done
+  for id in $(tmux new-window -P -F '#{pane_id}' -t '=started' 'zsh -f') $(tmux new-session -d -P -F '#{pane_id}' 'zsh -f'); do
+    type_line $id 'echo "OPENED:${DOTFILES_EDITOR_SOCKET:-none}:$DOTFILES_EDITOR_SERVE"'
+    wait_for "a pane opened later on a server started with a socket got one" "printed $id OPENED:none:"
+  done
+)
+print -r -- "ok: a server started with a workspace's socket hands it, and the flag to serve it, only to the panes workspace gives them"
 
 # keys through the real fzf, with tmux as the screen: at 120 columns every page
 # sits beside the preview, whatever FZF_DEFAULT_OPTS holds, and Enter reads the

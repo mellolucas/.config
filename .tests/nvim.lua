@@ -549,6 +549,15 @@ do
   assert(not vim.tbl_contains(servers(pane), socket) and not vim.uv.fs_stat(socket),
     "a Neovim in another pane of the workspace served its socket")
   assert(vim.tbl_contains(servers(env), socket), "the Neovim in the editor's pane serves no socket")
+  -- Its :terminal, a shell of the workspace, gets the socket but not the flag
+  -- to serve it, which the editor's pane alone has
+  local seen = dir .. "/terminal.env"
+  local opened = neovim(env, "-c", "terminal env > " .. fn.shellescape(seen, true), "-c",
+    "lua vim.fn.jobwait({ vim.b.terminal_job_id }, 5000)", "-c", "qa!"):wait()
+  assert(opened.code == 0 and fn.filereadable(seen) == 1, "a :terminal in the editor: " .. tostring(opened.stderr))
+  local carried = vim.tbl_filter(function(line) return line:find("^DOTFILES_EDITOR_") end, fn.readfile(seen))
+  assert(vim.deep_equal(carried, { "DOTFILES_EDITOR_SOCKET=" .. socket }),
+    "a :terminal in the editor has " .. vim.inspect(carried))
   assert(vim.tbl_contains(servers(env), socket), "a Neovim restarted in the editor's pane serves no socket")
   local first = neovim(env)
   -- The first one ends as a crash would, whatever the checks find

@@ -51,6 +51,7 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 - Files open in the workspace's one editor, which takes the focus: `v FILE` or `v FILE:LINE` from its shell (`v` alone goes to the editor), `rgv`'s and `fzfv`'s Enter, and agents through `edit FILE:LINE`, the command `v` runs. Outside a workspace, or while its editor is closed, `v` opens Neovim where you are, as `vi` and `vim` always do; Neovim started again in the editor's pane takes the files once more.
 - The editor opens on the project's file tree; `Cmd+Shift+Enter` zooms it to explore (`keys explore`).
 - For lasting defaults, set `DOTFILES_WORKSPACE_LAYOUT=lean` (on a laptop, say) or the commands in `zsh/local.zsh`.
+- Rerunning `workspace` (or `workspace --task NAME`) while that workspace's editor is open brings the workspace forward instead of building another.
 - Outside Ghostty, or on Linux, the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux, windows take the place of tabs.
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
 - Tab completes `workspace`'s flags, directories, and task names.

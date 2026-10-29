@@ -8,9 +8,11 @@ local agent=${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}
 # An empty status or shell command is skipped.
 local status_cmd=${DOTFILES_WORKSPACE_STATUS_CMD-gg}
 local shell_cmd=${DOTFILES_WORKSPACE_SHELL_CMD:-}
-local dir=$PWD option value task=''
+local dir=$PWD option value task='' line
 local -i finish=0 arguments=$#
 local -a directories=()
+# The folder of the workspaces' editor sockets (below)
+local run=${${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}%/}/nvim.$USERNAME
 
 while (( $# )); do
   case $1 in
@@ -26,8 +28,11 @@ macOS: in this tab when this shell is its only pane and Ghostty can tell which
 pane that is (this shell becomes the workspace's shell, moves to DIR, and runs
 its commands), else in a new tab. Inside tmux, the same with windows.
 Elsewhere, a tmux session named after DIR, which rerunning workspace in DIR
-reattaches. In the workspace's panes, edit (v), rgv, and agents open files in
-its editor when it is Neovim, and focus it (edit --help).
+reattaches at the workspace's window. In the workspace's panes, edit (v), rgv,
+and agents open files in its editor when it is Neovim, and focus it (edit
+--help); while it runs, rerunning workspace for DIR brings the workspace
+forward instead of laying out another: in Ghostty its editor's pane, in tmux
+its window.
 
 Arguments:
   DIR   Workspace directory. Defaults to the current directory.
@@ -132,12 +137,17 @@ if (( finish )); then
     return 1
   fi
   local branch=${ref#refs/heads/} checkout listed
+  # The task's editor socket, named as below
+  local socket=$run/ws-${"$(print -rn -- ${top:A} | cksum)"%% *}.sock
   local -a ignored
   # The main checkout is the first worktree Git lists
   checkout=${${(0)"$(git worktree list --porcelain -z)"}[1]#worktree }
-  # Git doesn't count the files it ignores (an .env, a local database) as
-  # work, and would delete them with the worktree
-  ignored=(${(0)"$(git -C "$top" ls-files -z --others --ignored --exclude-standard --directory --no-empty-directory)"})
+  # Git refuses to remove a worktree holding uncommitted or untracked work
+  # (below), and says so first. It doesn't count the files it ignores (an
+  # .env, a local database) as work, and would delete them with the worktree
+  if [[ -z $(git -C "$top" status --porcelain --ignore-submodules=none 2> /dev/null) ]]; then
+    ignored=(${(0)"$(git -C "$top" ls-files -z --others --ignored --exclude-standard --directory --no-empty-directory)"})
+  fi
   if (( $#ignored )); then
     listed=${(j:, :)ignored[1,3]}
     (( $#ignored <= 3 )) || listed+=", and $(( $#ignored - 3 )) more"
@@ -148,6 +158,14 @@ if (( finish )); then
   if ! git -C "$checkout" worktree remove "$top"; then
     print -r -u2 -- "workspace: task ${branch#task/} stays as it was"
     return 1
+  fi
+  # The task's tmux windows let go of its socket: panes tmux's keys open there
+  # later take none (tmux/tmux.conf), and the task, made anew, gets a
+  # workspace of its own (below)
+  if (( $+commands[tmux] )); then
+    for line in ${(f)"$(tmux list-windows -a -F '#{window_id} #{@dotfiles_editor_socket}' 2> /dev/null)"}; do
+      [[ ${line#* } != "$socket" ]] || tmux set-option -w -u -t "${line%% *}" @dotfiles_editor_socket
+    done
   fi
   # Quietly, so the repository's card doesn't push what follows out of sight;
   # git-glance's hook (zsh/.zshrc) then remembers the repository, as below.
@@ -216,7 +234,7 @@ if [[ -n $task ]]; then
   fi
   # Each worktree's branch by its folder, empty when detached; the main
   # checkout comes first
-  local line folder checkout=''
+  local folder checkout=''
   local -A branches
   for line in ${(0)"$(git worktree list --porcelain -z 2> /dev/null)"}; do
     case $line in
@@ -249,15 +267,16 @@ if [[ -n $task ]]; then
       codex) agent="$program resume --last${agent#$program}" ;;
     esac
   else
+    # The branch comes back in the task's folder, unless another worktree has
+    # it checked out (the main checkout, say, after --done kept it)
+    for folder in ${(k)branches}; do
+      [[ $folder != $dir && $branches[$folder] == $own ]] || continue
+      print -r -u2 -- "workspace: task $task's folder is gone, and task/$task is checked out in $folder; to free the branch: git -C ${(q-)folder} switch --detach"
+      return 1
+    done
     # A folder deleted by hand leaves its worktree registered: Git drops that
-    # registration alone and the branch comes back there, unless another
-    # worktree has it checked out
+    # registration alone
     if (( ${+branches[$dir]} )); then
-      for folder in ${(k)branches}; do
-        [[ $folder != $dir && $branches[$folder] == $own ]] || continue
-        print -r -u2 -- "workspace: task $task's folder is gone, and task/$task is checked out in $folder; to free the branch: git -C ${(q-)folder} switch --detach"
-        return 1
-      done
       git worktree remove "$dir" || return
     fi
     if git show-ref -q --verify "$own"; then
@@ -277,22 +296,52 @@ dir=${dir:A}
 # Every pane the workspace starts gets the socket its editor serves
 # (config.workspace) for edit and rgv: one per workspace folder, in Neovim's
 # runtime folder, private as Neovim keeps it
-local socket='' run=${${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}%/}/nvim.$USERNAME
+local socket=''
 mkdir -p -m 700 -- $run 2> /dev/null
 local -a private=($run(N/Uf:go-rwx:))
 (( ! $#private )) || socket=$run/ws-${"$(print -rn -- $dir | cksum)"%% *}.sock
 
+# While an editor serves the socket, its workspace comes forward in place of
+# another: in tmux, the window keeping the socket (set below); else the
+# editor's pane, focused as edit does by the id kept beside the socket (also
+# below). zsocket silently cuts a path longer than a socket address holds
+# (104 bytes on macOS), so it connects from the socket's folder
+local window=''
+local -i served=0
+if [[ -n $socket ]] && zmodload -F zsh/net/socket b:zsocket 2>/dev/null &&
+    ( builtin cd -q -- ${socket:h} && zsocket ${socket:t} ) 2>/dev/null; then
+  served=1
+fi
+if [[ -z $script && -n $socket ]]; then
+  for line in ${(f)"$(tmux list-windows -a -F '#{window_id} #{@dotfiles_editor_socket}' 2>/dev/null)"}; do
+    [[ ${line#* } == "$socket" ]] && window=${line%% *} && break
+  done
+fi
+if (( served )) && [[ -z $window ]]; then
+  [[ -s ${socket%.sock}.ghostty ]] && /usr/bin/osascript -e 'on run argv' \
+    -e 'tell application "Ghostty" to focus terminal id (item 1 of argv)' -e 'end run' \
+    "$(<${socket%.sock}.ghostty)" > /dev/null 2>&1 && return
+  print -r -u2 -- "workspace: an editor for $dir is running already, where workspace can't bring it forward; quit it to lay out a new workspace"
+  return 1
+fi
+
 # Outside Ghostty on macOS, and inside tmux, tmux lays out the same panes.
 if [[ -z $script ]]; then
-  local name line main here='' agent_pane editor_pane focus pane command
+  local name='' main here='' agent_pane editor_pane focus pane command
   # The editor's pane alone also gets the flag for its Neovim to serve the
   # socket (config.workspace)
   local -a with_socket=(${socket:+-e} ${socket:+DOTFILES_EDITOR_SOCKET=$socket})
   local -a serving=(${socket:+-e} ${socket:+DOTFILES_EDITOR_SERVE=1})
-  if [[ -z $TMUX ]]; then
-    for line in ${(f)"$(tmux list-sessions -F '#{session_name}:#{session_path}' 2>/dev/null)"}; do
-      [[ ${line#*:} == "$dir" ]] && name=${line%%:*} && break
-    done
+  # The window keeping the socket is the folder's workspace: outside tmux, its
+  # session reattaches there; inside, the client switches there while its
+  # editor serves the socket, which a new layout takes from it otherwise
+  if [[ -n $window && -z $TMUX ]]; then
+    name=$(tmux display -p -t "$window" '#{session_name}') && tmux select-window -t "$window" || return
+  elif [[ -n $window ]] && (( served )); then
+    tmux switch-client -t "$window"
+    return
+  elif [[ -n $window ]]; then
+    tmux set-option -w -u -t "$window" @dotfiles_editor_socket || return
   fi
   if [[ -z $name ]]; then
     if [[ -n $TMUX ]]; then
@@ -406,7 +455,7 @@ if [[ $layout == full && -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
 fi
 
 local output mark=''
-local -i rc=0 served=0
+local -i rc=0
 # Ghostty can't tell a shell which pane it runs in, so this shell titles its
 # own pane with a unique mark for the script to find; the next prompt's title
 # replaces it
@@ -415,13 +464,7 @@ if [[ -t 0 ]]; then
   print -rn -- $'\e]2;'"$mark"$'\a' 2>/dev/null > /dev/tty || mark=''
 fi
 # Nor can it tell edit which pane the editor runs in: the script prints its
-# id, which goes beside the socket, unless an editor serves this folder
-# already. zsocket silently cuts a path longer than a socket address holds
-# (104 bytes on macOS), so it connects from the socket's folder
-if [[ -n $socket ]] && zmodload -F zsh/net/socket b:zsocket 2>/dev/null &&
-    ( builtin cd -q -- ${socket:h} && zsocket ${socket:t} ) 2>/dev/null; then
-  served=1
-fi
+# id, which goes beside the socket
 output=$(
   /usr/bin/osascript "$script" "$dir" \
     "$editor" "$agent" "$shell_cmd" \
@@ -435,7 +478,7 @@ output=$(
   return $rc
 }
 local -a printed=("${(@f)output}")
-(( served )) || [[ -z $socket || -z $printed[-2] ]] || print -r -- $printed[-2] > ${socket%.sock}.ghostty
+[[ -z $socket || -z $printed[-2] ]] || print -r -- $printed[-2] > ${socket%.sock}.ghostty
 # Laid out around this shell, which becomes the workspace's shell: it moves to
 # the workspace quietly, as the other panes start there (git-glance's hook then
 # remembers the workspace's repository, as above), and runs its own commands,

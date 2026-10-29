@@ -62,6 +62,19 @@ trap 'exit 1' HUP INT TERM
 fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
 # The socket the workspace of folder $1 names for its editor
 socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cksum)"%% *}.sock"; }
+# A stand-in for an editor serving socket $1, its descriptor in $REPLY,
+# listening from the socket's folder, as zsocket cuts a longer path. It holds
+# one connection waiting, and each workspace makes one: accepted takes it
+# before the next.
+zmodload -F zsh/net/socket b:zsocket
+listen() {
+  local here=$PWD
+  local -i rc=0
+  builtin cd -q -- ${1:h} && zsocket -l ${1:t} || rc=1
+  builtin cd -q -- $here
+  return $rc
+}
+accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
 
 # Stub the launcher's executable check and absolute path, preserving its
 # argument list; the Ghostty route needs macOS, Ghostty, and no tmux.
@@ -191,9 +204,10 @@ socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cks
   # The shell a workspace is laid out around takes its editor's socket, but
   # not an editor pane's flag to serve it; one that opens a new tab takes
   # neither. The editor's terminal id, which the script prints first, goes
-  # beside the socket for edit, unless an editor serves that socket already,
-  # however long its path: here past the 104 bytes of a socket's address on
-  # macOS.
+  # beside the socket for edit. While an editor serves that socket, however
+  # long its path (here past the 104 bytes of a socket's address on macOS),
+  # workspace lays out nothing: it focuses that editor by its id, as edit
+  # does, this shell staying as it was, or says why it can't.
   (
     export TMPDIR=$TMPDIR/${(l:64::x:)}
     socket=$(socket_for "${temporary:A}/path with spaces")
@@ -213,13 +227,24 @@ socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cks
     workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket in a new tab'
     (( ! ${+DOTFILES_EDITOR_SOCKET} )) || fail "a shell beside a new tab took ${(qqq)DOTFILES_EDITOR_SOCKET}"
     [[ $(<${socket%.sock}.ghostty) == EDITOR-TWO ]] || fail "the new tab's editor id: $(<${socket%.sock}.ghostty)"
-    # Listening from its folder, as zsocket cuts a longer path
-    zmodload -F zsh/net/socket b:zsocket
-    builtin cd -q -- ${socket:h}
-    zsocket -l ${socket:t} || fail 'listening on the socket'
-    workspace_osascript() { print -rl -- EDITOR-THREE 'new tab'; }
-    workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'socket served'
+    listen $socket || fail 'listening on the socket'
+    listener=$REPLY
+    builtin cd -q -- "$temporary"
+    workspace_osascript() { print -rl -- "$@" > "$temporary/asked"; print -rl -- EDITOR-THREE 'same tab'; }
+    workspace --status 'print -r -- STATUS' --shell '' "$temporary/path with spaces" < /dev/null > "$temporary/output" 2>&1 ||
+      fail "socket served: $(<"$temporary/output")"
+    [[ $(<"$temporary/asked") == *'focus terminal id'*$'\nEDITOR-TWO' ]] ||
+      fail "with its socket served, osascript was asked: $(<"$temporary/asked")"
+    [[ -z $(<"$temporary/output") && ${PWD:A} == ${temporary:A} ]] && (( ! ${+DOTFILES_EDITOR_SOCKET} )) ||
+      fail "with its socket served, the shell printed ${(qqq)$(<"$temporary/output")} in $PWD, with ${(qqq)DOTFILES_EDITOR_SOCKET-}"
     [[ $(<${socket%.sock}.ghostty) == EDITOR-TWO ]] || fail "a served socket's editor id: $(<${socket%.sock}.ghostty)"
+    accepted $listener
+    rm -- ${socket%.sock}.ghostty "$temporary/asked"
+    if workspace "$temporary/path with spaces" < /dev/null > "$temporary/output" 2>&1; then
+      fail 'a served socket without its id laid out a workspace'
+    fi
+    [[ $(<"$temporary/output") == "workspace: an editor for ${temporary:A}/path with spaces is running already, where workspace can't bring it forward; quit it to lay out a new workspace" &&
+      ! -e $temporary/asked ]] || fail "a served socket without its id: $(<"$temporary/output")"
   )
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
 
@@ -297,6 +322,19 @@ socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cks
   done
   DOTFILES_WORKSPACE_AGENT_CMD=claude laid_out "$tasks/fix" 'claude --continue' --task=fix
   [[ $(state) == $known ]] || fail "reopening changed Git's state: $(state)"
+  # While the task's editor serves its socket, reopening it lays out nothing
+  # and changes nothing: workspace focuses that editor by its id.
+  socket=$(socket_for "$tasks/fix")
+  print -r -- EDITOR-FIX > ${socket%.sock}.ghostty
+  listen $socket || fail 'listening on the socket'
+  listener=$REPLY
+  workspace_osascript() { print -rl -- "$@" > "$temporary/asked"; }
+  workspace --task fix < /dev/null || fail 'workspace --task fix with its socket served'
+  [[ $(<"$temporary/asked") == *'focus terminal id'*$'\nEDITOR-FIX' && $(state) == $known ]] ||
+    fail "with its socket served, workspace --task fix asked osascript: $(<"$temporary/asked")"
+  exec {listener}>&-
+  rm -- $socket ${socket%.sock}.ghostty
+  workspace_osascript() { print -rl -- "$2" "$4" > "$temporary/layout"; print -r -- 'new tab'; }
   # A first creation starts the agent anew.
   laid_out "$tasks/fresh" claude --task fresh --agent claude
   # A task branch without a worktree gets one, where the branch points.
@@ -404,26 +442,25 @@ socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cks
   done
   rejected 'workspace: --done takes no other arguments' --done --layout lean
   git -C "$checkout" checkout -q main
-  # Uncommitted work: Git refuses, and everything stays as it was, this
-  # shell too.
+  # Uncommitted or untracked work: Git refuses, and everything stays as it
+  # was, this shell too. Asked about first, before the files Git ignores (an
+  # .env, dependencies), which would go with the worktree too.
   builtin cd -- "$tasks/next"
-  print -r -- draft > draft
-  known=$(state)
-  if workspace --done > "$temporary/output" 2>&1; then fail 'removed a task with uncommitted work'; fi
-  [[ $(<"$temporary/output") == fatal:*$'\n''workspace: task next stays as it was' ]] ||
-    fail "uncommitted work: $(<"$temporary/output")"
-  [[ $PWD == $tasks/next && -e draft && $(state) == $known ]] || fail 'refusing changed something'
-  rm draft
-  # Files Git ignores (an .env, dependencies) would go with the worktree:
-  # they stay, and so does everything else; the hint names the command that
-  # deletes them when they're disposable.
   print -rl -- .env node_modules/ > .gitignore
   git add .gitignore
   git commit -q -m 'ignore files'
   print -r -- SECRET=1 > .env
   mkdir -p node_modules/dependency
   print -r -- code > node_modules/dependency/index.js
+  print -r -- draft > draft
   known=$(state)
+  if workspace --done > "$temporary/output" 2>&1; then fail 'removed a task with uncommitted work'; fi
+  [[ $(<"$temporary/output") == fatal:*$'\n''workspace: task next stays as it was' ]] ||
+    fail "uncommitted work beside ignored files: $(<"$temporary/output")"
+  [[ $PWD == $tasks/next && -e draft && $(<.env) == SECRET=1 && $(state) == $known ]] || fail 'refusing changed something'
+  rm draft
+  # Then the ignored files: they stay, and so does everything else; the hint
+  # names the command that deletes them when they're disposable.
   if workspace --done > "$temporary/output" 2>&1; then fail 'removed a task holding ignored files'; fi
   [[ $(<"$temporary/output") == "workspace: task next stays as it was: removing its worktree would delete files Git ignores: .env, node_modules/"$'\n'"hint: if they're disposable (node_modules and the like), delete them with: git -C $tasks/next clean -fdX" ]] ||
     fail "ignored files: $(<"$temporary/output")"
@@ -453,6 +490,13 @@ socket_for() { print -r -- "$TMPDIR/nvim.$USERNAME/ws-${"$(print -rn -- $1 | cks
     fail "unmerged: $(<"$temporary/output")"
   [[ $PWD == $checkout && ! -e $tasks/next && $(state) != *"worktree $tasks/next"* ]] || fail 'the unmerged worktree stayed'
   git show-ref -q --verify refs/heads/task/next || fail 'the unmerged branch went'
+  # Checked out in the main checkout, as once --done kept it, the branch
+  # can't come back in the task's folder: the message says what to run.
+  git switch -q task/next
+  known=$(state)
+  rejected "workspace: task next's folder is gone, and task/next is checked out in $checkout; to free the branch: git -C $checkout switch --detach" \
+    --task next
+  git switch -q main
   # Pushed, a branch is merged into its upstream, which git branch -d takes
   # for merged: unmerged here, it stays all the same.
   git init -q --bare "$temporary/origin.git"

@@ -17,11 +17,14 @@ end
 
 -- The editor's pane alone has DOTFILES_EDITOR_SERVE, as the pane edit
 -- focuses: a Neovim in another (v while the editor is closed, Git's commit
--- editor) never serves. There the first Neovim serves, also when restarted;
--- a later one finds it served and leaves it, without trying, as a start that
+-- editor) never serves, nor does one in this Neovim's :terminal, which the
+-- flag doesn't reach. There the first Neovim serves, also when restarted; a
+-- later one finds it served and leaves it, without trying, as a start that
 -- fails logs an error
 local socket = vim.env.DOTFILES_EDITOR_SOCKET
-if vim.env.DOTFILES_EDITOR_SERVE == "1" and socket and socket ~= "" then
+local serve = vim.env.DOTFILES_EDITOR_SERVE == "1"
+vim.env.DOTFILES_EDITOR_SERVE = nil
+if serve and socket and socket ~= "" then
   local ok, channel = pcall(vim.fn.sockconnect, "pipe", socket, { rpc = true })
   if ok then
     vim.fn.chanclose(channel)
