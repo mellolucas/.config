@@ -95,18 +95,23 @@ done
 # The card fits the window, 40 to 100 columns wide (80 without one): truncate
 # visible text first, %-escape after, so prompt escapes stay zero-width and no
 # printed line exceeds the width. Text is measured in the cells it takes,
-# two for most CJK characters
+# two for most CJK characters, none for an accent stored apart from its letter
+# (as macOS often names folders)
 local -i width=${COLUMNS:-0}
 (( width > 0 )) || width=80
 (( width >= 40 )) || width=40
 (( width <= 100 )) || width=100
-# Cuts the text in the variable named $1 to $2 cells, ending it with …
+# Cuts the text in the variable named $1 to $2 cells, ending it with …: the
+# characters that fit, each accent kept or dropped with its letter
 _git-glance-fit() {
-  local text=${(P)1}
+  local text=${(P)1} char fit=''
+  local -i cells=0
   (( ${(m)#text} > $2 )) || return 0
-  text=${text[1,$2 - 1]}
-  while (( ${(m)#text} > $2 - 1 )); do text=${text[1,-2]}; done
-  : ${(P)1::=$text…}
+  for char in "${(@s::)text}"; do
+    (( (cells += ${(m)#char}) < $2 )) || break
+    fit+=$char
+  done
+  : ${(P)1::=$fit…}
 }
 local repo=${toplevel:h:t}/${toplevel:t}
 _git-glance-fit repo $(( width - 20 ))

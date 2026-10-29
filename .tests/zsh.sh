@@ -348,6 +348,16 @@ STUB
   done
   [[ ${(M)lines:#branch *} == 'branch    機能/とても'*'… → no upstream' ]] || fail "wide branch row: ${(F)lines}"
   [[ ${(M)lines:#$(git log -1 --format=%h) *} == *' カードの'*'… · '* ]] || fail "wide commit line: ${(F)lines}"
+  # An accent stored apart from its letter, as macOS often names folders,
+  # takes none: the repository's folder is cut by its cells, each accent kept
+  # or dropped with its letter (é here as e and a combining accent)
+  e=e$'\xcc\x81'
+  folder=$HOME/code/owner/r${e}union-${e}t${e}-r${e}${e}crite
+  git init -q -b main "$folder"
+  builtin cd "$folder"
+  card=$(COLUMNS=40 git-glance) || fail 'git-glance status in a decomposed folder'
+  lines=(${(f)card//$'\e'\[[0-9;]#m})
+  expect "owner/r${e}union-${e}t${e}-r…       never fetched" "$lines[1]" 'decomposed folder name cut by its cells'
 )
 
 (
