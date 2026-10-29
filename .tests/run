@@ -1,5 +1,7 @@
 #!/bin/sh
-# Every isolated check: no provisioning, network, or workspace applications.
+# Every isolated check: nothing is installed or launched, though reading the
+# Brewfiles (with this machine's local.Brewfile) lets Homebrew refresh its
+# package metadata.
 # Runs from anywhere; checks whose tools are missing are reported as skipped.
 set -u
 # Deterministic permissions: zsh refuses group-writable completion directories.
