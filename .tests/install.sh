@@ -847,7 +847,9 @@ done
 # override file, and calls a link to nothing broken.
 repo_dir="$test_root/repo"
 run_doctor() (
-  # Keep diagnostics offline and independent of host binaries.
+  # Keep diagnostics offline and independent of host binaries: only the
+  # system's own tools, so no OpenCode.
+  PATH=/usr/bin:/bin
   gh() { return 1; }
   ghostty() { :; }
   nvim() { :; }
@@ -910,6 +912,11 @@ check doctor_says ✗ 'edit command' missing 'dotfiles link'
 check doctor_says ✓ 'Codex instructions' data/codex/AGENTS.md
 check doctor_says ✓ 'Claude instructions' data/claude/CLAUDE.md 'your own'
 check doctor_says ✗ 'Copilot instructions' missing 'dotfiles link'
+if [ -x /usr/bin/opencode ] || [ -x /bin/opencode ]; then
+  printf 'SKIP: doctor without OpenCode (the system has one)\n'
+else
+  check doctor_says ✗ opencode missing 'dotfiles bundle'
+fi
 # Every problem marked counts.
 marked=$(grep -c '^✗ ' "$test_root/doctor.log")
 check grep -Fqx "$marked problems found" "$test_root/doctor.log"
@@ -946,6 +953,7 @@ complete_doctor() (
   ghostty() { printf 'Ghostty 1.3.1\n'; }
   nvim() { printf 'NVIM v0.12.5\n'; }
   tmux() { printf 'tmux 3.7c\n'; }
+  opencode() { :; }
   git_identity() { :; }
   with_layout doctor_dotfiles
 )
@@ -953,6 +961,7 @@ complete_doctor > "$test_root/doctor.log" 2>&1 || fail "doctor found problems in
 check test "$(tail -n 1 "$test_root/doctor.log")" = 'no problems found'
 check doctor_says ✓ links '3 in'
 check doctor_says ✓ 'edit command' .local/bin/edit
+check doctor_says ✓ opencode
 check doctor_says ✓ 'Copilot instructions' data/copilot/copilot-instructions.md
 check doctor_says ✓ 'Claude instructions' 'your own'
 check doctor_says ✓ 'Git identity'

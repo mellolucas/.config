@@ -928,6 +928,13 @@ doctor_dotfiles() {
     doctor_problem tmux 'missing; run: dotfiles bundle'
   fi
 
+  # The workspace's default agent (ocode)
+  if command_path=$(command -v opencode); then
+    doctor_ok opencode "$(tilde "$command_path")"
+  else
+    doctor_problem opencode 'missing; run: dotfiles bundle'
+  fi
+
   if ! command -v gh >/dev/null 2>&1; then
     doctor_problem 'GitHub CLI' 'missing; run: dotfiles bundle'
   elif gh auth status >/dev/null 2>&1; then
