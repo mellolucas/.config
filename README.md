@@ -141,4 +141,4 @@ A network that inspects downloads can answer from a host yet cut or hold back a 
 
 `sh .tests/run` runs every isolated check without provisioning anything; CI runs it on macOS and Ubuntu. Rules for contributors, human or agent, live in [AGENTS.md](AGENTS.md).
 
-Licensed under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE); `glow/theme.json` derives from Catppuccin's, under its own MIT license ([notices](THIRD_PARTY_NOTICES.md)).
