@@ -4,8 +4,8 @@ emulate -L zsh
 
 if (( ${argv[(I)(-h|--help)]} )); then
   print -r -- 'usage: fzfv [FZF_OPTIONS...]'
-  print -r -- 'Pick a file below here, each previewed; Enter opens it in your editor.'
-  print -r -- "fzf's options pass through (fzf --help lists them)."
+  print -r -- 'Pick a file below here, each previewed; Enter opens it in your editor, in a'
+  print -r -- "workspace in its editor. fzf's options pass through (fzf --help lists them)."
   return 0
 fi
 
@@ -13,9 +13,6 @@ command -v fzf >/dev/null 2>&1 || {
   print -u2 -- "fzfv: fzf not found"
   return 1
 }
-
-local -a editor=("${(@Q)${(z)EDITOR}}")
-[[ -n $editor[1] ]] || { print -u2 'fzfv: EDITOR must name a command'; return 1 }
 
 local file_preview='command -v bat >/dev/null && bat --color=always --wrap=never --style=numbers --line-range=:500 -- {} || cat -- {}'
 local preview=$file_preview
@@ -25,5 +22,5 @@ if command -v glow >/dev/null 2>&1; then
   preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
 fi
 
-# fzf executes a shell string; quote every literal editor token before joining.
-fzf --bind "enter:become(${(j: :)${(@q)editor}} -- {})" --preview "$preview" --preview-window=wrap "$@"
+# Enter runs v's command (zsh/bin/edit) on the pick; fzf quotes {} for its shell
+fzf --bind 'enter:become(edit -- {})' --preview "$preview" --preview-window=wrap "$@"

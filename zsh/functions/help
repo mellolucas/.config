@@ -11,13 +11,14 @@ if [[ $1 == (-h|--help) ]]; then
   return 0
 fi
 
-# Accept literal words, quotes, escaped characters, and Git's @{...} revisions
-# (no comma or .., so never brace expansion), not shell expressions.
+# Accept literal words in any script, quotes, escaped characters, and Git's
+# @{...} revisions (no comma or .., so never brace expansion), not shell
+# expressions.
 local -a cmd=("$1")
 local -A seen
 local expression token previous
 local -i editor_alias=0
-local literal_word='^([a-zA-Z0-9_./:@%+,=!-]+|@\{[a-zA-Z0-9_-]+\}|\\.|'"'[^']*'"'|"[^"$`\\]*")+$'
+local literal_word='^([[:alnum:]_./:@%+,=!-]+|@\{[[:alnum:]_-]+\}|\\.|'"'[^']*'"'|"[^"$`\\]*")+$'
 local -a words
 while (( ${+aliases[$cmd[1]]} )); do
   if (( ${+seen[$cmd[1]]} )); then
@@ -77,6 +78,9 @@ local -a request=("${cmd[@]}" "${@[2,-1]}")
 [[ $request[1] == git && $request[2] == [^-]* ]] && request=(git "$request[2]")
 local output result=0
 output=$("${request[@]}" --help 2>&1) || result=$?
+# Manuals (git SUBCOMMAND --help shows one) overstrike bold and underlined
+# text: each character after itself or _ and a backspace
+output=${output//?$'\b'}
 # BSD tools such as caffeinate reject --help; their manual is the help.
 if (( result )) && man -w "$cmd[1]" >/dev/null 2>&1; then
   man "$cmd[1]"

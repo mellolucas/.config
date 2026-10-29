@@ -702,6 +702,12 @@ editor() { record editor "$@"; }
   git() { record git "$@"; }
   help gs >/dev/null
   expect $'git\nstatus\n--help' "$(recorded)" 'help git subcommand alias'
+  # Words in any script are literal too, as in the glow alias's theme path
+  LC_ALL=C.UTF-8 XDG_CONFIG_HOME=$test_root/código-設定
+  source /dev/stdin <<< "$alias_block"
+  output=$(help glow 2>&1) || fail "help glow, its theme in a folder named in any script: $output"
+  expect $'glow\n--style\n'"$XDG_CONFIG_HOME"$'/glow/theme.json\n--help' "$(recorded)" \
+    'help glow, its theme in a folder named in any script'
 
   for expression in 'editor | fail unexpected' 'editor $(print injected > $test_root/injected)'; do
     alias help-syntax="$expression"
@@ -729,7 +735,8 @@ editor() { record editor "$@"; }
 
 # help shows the command's own --help, through bat when it's installed (here a
 # stand-in on PATH that names its options before the text), and returns the
-# command's status.
+# command's status. A manual, as git SUBCOMMAND --help prints one to a pipe
+# (here from a stand-in Git), reaches bat without its overstrikes.
 (
   unfunction bat
   help-tool() { print -r -- "usage: help-tool $*"; return 3; }
@@ -745,27 +752,48 @@ editor() { record editor "$@"; }
     expect "$expected" "$output" "help with bat $bat_state"
     expect 3 "$rc" "help's status with bat $bat_state"
   done
+  # Bold text struck over itself, underlined over _
+  git() { print -r -- $'N\bNA\bAM\bME\bE\n       g\bgi\bit\bt-\b-d\bdi\bif\bff\bf - Show _\bc_\bh_\ba_\bn_\bg_\be_\bs'; }
+  output=$(help git diff) || fail 'help git diff status'
+  expect $'bat --plain --language=help\nNAME\n       git-diff - Show changes' "$output" "help git diff's manual through bat"
 )
 
+# fzf runs Enter's action with $SHELL (sh here), the pick quoted for it in {}
 fzf() {
   record fzf "$@"
-  local action=${2#'enter:become('}
-  action=${action%')'}
-  action=${action//'{}'/${(q)selection}}
-  eval "$action"
+  local action=${${2#'enter:become('}%')'}
+  action=${action//'{}'/${(qq)selection}}
+  /bin/sh -c "$action"
 }
 
-export EDITOR='editor --clean'
-selection='-c quit | touch should-not-run'
-fzfv --query needle
-expect $'editor\n--clean\n--\n-c quit | touch should-not-run' "$(recorded)" 'editor option terminator and filename quoting'
+# Enter opens the pick, whatever its name, as v does (zsh/bin/edit): in a
+# workspace in its editor, here a stand-in Neovim that answers edit from its
+# tmux pane and records what it's asked to open; elsewhere in $EDITOR, on the
+# terminal fzf leaves (a stand-in that records its arguments).
 (
-  editor_name='editor with spaces'
-  functions[$editor_name]='record "editor with spaces" "$@"'
-  EDITOR='"editor with spaces" --clean "profile name" "$HOME" "$(print injected > $test_root/injected)" ; literal'
-  fzfv
-  expect $'editor with spaces\n--clean\nprofile name\n$HOME\n$(print injected > $test_root/injected)\n;\nliteral\n--\n-c quit | touch should-not-run' "$(recorded)" 'fzfv literal quoted editor tokens'
-  [[ ! -e "$test_root/injected" ]] || fail 'fzfv evaluated editor command substitution'
+  zmodload zsh/zpty
+  bin=$test_root/fzfv-bin
+  /bin/mkdir -p "$bin" "$test_root/fzfv"
+  print -rl -- '#!/bin/sh' 'case $4 in' "  '\$TMUX_PANE') echo %1 ;;" \
+    "  *) printf '%s\n' \"\$4\" > '$test_root/fzfv-opened' ;;" 'esac' > "$bin/nvim"
+  print -r -- '#!/bin/sh' > "$bin/tmux"
+  print -rl -- '#!/bin/sh' "printf '%s\n' \"\$@\" > '$test_root/fzfv-editor'" > "$bin/editor"
+  /bin/chmod +x "$bin"/*
+  path=("$bin" "$repo/zsh/bin" "${zsh_bin:h}" /usr/bin /bin)
+  export EDITOR='editor --clean'
+  builtin cd "$test_root/fzfv"
+  selection='-c quit | touch should-not-run'
+  DOTFILES_EDITOR_SOCKET=$test_root/fzfv.sock fzfv
+  [[ ! -e $test_root/fzfv-editor ]] || fail "fzfv's Enter in a workspace ran the editor here: $(recorded fzfv-editor)"
+  [[ $(recorded fzfv-opened) == *"'$PWD/$selection'"* ]] || fail "fzfv's Enter in a workspace: $(recorded fzfv-opened)"
+  zpty -b fzfv-terminal fzfv
+  tries=0
+  while zpty -t fzfv-terminal 2> /dev/null; do
+    (( ++tries < 500 )) || fail 'fzfv on a terminal never ended'
+    zpty -r -t fzfv-terminal chunk 2> /dev/null || sleep 0.01
+  done
+  zpty -d fzfv-terminal
+  expect $'--clean\n--\n'"$selection" "$(recorded fzfv-editor)" "fzfv's Enter outside a workspace"
 )
 
 # fzfv and mdv print their own usage for -h or --help anywhere among their
