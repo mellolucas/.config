@@ -47,6 +47,8 @@ with shellcheck 'shellcheck' shellcheck install.sh get.sh zsh/homebrew.sh zsh/xd
 with zsh 'zsh syntax' zsh -fc 'for f in zsh/.zshenv zsh/.zprofile zsh/.zshrc zsh/*.sh zsh/functions/* zsh/bin/*; do zsh -n "$f" || exit 1; done'
 with git 'git config' git config --file git/config --list
 with ghostty 'ghostty config' ghostty +validate-config --config-file=ghostty/config.ghostty
+# Compiling reads Ghostty's scripting terms, so it needs the app too.
+with 'osacompile ghostty' 'workspace script' osacompile -o /dev/null ghostty/workspace.applescript
 with biome 'opencode config' biome lint opencode/opencode.jsonc opencode/cli.json
 with 'opencode python3' 'opencode instructions' sh .tests/opencode.sh
 # Both package sets parse, and the workstation keeps every essential.
