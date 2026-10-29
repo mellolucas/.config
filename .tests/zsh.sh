@@ -1089,7 +1089,7 @@ if [[ -n $nvim_bin ]]; then
         "exec '$bin/osascript' \"\$@\"" > "$test_root/rgv-bin/osascript"
       chmod +x "$test_root/rgv-bin/osascript"
       (
-        export DOTFILES_EDITOR_SOCKET=$socket TMPDIR=$test_root/edit-tmp
+        export EDITOR=nvim DOTFILES_EDITOR_SOCKET=$socket TMPDIR=$test_root/edit-tmp
         mkdir -p "$TMPDIR"
         path=("$test_root/rgv-bin" "$bin" "$repo/zsh/bin" "${rg_bin:h}" "${nvim_bin:h}" "${zsh_bin:h}" /usr/bin /bin)
         autoload -Uz rgv
