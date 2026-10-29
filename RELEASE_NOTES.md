@@ -36,12 +36,12 @@ Changes since `v0.0.1`.
   instead. Elsewhere tmux keeps its own keys behind `Ctrl+B`.
 - **The prompt:** it edits like any Mac text field, with zsh's emacs keys
   (`Ctrl+A`/`Ctrl+E`/`Ctrl+K`/`Ctrl+Y`), and the word and line keys
-  (`Option+←/→`, `Cmd+←/→`, `Option+Backspace`) step as Mac text fields do,
-  keeping `_` and `.` inside words, also while typing in Neovim. Option types
-  characters with either key; `Esc` then a key stands in for Alt. `↑`/`↓`
-  step through commands that start with what you typed, `Ctrl+X Ctrl+E` edits
-  in Neovim, and fzf adds `Ctrl+T`, `Ctrl+R`, and `Esc` then `c` (which
-  previews each directory).
+  (`Option+←/→`, `Cmd+←/→`, `Option+Backspace`) step much as Mac text fields
+  do, keeping `_` and `.` inside words, also while typing in Neovim. Option
+  types characters with either key; `Esc` then a key stands in for Alt.
+  `↑`/`↓` step through commands that start with what you typed, `Ctrl+X
+  Ctrl+E` edits in Neovim, and fzf adds `Ctrl+T`, `Ctrl+R`, and `Esc` then `c`
+  (which previews each directory).
 - **Exploring code:** Neovim opens on a file tree that sits beside the code
   when there's room (`-` goes to it, `Esc` back; `?` lists its keys). As in
   Finder, `→`/`←` open and close folders and `Space` previews a file.
@@ -63,12 +63,13 @@ Changes since `v0.0.1`.
   Neovim (`q` leaves the rendered view).
 - **Agents:** OpenCode is the default; Claude Code, Copilot CLI, and Codex
   are installed too, and all four read this setup's shared instructions,
-  `agents/instructions.md`. Agents notify you when they finish or need you out
-  of sight, as do shell commands of 10 s or more. The guide lists each one's
-  scroll, search, and copy keys.
+  `agents/instructions.md`. Agents notify you when they finish or need you
+  while you're elsewhere, as do shell commands of 10 s or more; inside tmux,
+  only panes in sight notify. The guide lists each one's scroll, search, and
+  copy keys.
 - **Colors:** Catppuccin Mocha in dark mode and Latte in light, following the
   system's appearance in Ghostty, Neovim (even while running), OpenCode, fzf,
-  bat, Delta, Glow, and the prompt.
+  bat, Delta, Glow (its code blocks keep Latte), and the prompt.
 - **Files in their place:** configuration, data, state, and caches go to the
   XDG folders, agents and npm, Node, Python, and Go included.
 - **Beyond the Mac:** Linux, WSL, GitHub Codespaces, and containers get tmux
@@ -131,13 +132,14 @@ Changes since `v0.0.1`.
 - In `HOMEBREW_CASK_OPTS`, write `--appdir=/path`; Homebrew ignores
   `--appdir /path`.
 - Agent homes moved to `~/.local/share/copilot`, `codex`, and `claude`. On a
-  machine set up earlier, quit the agents and replace those folders, which
-  `dotfiles link` creates to hold the shared instructions, with `~/.copilot`,
-  `~/.codex`, and `~/.claude`, moving `~/.claude.json` into `claude`; then run
-  `dotfiles link` to link the instructions inside again. Claude Code may ask
-  you to log in again. Links that already point there can simply be removed.
-  Move Codex's `*.sqlite*` files to `~/.local/state/codex` while Codex is
-  stopped.
+  machine set up earlier, quit the agents and move those folders aside as
+  backups (`codex` to `codex.backup`, say): `dotfiles link` creates them for
+  the shared instructions, and agents run since may have saved logins or
+  sessions there. Move `~/.copilot`, `~/.codex`, and `~/.claude` into their
+  places, and `~/.claude.json` into `claude`; then run `dotfiles link` to
+  link the instructions inside again. Claude Code may ask you to log in
+  again. Links that already point there can simply be removed. Move Codex's
+  `*.sqlite*` files to `~/.local/state/codex` while Codex is stopped.
 - Move `~/.node_repl_history` and `~/.python_history` to `~/.local/state`
   (as `node_repl_history` and `python_history`), and `~/.npmrc` to
   `~/.config/npm/npmrc`. `~/.npm`, `~/Library/Caches/Homebrew`,

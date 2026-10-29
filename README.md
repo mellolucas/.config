@@ -14,7 +14,7 @@ On a Mac, these install the setup, start a shell that has it, and show the essen
 
 ## Get started
 
-macOS is the primary platform; Linux, WSL, and GitHub Codespaces get the essentials, with tmux where Ghostty is absent ([Without Ghostty](#without-ghostty)).
+macOS is the primary platform; Linux, WSL, and GitHub Codespaces get best-effort support for the essentials, with tmux where Ghostty is absent ([Without Ghostty](#without-ghostty)), and fresh Linux installs aren't validated yet.
 
 `get.sh` clones this repository to `~/code/mellolucas/.config` and runs its installer; on a Mac without the Command Line Tools, Homebrew's installer adds them, Git included, first. If something fails, run the same command again: it reuses the checkout. Keep the `sh -c` form, which leaves Homebrew's installer a terminal to ask for your password.
 
@@ -55,13 +55,13 @@ Open Ghostty, then:
 
 ## Daily use
 
-Start a project with **`workspace`**: the editor on the left, the agent above a shell on the right; `--layout lean` puts the editor above the shell, beside the agent. In a repository, `workspace --task NAME` lays out a task in a worktree and branch of its own beside the checkout, and reopens it later with the agent's last session; `workspace --done` removes the worktree, and the branch once it's merged. `v FILE:LINE`, `rgv`, and agents (through `edit`) open files in the workspace's editor.
+Start a project with **`workspace`**: the editor on the left, the agent above a shell on the right; `--layout lean` puts the editor above the shell, beside the agent. In a repository, `workspace --task NAME` lays out a task in a worktree and branch of its own beside the checkout, and reopens it later with the agent's last session; `workspace --done` removes the worktree, and the branch once it's merged. `v FILE:LINE`, `rgv`, `fzfv`, and agents (through `edit`) open files in the workspace's editor.
 
 Run **`keys`** to browse the [field guide](GUIDE.md) with a preview of each page, or type to search every line; `keys TOPIC` opens a page (`keys git`), and `keys WORDS` searches from the prompt (`keys close tab`). `help COMMAND` shows any command's help, even through an alias.
 
-Agents: OpenCode is the workspace default; Claude Code, Copilot CLI (also `gh copilot`), and Codex are installed too. All four read `agents/instructions.md`, this setup's notes for every repository (how to show you a file, the tools at hand, and no pushing or rewriting shared history unless asked): Codex as `AGENTS.md`, Claude Code as `CLAUDE.md`, and Copilot CLI as `copilot-instructions.md`, each linked in its home, and OpenCode through its config. To keep your own instructions instead, put a file in place of an agent's link; the installer leaves it. Agents notify you when they finish or need you while you're elsewhere; Copilot CLI's notifications start off: run `copilot config notifications on` and `copilot config terminalNotifications on`.
+Agents: OpenCode is the workspace default; Claude Code, Copilot CLI (also `gh copilot`), and Codex are installed too. All four read `agents/instructions.md`, this setup's notes for every repository (how to show you a file, the tools at hand, and no pushing or rewriting shared history unless asked): Codex as `AGENTS.md`, Claude Code as `CLAUDE.md`, and Copilot CLI as `copilot-instructions.md`, each linked in its home, and OpenCode through its config. To keep your own instructions instead, put a file in place of an agent's link; the installer leaves it. Agents notify you when they finish or need you while you're elsewhere (inside tmux, only from panes in sight); Copilot CLI's notifications start off: run `copilot config notifications on` and `copilot config terminalNotifications on`.
 
-Colors follow Catppuccin, Mocha in dark mode and Latte in light, switching with the system appearance in Ghostty, Neovim (once its pane regains focus), OpenCode, fzf, bat, Delta, Glow, and the prompt.
+Colors follow Catppuccin, Mocha in dark mode and Latte in light, switching with the system appearance in Ghostty, Neovim (once its pane regains focus), OpenCode, fzf, bat, Delta, Glow, and the prompt; Glow's code blocks keep Latte colors in dark mode.
 
 ## Maintain the setup
 
@@ -119,10 +119,11 @@ Notes:
 
 ## Set up another machine
 
-1. Follow [Get started](#get-started), including [First run](#first-run).
+1. Install as [Get started](#get-started) shows, stopping before [First run](#first-run).
 2. Restore the private files Git does not carry: SSH keys in `~/.ssh` and the local files above, then run `dotfiles bundle` if `local.Brewfile` came back.
-3. On a machine set up with an earlier version, follow the Migration steps in [RELEASE_NOTES.md](RELEASE_NOTES.md); `dotfiles doctor` lists leftovers.
-4. Check the result: `sh .tests/run` passes; switching the system appearance recolors Ghostty, the prompt, and Neovim; `Cmd+Option+arrows` cross panes and reach Neovim's windows at the edges; `keys` opens the guide; each agent starts logged in; and a test commit is signed (`git log --show-signature -1`).
+3. On a machine set up with an earlier version, follow the Migration steps in [RELEASE_NOTES.md](RELEASE_NOTES.md), which move the agents' old homes into place before you log in; `dotfiles doctor` lists leftovers.
+4. Go through [First run](#first-run), skipping what came back.
+5. Check the result: `sh .tests/run` passes; switching the system appearance recolors Ghostty, the prompt, and Neovim; `Cmd+Option+arrows` cross panes and reach Neovim's windows at the edges; `keys` opens the guide; each agent starts logged in; and a test commit is signed (`git log --show-signature -1`).
 
 ## Network access
 
