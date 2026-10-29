@@ -50,10 +50,16 @@ linked_checkout() {
 
 # Whether a folder, there or not yet, is the configuration folder or inside it:
 # as the disk compares folders (-ef), so in any case where it ignores case, or
-# as text where the configuration folder isn't there yet.
+# as text where the configuration folder isn't there yet, ignoring case on
+# macOS, whose disks do by default.
 in_config_home() {
-  case "$1/" in
-    "$config_home"/*) return 0 ;;
+  folder=$1 config=$config_home
+  if [ "$(uname -s)" = Darwin ]; then
+    folder=$(printf '%s\n' "$folder" | tr '[:upper:]' '[:lower:]')
+    config=$(printf '%s\n' "$config" | tr '[:upper:]' '[:lower:]')
+  fi
+  case "$folder/" in
+    "$config"/*) return 0 ;;
   esac
   folder=$1
   # shellcheck disable=SC3013 # every sh this runs in has -ef

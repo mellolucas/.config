@@ -681,7 +681,7 @@ done
 # So is a checkout inside XDG_CONFIG_HOME, such as a clone at ~/.config/zsh
 # that linking would back up, link included: the folders compare as the disk
 # sees them, also through a path in another case where the disk ignores case,
-# and through ..
+# and through .., also after a folder not there yet.
 inside="$test_root/inside"
 mkdir -p "$inside/config/zsh/zsh" "$inside/config/zsh/homebrew"
 cp "$repo/install.sh" "$inside/config/zsh/"
@@ -689,11 +689,12 @@ cp "$repo/zsh/.zshenv" "$repo/zsh/xdg.sh" "$repo/zsh/homebrew.sh" "$inside/confi
 printf '# existing Brewfile\n' > "$inside/config/zsh/homebrew/Brewfile"
 cp -R "$inside" "$test_root/inside-before"
 cli_home_before=$(find "$test_root/cli-home")
-for setting in inside case dotdot; do
+for setting in inside case dotdot new-dotdot; do
   config_path="$inside/config" checkout="$inside/config/zsh"
   case "$setting" in
     case) checkout="$inside/CONFIG/zsh" ;;
     dotdot) config_path="$checkout/.." ;;
+    new-dotdot) config_path="$inside/config/new/.." ;;
   esac
   if [ ! -d "$checkout" ]; then
     printf 'SKIP: a checkout in XDG_CONFIG_HOME through another case (the disk tells cases apart)\n'
@@ -705,13 +706,16 @@ for setting in inside case dotdot; do
       fail "$operation: a checkout in XDG_CONFIG_HOME ($setting) must be rejected"
     fi
     check grep -Fq 'require a checkout separate from XDG_CONFIG_HOME' "$test_root/inside.log"
+    # Only the folder on the way to XDG_CONFIG_HOME is new
+    if [ "$setting" = new-dotdot ]; then check rmdir "$inside/config/new"; fi
     check diff -r "$test_root/inside-before" "$inside"
     check test "$(find "$test_root/cli-home")" = "$cli_home_before"
   done
 done
 
 # Unsafe updates fail and change nothing, ignoring the repository selectors a
-# calling Git exports.
+# calling Git exports; XDG_CONFIG_HOME, created to compare the checkout with
+# it, stays empty.
 elsewhere="$test_root/invalid-git-path"
 git -C "$seed" update-ref refs/heads/main "$incoming_commit"
 for failure in hidden-untracked failed-status; do
@@ -731,7 +735,7 @@ for failure in hidden-untracked failed-status; do
   check grep -Fq "$diagnostic" "$test_root/$failure.log"
   check test "$(git -C "$cli_repo" rev-parse HEAD)" = "$base_commit"
   check test "$(cat "$cli_repo/dispatcher-marker")" = untracked
-  check test ! -e "$test_root/cli-home/config"
+  check rmdir "$test_root/cli-home/config"
   check test ! -e "$test_root/cli-home/provision.log"
 done
 
@@ -1183,30 +1187,32 @@ check test "$(readlink "$home/.local/bin/dotfiles.backup."*)" = "$home/gone/inst
 # The checkout can't be XDG_CONFIG_HOME or inside it, wherever that is, and
 # get.sh says so before installing anything: also where that folder is there,
 # as the disk compares folders, through another case where the disk ignores
-# case, and through .. in folders not there yet.
+# case, there or not yet, and through .. in folders not there yet.
 home="$test_root/get-xdg"
-for setting in default-itself default-inside custom there case dotdot; do
+mkdir "$home"
+settings='default-itself default-inside custom there dotdot'
+if [ -d "$test_root/GET-XDG" ]; then
+  settings="$settings case new-case"
+else
+  printf 'SKIP: get.sh into XDG_CONFIG_HOME through another case (the disk tells cases apart)\n'
+fi
+for setting in $settings; do
   case "$setting" in
     default-itself) set -- '' "$home/.config" ;;
     default-inside) set -- '' "$home/.config/dotfiles" ;;
     custom) set -- "$home/xdg" "$home/xdg/dotfiles" ;;
     there) set -- '' "$home/.config/zsh" ;;
-    case) set -- '' "$home/.Config/x" ;;
     dotdot) set -- "$home/xdg/../.config" "$home/new/../.config/dots" ;;
+    case | new-case) set -- '' "$home/.Config/x" ;;
   esac
   case "$setting" in
-    there | case | dotdot) mkdir -p "$home/.config" ;;
+    there | dotdot | case) mkdir -p "$home/.config" ;;
   esac
-  if [ "$setting" = case ] && [ ! -d "$home/.Config" ]; then
-    printf 'SKIP: get.sh into XDG_CONFIG_HOME through another case (the disk tells cases apart)\n'
-    rmdir "$home/.config"
-    continue
-  fi
   rc=0
   run_get HOME="$home" CLT="$home.clt" XDG_CONFIG_HOME="$1" DOTFILES_DIR="$2" sh > "$home.log" 2>&1 || rc=$?
   [ "$rc" = 1 ] || fail "get.sh into XDG_CONFIG_HOME ($setting) exited $rc: $(cat "$home.log")"
   case "$setting" in
-    there | case | dotdot) check test "$(ls -A "$home")" = .config; check rmdir "$home/.config" ;;
+    there | dotdot | case) check test "$(ls -A "$home")" = .config; check rmdir "$home/.config" ;;
     *) check test -z "$(ls -A "$home")" ;;
   esac
   check grep -q '^error: .* is in XDG_CONFIG_HOME' "$home.log"

@@ -95,8 +95,11 @@ git_identity() {
 
 # The checkout can't be XDG_CONFIG_HOME or inside it, where linking would back
 # up its own folders. Folders compare as the disk does (-ef): through symlinks
-# and .., and in any case where the disk ignores case.
+# and .., and in any case where the disk ignores case. -ef compares only
+# folders that are there, so XDG_CONFIG_HOME is created first, as linking
+# would anyway.
 require_separate_checkout() {
+  mkdir -p "$xdg_config_home"
   folder=$repo_dir
   # shellcheck disable=SC3013 # every sh this runs in has -ef
   until [ "$folder" -ef "$xdg_config_home" ]; do
