@@ -24,11 +24,16 @@ local api = require("nvim-tree.api")
 local function narrow()
   return vim.o.columns < 110
 end
--- The sidebar's width: what a drag of its edge or Ctrl+W < / > last gave it,
--- kept between sessions (ShaDa saves uppercase globals), and narrowed as
--- needed to leave the code 80 columns; 30 until then
+-- The sidebar's width: the last one a drag of its edge or Ctrl+W < / > gave it,
+-- here or in any editor before this one started (Neovim's state folder keeps
+-- it), from 30 columns up to the room that leaves the code 80; 30 until then
+local saved = vim.fn.stdpath("state") .. "/tree-width"
+local sidebar_width = vim.fn.filereadable(saved) == 1 and tonumber(vim.fn.readfile(saved, "", 1)[1]) or 30
+local function room()
+  return math.max(30, vim.o.columns - 80)
+end
 local function width()
-  return math.min(vim.g.TREE_WIDTH or 30, math.max(30, vim.o.columns - 80))
+  return math.min(math.max(sidebar_width, 30), room())
 end
 
 local function windows()
@@ -182,7 +187,10 @@ require("nvim-tree").setup({
   update_focused_file = { enable = true }, -- follow the file being edited
   filters = { custom = { "^\\.git$" } }, -- as rg and :grep skip it
   help = { sort_by = "desc" }, -- ? lists the keys by what they do
-  view = { width = width },
+  view = {
+    width = width,
+    preserve_window_proportions = true, -- resizing the tree leaves the code's splits as they are
+  },
   renderer = {
     root_folder_label = ":t", -- the project's name, not its full path
     group_empty = true, -- single-folder chains on one line (src/main/java)
@@ -371,16 +379,25 @@ vim.api.nvim_create_autocmd({ "VimResized", "TabEnter" }, {
 })
 
 -- nvim-tree restores its own width whenever it opens a file or shows the tree;
--- a width set by hand on the sidebar becomes the one it restores
+-- a width set by hand on the sidebar becomes the one it restores. Dragged past
+-- the room the code needs, it stops there; squeezed under 30 columns (Ctrl+W |
+-- in the code) it takes its width back, and alone in its row it saves none
 vim.api.nvim_create_autocmd("WinResized", {
   callback = function()
     local tree = api.tree.winid()
-    if tree and not narrow() and #windows() > 1 then
-      local now = vim.api.nvim_win_get_width(tree)
-      if now ~= width() then
-        vim.g.TREE_WIDTH = now
-      end
+    if not tree or narrow() or not vim.tbl_contains(vim.v.event.windows, tree) then
+      return
     end
+    local now = vim.api.nvim_win_get_width(tree)
+    if now == width() or now == vim.o.columns then
+      return
+    end
+    if now >= 30 then
+      sidebar_width = now > room() and math.max(sidebar_width, room()) or now
+      vim.fn.mkdir(vim.fn.fnamemodify(saved, ":h"), "p")
+      pcall(vim.fn.writefile, { tostring(sidebar_width) }, saved)
+    end
+    api.tree.resize()
   end,
 })
 

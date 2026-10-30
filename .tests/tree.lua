@@ -14,6 +14,8 @@ end
 local project = fn.tempname()
 fn.mkdir(project .. "/src/deep", "p")
 project = vim.uv.fs_realpath(project)
+-- The sidebar's saved width stays in this run's own state folder
+vim.env.XDG_STATE_HOME = fn.tempname()
 for _, name in ipairs({ "a.txt", "b.txt", "c.txt", "d.txt", "src/y.txt", "src/deep/x.txt" }) do
   fn.writefile({ name }, project .. "/" .. name)
 end
@@ -445,51 +447,81 @@ float_over_tree("widening")
 resize(200)
 expect({ "tree", long }, "widening with the whole-name float")
 
--- A drag of the sidebar's edge (here Ctrl+W >) sets the width it keeps:
+-- A drag of the sidebar's edge (here Ctrl+W > and <) sets the width it keeps:
 -- through opening a file and hiding and showing the tree, narrowing only to
--- leave the code 80 columns. Neovim raises WinResized from its main loop,
--- which this script doesn't run, so a child Neovim takes the keys.
-local child = fn.jobstart({ vim.v.progpath, "--embed", "--headless", "-u", "NONE", "-i", "NONE", "-n" }, { rpc = true })
-local function child_lua(code, ...)
-  return fn.rpcrequest(child, "nvim_exec_lua", code, { ... })
+-- leave the code 80 columns, and leaving the code's splits as they are; a drag
+-- past that room stops there, keeping a wider saved width. Vim's own window
+-- commands elsewhere leave it alone. Editors started later take the newest
+-- width, which an editor that never resized leaves alone. Neovim raises
+-- WinResized from its main loop, which this script doesn't run, so child
+-- Neovims take the keys.
+local function editor()
+  local channel = fn.jobstart({ vim.v.progpath, "--embed", "--headless", "-u", "NONE", "-i", "NONE", "-n" },
+    { rpc = true })
+  local child = {}
+  function child.lua(code, ...)
+    return fn.rpcrequest(channel, "nvim_exec_lua", code, { ... })
+  end
+  -- Keys run in order, so a counter the last of them raises marks them all
+  -- done; a child still waiting for keys fails the check rather than hanging it
+  function child.keys(keys)
+    local ticks = child.lua("return vim.g.ticks or 0")
+    fn.rpcrequest(channel, "nvim_input", keys .. ":lua vim.g.ticks = (vim.g.ticks or 0) + 1<CR>")
+    assert(vim.wait(2000, function()
+      return not fn.rpcrequest(channel, "nvim_get_mode").blocking and child.lua("return vim.g.ticks or 0") > ticks
+    end, 20), "the child did not finish " .. keys)
+  end
+  function child.stop()
+    fn.jobstop(channel)
+  end
+  child.lua([[
+    local repo, project = ...
+    vim.o.columns, vim.o.lines = 200, 40
+    vim.g.mapleader = " "
+    dofile(repo .. "/nvim/lua/config/keymaps.lua")
+    vim.pack = {
+      add = function(specs)
+        for _, spec in ipairs(specs) do
+          vim.cmd.packadd(vim.fs.basename(spec.src))
+        end
+      end,
+    }
+    package.loaded["config.pack"] = dofile(repo .. "/nvim/lua/config/pack.lua")
+    package.loaded["config.explorer"] = dofile(repo .. "/nvim/lua/config/explorer.lua")
+    vim.cmd.cd(vim.fn.fnameescape(project))
+    vim.cmd.edit("a.txt")
+  ]], repo, project)
+  return child
 end
-local function child_keys(keys)
-  fn.rpcrequest(child, "nvim_input", keys)
-end
-local function sidebar_width(want, label)
-  local got
-  vim.wait(2000, function()
-    got = child_lua([[
-      local win = require("nvim-tree.api").tree.winid()
-      return win and vim.api.nvim_win_get_width(win) or -1
-    ]])
-    return got == want
-  end, 20)
+local function sidebar_width(child, want, label)
+  local got = child.lua([[
+    local win = require("nvim-tree.api").tree.winid()
+    return win and vim.api.nvim_win_get_width(win) or -1
+  ]])
   assert(got == want, label .. ": " .. tostring(got))
 end
-child_lua([[
-  local repo, project = ...
-  vim.o.columns, vim.o.lines = 200, 40
-  vim.g.mapleader = " "
-  dofile(repo .. "/nvim/lua/config/keymaps.lua")
-  vim.pack = {
-    add = function(specs)
-      for _, spec in ipairs(specs) do
-        vim.cmd.packadd(vim.fs.basename(spec.src))
+local function saved_width()
+  local path = vim.env.XDG_STATE_HOME .. "/nvim/tree-width"
+  return fn.filereadable(path) == 1 and fn.readfile(path)[1] or nil
+end
+local function code_heights(child)
+  return child.lua([[
+    local tree, heights = require("nvim-tree.api").tree.winid(), {}
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if win ~= tree and vim.api.nvim_win_get_config(win).relative == "" then
+        heights[#heights + 1] = vim.api.nvim_win_get_height(win)
       end
-    end,
-  }
-  package.loaded["config.pack"] = dofile(repo .. "/nvim/lua/config/pack.lua")
-  package.loaded["config.explorer"] = dofile(repo .. "/nvim/lua/config/explorer.lua")
-  vim.cmd.cd(vim.fn.fnameescape(project))
-  vim.cmd.edit("a.txt")
-]], repo, project)
-child_keys("-")
-sidebar_width(30, "the sidebar's first width")
-child_keys("15<C-w>>")
-sidebar_width(45, "Ctrl+W > on the sidebar")
-assert(child_lua("return vim.g.TREE_WIDTH") == 45, "the sidebar's new width is not kept")
-child_lua([[
+    end
+    return heights
+  ]])
+end
+local first, earlier = editor(), editor()
+first.keys("-")
+sidebar_width(first, 30, "the sidebar's first width")
+first.keys("15<C-w>>")
+sidebar_width(first, 45, "Ctrl+W > on the sidebar")
+assert(saved_width() == "45", "the sidebar's new width is not saved: " .. tostring(saved_width()))
+first.lua([[
   vim.api.nvim_set_current_win(require("nvim-tree.api").tree.winid())
   for row, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
     if line:find("b.txt", 1, true) then
@@ -497,23 +529,58 @@ child_lua([[
     end
   end
 ]])
-child_keys("<CR>")
-assert(vim.wait(2000, function()
-  return child_lua("return vim.fn.expand('%:t')") == "b.txt"
-end, 20), "Enter on b.txt in the child's sidebar")
-sidebar_width(45, "opening a file from the sidebar")
-child_keys("-q")
-assert(vim.wait(2000, function()
-  return not child_lua("return require('nvim-tree.api').tree.is_visible()")
-end, 20), "q in the child's sidebar")
-child_keys("-")
-sidebar_width(45, "hiding and showing the sidebar")
-child_lua("vim.o.columns = 120; vim.api.nvim_exec_autocmds('VimResized', {})")
-sidebar_width(40, "a narrower editor leaves the code 80 columns")
-child_lua("vim.o.columns = 200; vim.api.nvim_exec_autocmds('VimResized', {})")
-sidebar_width(45, "the width back with room")
-assert(child_lua("return vim.g.TREE_WIDTH") == 45, "narrowing changed the kept width")
-fn.jobstop(child)
+first.keys("<CR>")
+assert(first.lua("return vim.fn.expand('%:t')") == "b.txt", "Enter on b.txt in the child's sidebar")
+sidebar_width(first, 45, "opening a file from the sidebar")
+first.keys("-q")
+assert(not first.lua("return require('nvim-tree.api').tree.is_visible()"), "q in the child's sidebar")
+first.keys("-")
+sidebar_width(first, 45, "hiding and showing the sidebar")
+first.keys("<Esc>:split<CR>:resize 8<CR>")
+local heights = code_heights(first)
+first.lua("vim.o.columns = 120; vim.api.nvim_exec_autocmds('VimResized', {})")
+sidebar_width(first, 40, "a narrower editor leaves the code 80 columns")
+assert(vim.deep_equal(code_heights(first), heights), "narrowing the sidebar evened out the code's splits: "
+  .. vim.inspect(code_heights(first)) .. " from " .. vim.inspect(heights))
+first.lua("vim.api.nvim_set_current_win(require('nvim-tree.api').tree.winid())")
+first.keys("20<C-w>>")
+sidebar_width(first, 40, "a drag past the room the code needs")
+assert(saved_width() == "45", "a drag past the room changed the saved width: " .. tostring(saved_width()))
+first.lua("vim.o.columns = 200; vim.api.nvim_exec_autocmds('VimResized', {})")
+sidebar_width(first, 45, "the width back with room")
+assert(vim.deep_equal(code_heights(first), heights), "widening the sidebar evened out the code's splits")
+first.lua("vim.cmd.wincmd('l')")
+first.keys("<C-w>|")
+sidebar_width(first, 45, "Ctrl+W | in the code")
+assert(saved_width() == "45", "Ctrl+W | in the code changed the saved width: " .. tostring(saved_width()))
+first.keys(":botright copen<CR>")
+first.lua([[
+  local tree = require("nvim-tree.api").tree.winid()
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if win ~= tree and vim.bo[vim.api.nvim_win_get_buf(win)].buftype == "" then
+      vim.api.nvim_win_close(win, false)
+    end
+  end
+]])
+first.keys("")
+sidebar_width(first, 200, "the tree alone in its row")
+assert(saved_width() == "45", "the tree alone in its row changed the saved width: " .. tostring(saved_width()))
+earlier.keys("-")
+sidebar_width(earlier, 30, "an editor started before the drag")
+earlier.stop()
+assert(saved_width() == "45", "an editor that never resized changed the saved width: " .. tostring(saved_width()))
+local later = editor()
+later.keys("-")
+sidebar_width(later, 45, "an editor started after the drag")
+later.keys("10<C-w><LT>")
+sidebar_width(later, 35, "Ctrl+W < on the sidebar")
+later.lua("vim.o.columns = 120; vim.api.nvim_exec_autocmds('VimResized', {})")
+sidebar_width(later, 35, "a narrower editor with room for the sidebar")
+later.keys("20<C-w>>")
+sidebar_width(later, 40, "a drag past the room stops there")
+assert(saved_width() == "40", "a drag past the room did not save the room: " .. tostring(saved_width()))
+first.stop()
+later.stop()
 
 local errors = vim.tbl_filter(function(line)
   return line:match("E%d+:") ~= nil
@@ -521,4 +588,5 @@ end, vim.split(fn.execute("messages"), "\n"))
 assert(#errors == 0, "messages: " .. table.concat(errors, " | "))
 vim.cmd.cd(fn.fnameescape(repo))
 fn.delete(project, "rf")
-print("ok: file tree with the real plugins (narrow and wide starts, zoom at 110 columns, tab pages, Tab and Space, → and ←, - and the root, alternate file, files opened from outside, cut names, the sidebar's kept width)")
+fn.delete(vim.env.XDG_STATE_HOME, "rf")
+print("ok: file tree with the real plugins (narrow and wide starts, zoom at 110 columns, tab pages, Tab and Space, → and ←, - and the root, alternate file, files opened from outside, cut names, the sidebar's saved width)")
