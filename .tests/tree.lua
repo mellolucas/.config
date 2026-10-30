@@ -330,6 +330,24 @@ select("a.txt")
 press("<Right>")
 assert(current() == "a.txt", "→ on a file does not open it")
 
+-- A name the sidebar cuts shows whole over the code while the cursor is on it.
+local long = "a-name-longer-than-the-sidebar-is-wide.txt"
+fn.writefile({ long }, project .. "/" .. long)
+tree_api.reload()
+settle()
+local function float_line()
+  local win = help_window()
+  return win and api.nvim_buf_get_lines(api.nvim_win_get_buf(win), 0, 1, false)[1]
+end
+select(long)
+vim.cmd("doautocmd <nomodeline> CursorMoved")
+settle()
+assert((float_line() or ""):find(long, 1, true), "the cut name does not show whole: " .. tostring(float_line()))
+select("a.txt")
+vim.cmd("doautocmd <nomodeline> CursorMoved")
+settle()
+assert(not help_window(), "the whole name stays after the cursor leaves it")
+
 -- With room for the tree (a zoomed pane, a full terminal), `nvim DIR` opens it
 -- beside an empty window, with the cursor in the tree; the start runs again
 -- here, in a tab page of its own.
@@ -401,4 +419,4 @@ end, vim.split(fn.execute("messages"), "\n"))
 assert(#errors == 0, "messages: " .. table.concat(errors, " | "))
 vim.cmd.cd(fn.fnameescape(repo))
 fn.delete(project, "rf")
-print("ok: file tree with the real plugins (narrow and wide starts, zoom at 110 columns, tab pages, Tab and Space, → and ←, - and the root, alternate file, files opened from outside)")
+print("ok: file tree with the real plugins (narrow and wide starts, zoom at 110 columns, tab pages, Tab and Space, → and ←, - and the root, alternate file, files opened from outside, cut names)")

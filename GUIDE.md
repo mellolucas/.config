@@ -131,6 +131,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 
 - In a pane under 110 columns (a workspace's editor in a window under about 184), the tree and the code take turns: Enter, `Space`, `Tab`, or `→` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
 - In the tree, `Space` previews at once; the `Space` leader keys work from the code.
+- A name longer than the tree is wide shows whole, over the code, while the cursor is on it.
 - Hidden with `q` while zoomed, the tree stays out of later zooms until you show it again.
 - The tree follows the file you're in and marks Git changes as they happen: `✗` modified, `★` new, `✓` staged, `➜` renamed; a folder shows the marks of what it holds.
 - `-` (from a file) and `Esc` (from the tree) move between the tree and the code at any width. `Cmd+Option+arrows` move between terminal panes: in a workspace, `Cmd+Option+→` from the tree heads for the agent and shell on the right, and `Cmd+Option+←` reaches the tree only because no pane sits to the editor's left.

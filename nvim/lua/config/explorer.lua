@@ -179,6 +179,7 @@ require("nvim-tree").setup({
     root_folder_label = ":t", -- the project's name, not its full path
     group_empty = true, -- single-folder chains on one line (src/main/java)
     indent_markers = { enable = true },
+    full_name = true, -- a name the tree cuts shows whole over the code while the cursor is on it
   },
   on_attach = function(buf)
     api.map.on_attach.default(buf)
