@@ -18,7 +18,8 @@ Changes since `v0.0.1`.
 - **A field guide:** `keys start` shows the essentials in a minute; `keys`
   browses the guide's pages with a preview and searches every line as you
   type; `keys TOPIC` and `keys WORDS` work from the prompt, and
-  `help COMMAND` shows any command's help, even through an alias.
+  `help COMMAND` shows any command's help, even through an alias. The
+  guide's tables bold what each key does.
 - **Workspaces:** `workspace` leads with the editor, on the left 60% of a
   Ghostty tab, beside the agent above a shell; it lays out the current tab
   when its shell is alone there. `--layout lean` puts the editor above the
@@ -44,7 +45,9 @@ Changes since `v0.0.1`.
   (which previews each directory).
 - **Exploring code:** Neovim opens on a file tree that sits beside the code
   when there's room (`-` goes to it, `Esc` back; `?` lists its keys). As in
-  Finder, `→`/`←` open and close folders and `Space` previews a file.
+  Finder, `→`/`←` open and close folders, `Space` previews a file, and the
+  tree keeps the width you drag it to; a name it cuts shows whole while the
+  cursor is on it.
   `rgv TEXT` browses ripgrep's matching lines file by file and opens Neovim
   with all of them in the quickfix list; `:grep` and `:find` search like the
   shell's `rg`.
