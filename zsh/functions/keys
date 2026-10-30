@@ -38,7 +38,7 @@ while IFS= read -r line || [[ -n $line ]]; do
       # Rows below the header and separator; previous line is part of the table.
       if [[ $previous == '|'* && $line != '| ---'* ]]; then
         row=${${line#'| '}%' |'}
-        labels+=("$current"$'\t'"  ${${row%% | *}//\`/}  ${${row#* | }//\`/}")
+        labels+=("$current"$'\t'"  ${${row%% | *}//\`/}  ${${${row#* | }//\`/}//\*\*/}")
       fi
     elif [[ $line == '- '* ]]; then
       labels+=("$current"$'\t'"  ${text#'- '}")

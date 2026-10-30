@@ -4,7 +4,7 @@
   "h1": { "color": "4", "bold": true },
   "h2": { "color": "4", "bold": true },
   "h3": { "bold": true },
-  "strong": { "bold": true },
+  "strong": { "color": "5", "bold": true },
   "emph": { "italic": true },
   "code": { "color": "6" },
   "item": { "block_prefix": "- " },

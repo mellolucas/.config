@@ -12,16 +12,16 @@ The essentials, each a door to the pages that follow.
 
 | Run or press | Result |
 | --- | --- |
-| `workspace` | This project's editor, agent, and a shell in one tab |
-| `workspace --task NAME` | The same for a task, on a branch and worktree of its own |
-| `v FILE` | Edit in Neovim (in a workspace, its editor): `Cmd+S` saves, `Cmd+/` comments, `-` shows the file tree |
-| `Cmd+D` / `Cmd+Option+arrows` | Split the pane / move between panes and Neovim's windows |
-| `gg` | This repository at a glance: branch, changes, recent commits |
-| `gdv` | Review your changes in Neovim, file by file |
-| `fzfv` | Find a file by name, with a preview; Enter opens it |
-| `rgv TEXT` | Every matching line, file by file; Enter opens them in Neovim |
-| `cd **` then `Tab` | Fuzzy-pick a directory below here |
-| `keys WORDS` | Search this guide, as in `keys close tab` |
+| `workspace` | This project's **editor, agent, and a shell** in one tab |
+| `workspace --task NAME` | The same for a **task**, on a branch and worktree of its own |
+| `v FILE` | **Edit** in Neovim (in a workspace, its editor): `Cmd+S` saves, `Cmd+/` comments, `-` shows the file tree |
+| `Cmd+D` / `Cmd+Option+arrows` | **Split** the pane / **move** between panes and Neovim's windows |
+| `gg` | This repository **at a glance**: branch, changes, recent commits |
+| `gdv` | **Review** your changes in Neovim, file by file |
+| `fzfv` | **Find** a file by name, with a preview; Enter opens it |
+| `rgv TEXT` | Every **matching line**, file by file; Enter opens them in Neovim |
+| `cd **` then `Tab` | **Fuzzy-pick** a directory below here |
+| `keys WORDS` | **Search** this guide, as in `keys close tab` |
 
 - `Esc` then a key stands in for Alt, since Option types characters: `Esc` then `c` picks a directory with a preview of each, and `Esc` then `.` inserts the last command's last word.
 - `help COMMAND` shows any command's help; for an alias, what it runs comes first.
@@ -33,16 +33,16 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 
 | Run | Result |
 | --- | --- |
-| `workspace` | Lay out the current directory |
-| `workspace DIR` | Lay out another directory |
-| `workspace --task NAME` | Start or reopen task NAME in a worktree of its own, on branch `task/NAME` |
-| `workspace --done` | In a task, remove its worktree, and its branch once merged |
-| `workspace --layout lean` | Editor above the shell on the left, agent right, in even halves |
-| `workspace --agent CMD` | Start a different agent in the agent pane |
-| `workspace --status ggg` | The card with the code summary in the shell |
-| `workspace --status ''` | Start the shell without the card |
-| `workspace --help` | Every option and its default |
-| `v FILE:LINE` | From any of its panes, open the file in the workspace's editor at that line, and go there |
+| `workspace` | **Lay out** the current directory |
+| `workspace DIR` | **Lay out** another directory |
+| `workspace --task NAME` | **Start** or **reopen** task NAME in a worktree of its own, on branch `task/NAME` |
+| `workspace --done` | In a task, **remove** its worktree, and its branch once merged |
+| `workspace --layout lean` | Editor above the shell on the left, agent right, in **even halves** |
+| `workspace --agent CMD` | **Start** a different agent in the agent pane |
+| `workspace --status ggg` | The card with the **code summary** in the shell |
+| `workspace --status ''` | **Start** the shell without the card |
+| `workspace --help` | **Every option** and its default |
+| `v FILE:LINE` | From any of its panes, **open** the file in the workspace's editor at that line, and go there |
 
 - Focus starts in the editor (in the lean layout, in the shell); `Cmd+Option+arrows` move between the panes.
 - Run from a tab where your shell is the only pane, `workspace` lays out that tab around it, and your shell becomes the workspace's shell. Otherwise it opens a new tab, as it does when Ghostty can't tell which pane you're in (after you set a tab title by hand).
@@ -62,14 +62,14 @@ Ghostty's own Mac keys, as in Terminal and iTerm2. Without Ghostty, a `workspace
 
 | Press | Result |
 | --- | --- |
-| `Cmd+Option+arrows` | Move to the pane that way |
-| `Cmd+D` / `Cmd+Shift+D` | Split: new pane right / below |
-| `Cmd+Ctrl+arrows` | Resize |
-| `Cmd+Ctrl+=` | Equalize sizes |
-| `Cmd+Shift+Enter` | Zoom the current pane (press again to return) |
-| `Cmd+W` | Close the current pane (`Cmd+Z` reopens it within 5 seconds) |
-| `Cmd+[` / `Cmd+]` | Previous / next pane |
-| `Ctrl+B` then an arrow, `%` / `"`, `z`, `x` (in tmux) | Move, split right / below, zoom, close |
+| `Cmd+Option+arrows` | **Move** to the pane that way |
+| `Cmd+D` / `Cmd+Shift+D` | **Split**: new pane right / below |
+| `Cmd+Ctrl+arrows` | **Resize** |
+| `Cmd+Ctrl+=` | **Equalize** sizes |
+| `Cmd+Shift+Enter` | **Zoom** the current pane (press again to return) |
+| `Cmd+W` | **Close** the current pane (`Cmd+Z` reopens it within 5 seconds) |
+| `Cmd+[` / `Cmd+]` | **Previous** / **next** pane |
+| `Ctrl+B` then an arrow, `%` / `"`, `z`, `x` (in tmux) | **Move**, **split** right / below, **zoom**, **close** |
 
 - At an edge, `Cmd+Option+arrows` reach Neovim, which moves between its windows (normal mode); `Ctrl+W h/j/k/l` or `Ctrl+W` arrows always do, in tmux too.
 - `Cmd+W` closes a terminal pane, not a buffer.
@@ -82,29 +82,29 @@ Command keys do what they do in every Mac app. They reach Neovim through Ghostty
 
 | Press | Result |
 | --- | --- |
-| `Cmd+S` (`:w`) | Save, also while typing |
-| `Cmd+O` (`:find NAME`) | Open a file by name, also while typing: type part of it, `Tab` completes, `Enter` opens |
-| `Cmd+C` / `Cmd+X` / `Cmd+V` (`"+y` / `"+d` / `"+p`) | Copy / cut the selection to the system clipboard / paste; plain `y` stays in Neovim |
-| `Cmd+/` (`gcc` / `gc`) | Comment or uncomment the line, also while typing, or the selection |
-| `-` | Up to this file in the file tree, where `Esc` comes back (`keys explore`) |
-| `Space b l` / `Ctrl+^` (`Ctrl+6`) | List buffers and pick one (number or name, `Tab` completes) / switch to the previous file |
-| `:b NAME` | Switch to a buffer by number or part of its name (`Tab` completes) |
-| `:q` / `ZZ` / `ZQ` | Quit / save and quit / quit without saving |
-| `Space t w` / `Space t d` | Toggle wrap / inline diagnostics |
-| `Space t u` | Toggle the undo tree beside the code; moving through it brings back each earlier version, even one undone and typed over |
-| `Ctrl+L` | Clear search highlighting until the next search |
-| `Space c f` | Format with the language server |
-| `Space d q` | Diagnostics into the quickfix list |
-| `:grep TEXT` | Search the project with rg into the quickfix list |
-| `]q` / `[q` / `:copen` / `:cclose` | Next / previous quickfix entry / show / hide the list |
-| `]` then `Ctrl+Q` / `[` then `Ctrl+Q` | First quickfix entry in the next file / last in the previous file |
-| `K` / `grn` / `gra` | Hover / rename / code actions |
-| `grr` / `gri` / `grt` | References / implementations / type definition |
-| `Ctrl+]` / `Ctrl+T` | Jump to the definition / back |
-| `[d` / `]d` / `gO` | Previous / next diagnostic / list the file's symbols |
-| `Space g d` | Saved file against the Git index (`:GitDiff`; `q` leaves the pager, then closes the tab) |
-| `:DiffSaved` | Compare unsaved edits with the saved file |
-| `Ctrl+\` then `Ctrl+N` | Leave terminal mode |
+| `Cmd+S` (`:w`) | **Save**, also while typing |
+| `Cmd+O` (`:find NAME`) | **Open** a file by name, also while typing: type part of it, `Tab` completes, `Enter` opens |
+| `Cmd+C` / `Cmd+X` / `Cmd+V` (`"+y` / `"+d` / `"+p`) | **Copy** / **cut** the selection to the system clipboard / **paste**; plain `y` stays in Neovim |
+| `Cmd+/` (`gcc` / `gc`) | **Comment** or **uncomment** the line, also while typing, or the selection |
+| `-` | **Up to this file** in the file tree, where `Esc` comes back (`keys explore`) |
+| `Space b l` / `Ctrl+^` (`Ctrl+6`) | **List** buffers and **pick** one (number or name, `Tab` completes) / **switch** to the previous file |
+| `:b NAME` | **Switch** to a buffer by number or part of its name (`Tab` completes) |
+| `:q` / `ZZ` / `ZQ` | **Quit** / **save and quit** / **quit without saving** |
+| `Space t w` / `Space t d` | **Toggle** wrap / inline diagnostics |
+| `Space t u` | **Toggle** the undo tree beside the code; moving through it brings back each earlier version, even one undone and typed over |
+| `Ctrl+L` | **Clear** search highlighting until the next search |
+| `Space c f` | **Format** with the language server |
+| `Space d q` | **Diagnostics** into the quickfix list |
+| `:grep TEXT` | **Search** the project with rg into the quickfix list |
+| `]q` / `[q` / `:copen` / `:cclose` | **Next** / **previous** quickfix entry / **show** / **hide** the list |
+| `]` then `Ctrl+Q` / `[` then `Ctrl+Q` | **First** quickfix entry in the next file / **last** in the previous file |
+| `K` / `grn` / `gra` | **Hover** / **rename** / **code actions** |
+| `grr` / `gri` / `grt` | **References** / **implementations** / **type definition** |
+| `Ctrl+]` / `Ctrl+T` | **Jump** to the definition / **back** |
+| `[d` / `]d` / `gO` | **Previous** / **next** diagnostic / **list** the file's symbols |
+| `Space g d` | Saved file **against the Git index** (`:GitDiff`; `q` leaves the pager, then closes the tab) |
+| `:DiffSaved` | **Compare** unsaved edits with the saved file |
+| `Ctrl+\` then `Ctrl+N` | **Leave** terminal mode |
 
 - Completion starts unselected: `Ctrl+N` / `Ctrl+P` choose, `Ctrl+Y` accepts.
 - While typing and on the command line, `Option+←` / `Option+→` step over words much as Mac text fields do, keeping `_` and `.` inside words (a dot always joins, so `main...feature` is one word) and crossing line breaks, and `Option+Backspace` deletes back to where `Option+←` goes; in normal mode they move by Vim's words (`b` / `w`). `Cmd+←` / `Cmd+→` reach the line's start / end, in the text and on the command line; they arrive as Vim's `Ctrl+A` / `Ctrl+E`, so to add 1 to a number, select it and press `g` then `Ctrl+A`. The file tree keeps its own keys (`?`).
@@ -118,17 +118,17 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 
 | Press | Result |
 | --- | --- |
-| `Cmd+Shift+Enter` (in the editor) | Zoom the editor to the whole tab, where the tree joins the code as a sidebar; again for the agent and shell |
-| Drag the tree's edge / `Ctrl+W` then `<` or `>` | Resize the tree; it keeps the width, in later sessions too, leaving the code 80 columns |
-| `-` / `Esc` / `q` | From a file, to it in the tree / from the tree, back to the code / hide the tree |
-| `→` / `←` | Step into a folder or open a file / step out of a folder, closing it (on the top line, out of the root), as in Finder's list view |
-| `-` / `Ctrl+]` | Root: up to the parent folder, keeping yours open / into the folder under the cursor |
-| Enter / `Space` or `Tab` | Open the file / show it, keeping the cursor in the tree, as Quick Look does |
-| `Ctrl+V` / `Ctrl+X` | Open beside / below the code, to compare files |
-| `f` / `H` / `I` | Filter by name / toggle hidden / ignored files |
-| `a` / `r` / `d` | Create / rename / delete |
-| `[c` / `]c` | Previous / next changed file |
-| `?` | Every key, by what it does |
+| `Cmd+Shift+Enter` (in the editor) | **Zoom** the editor to the whole tab, where the tree joins the code as a sidebar; again for the agent and shell |
+| Drag the tree's edge / `Ctrl+W` then `<` or `>` | **Resize** the tree; it keeps the width, in later sessions too, leaving the code 80 columns |
+| `-` / `Esc` / `q` | From a file, **to it in the tree** / from the tree, **back to the code** / **hide** the tree |
+| `→` / `←` | **Step into** a folder or **open** a file / **step out** of a folder, closing it (on the top line, out of the root), as in Finder's list view |
+| `-` / `Ctrl+]` | **Root: up** to the parent folder, keeping yours open / **into** the folder under the cursor |
+| Enter / `Space` or `Tab` | **Open** the file / **show** it, keeping the cursor in the tree, as Quick Look does |
+| `Ctrl+V` / `Ctrl+X` | **Open** beside / below the code, to compare files |
+| `f` / `H` / `I` | **Filter** by name / **toggle** hidden / ignored files |
+| `a` / `r` / `d` | **Create** / **rename** / **delete** |
+| `[c` / `]c` | **Previous** / **next** changed file |
+| `?` | **Every key**, by what it does |
 
 - In a pane under 110 columns (a workspace's editor in a window under about 184), the tree and the code take turns: Enter, `Space`, `Tab`, or `→` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
 - In the tree, `Space` previews at once; the `Space` leader keys work from the code.
@@ -146,13 +146,13 @@ Run a coding agent beside your editor.
 
 | Run | Result |
 | --- | --- |
-| `workspace` | OpenCode in the agent pane (the default) |
-| `ocode` | OpenCode in the current pane |
-| `Ctrl+P` (in OpenCode) | OpenCode's command palette; `Ctrl+X` is its leader |
-| `Ctrl+X` then `l` / `Ctrl+O` (in OpenCode) | List sessions / reopen a recent one |
-| `workspace --agent claude` | Claude Code |
-| `workspace --agent copilot` | GitHub Copilot CLI (`gh copilot` runs it too) |
-| `workspace --agent codex` | Codex |
+| `workspace` | **OpenCode** in the agent pane (the default) |
+| `ocode` | **OpenCode** in the current pane |
+| `Ctrl+P` (in OpenCode) | OpenCode's **command palette**; `Ctrl+X` is its leader |
+| `Ctrl+X` then `l` / `Ctrl+O` (in OpenCode) | **List** sessions / **reopen** a recent one |
+| `workspace --agent claude` | **Claude Code** |
+| `workspace --agent copilot` | **GitHub Copilot CLI** (`gh copilot` runs it too) |
+| `workspace --agent codex` | **Codex** |
 
 Agents run full screen and keep their own history; each scrolls, searches, and copies with its own keys.
 
@@ -176,20 +176,20 @@ Resume a repository, review your changes, and compare before sharing.
 
 | Run | Result |
 | --- | --- |
-| `gg` | Repository card: branch, upstream, worktree, branches and tasks, recent commits |
-| `ggg` | The card plus a language summary |
-| `gs` | Status, including ignored files |
-| `gd` / `gds` / `gda` | Unstaged / staged / all tracked changes since the last commit |
-| `gdv` / `gdv --staged` / `gdv @` | The same in Neovim, file by file, old beside new |
-| `gdo` / `gdi` | Committed changes outgoing to / incoming from the upstream |
-| `gdm` | Committed changes since branching from `origin/HEAD` |
-| `gl` / `gls` | Log / log with file stats |
-| `glg` / `glga` | Branch graph / graph of all refs |
-| `glc A...B` | Commits unique to each side |
-| `ga` / `gc` / `gcm MSG` / `gca` | Stage / commit / commit with a message / amend the last commit |
-| `gf` / `gp` | Fetch / pull (fast-forward only) |
-| `ghopen [PATH]` | Open this directory or a file on GitHub at the current branch |
-| `gcl owner/repo` | Clone into `~/code/owner/repo` |
+| `gg` | **Repository card**: branch, upstream, worktree, branches and tasks, recent commits |
+| `ggg` | The card plus a **language summary** |
+| `gs` | **Status**, including ignored files |
+| `gd` / `gds` / `gda` | **Unstaged** / **staged** / **all tracked** changes since the last commit |
+| `gdv` / `gdv --staged` / `gdv @` | The same **in Neovim**, file by file, old beside new |
+| `gdo` / `gdi` | Committed changes **outgoing** to / **incoming** from the upstream |
+| `gdm` | Committed changes **since branching** from `origin/HEAD` |
+| `gl` / `gls` | **Log** / **log with file stats** |
+| `glg` / `glga` | **Branch graph** / **graph of all refs** |
+| `glc A...B` | Commits **unique to each side** |
+| `ga` / `gc` / `gcm MSG` / `gca` | **Stage** / **commit** / **commit** with a message / **amend** the last commit |
+| `gf` / `gp` | **Fetch** / **pull** (fast-forward only) |
+| `ghopen [PATH]` | **Open** this directory or a file on GitHub at the current branch |
+| `gcl owner/repo` | **Clone** into `~/code/owner/repo` |
 
 - Add `f` after `gd` to list files only (`gdf`, `gdfs`, `gdfo`…); add `t` for tip-to-tip comparisons (`gdot`, `gdit`, `gdmt`).
 - `gdv` takes what `gd` takes (`gdv main...`) and lists the changed files in Neovim's quickfix list: `]q` / `[q` open the next / previous one, and `:qa` ends the review. Untracked files appear in no diff until `git add -N FILE` marks them for adding.
@@ -206,17 +206,17 @@ Move around and build commands without retyping.
 
 | Press | Result |
 | --- | --- |
-| `Ctrl+T` | Insert file paths into the command line |
-| `↑` / `↓` | While typing, earlier / later commands that start with the text so far |
-| `Ctrl+R` | Search history; Enter inserts without running |
-| `Ctrl+X` `Ctrl+E` | Edit the command line in Neovim; save and quit to bring it back for review |
-| `Tab` | Complete, ignoring case and including hidden files, even mid-name (`conf` finds `.config`); press again for a menu |
-| `v **` then `Tab` | Fuzzy-pick paths for any command |
-| `cd -` | Return to the previous directory |
-| `Option+←` / `Option+→` | Jump a word back / forward |
-| `Cmd+←` / `Cmd+→` | Jump to the start / end of the line |
-| `Option+Backspace` or `Ctrl+W` / `Cmd+Backspace` or `Ctrl+U` | Delete the word / everything before the cursor |
-| `Ctrl+K` / `Ctrl+Y` | Delete to the end of the line / paste back what a delete removed |
+| `Ctrl+T` | **Insert** file paths into the command line |
+| `↑` / `↓` | While typing, **earlier** / **later** commands that start with the text so far |
+| `Ctrl+R` | **Search** history; Enter inserts without running |
+| `Ctrl+X` `Ctrl+E` | **Edit** the command line in Neovim; save and quit to bring it back for review |
+| `Tab` | **Complete**, ignoring case and including hidden files, even mid-name (`conf` finds `.config`); press again for a menu |
+| `v **` then `Tab` | **Fuzzy-pick** paths for any command |
+| `cd -` | **Return** to the previous directory |
+| `Option+←` / `Option+→` | **Jump** a word back / forward |
+| `Cmd+←` / `Cmd+→` | **Jump** to the start / end of the line |
+| `Option+Backspace` or `Ctrl+W` / `Cmd+Backspace` or `Ctrl+U` | **Delete** the word / everything before the cursor |
+| `Ctrl+K` / `Ctrl+Y` | **Delete** to the end of the line / **paste back** what a delete removed |
 
 - Typing a directory name alone changes into it; `zsh/local.zsh.example` shows how to reach any project by its name (`cdpath`).
 - The prompt edits like any Mac text field, with zsh's emacs keys (Terminal's own). Words keep `_` and `.` and stop at other punctuation, much as in Mac text fields: on `~/code/my_file.lua`, `Option+Backspace` deletes `my_file.lua`, and `Option+→` stops at a word's end. A dot always joins, though, so `main...feature` is one word.
@@ -232,17 +232,17 @@ List what is here, then find a file by name or by content.
 
 | Run | Result |
 | --- | --- |
-| `l` | Names, including hidden entries |
-| `ll` | Long view: sizes, Git status, relative ages |
-| `lll` | `ll` plus directory totals, line counts, and each repository's branch (slower) |
-| `llt` / `lld` | Two-level tree / directories only |
-| `lc` | Lines of code by language |
-| `v FILE` / `view FILE` | Edit (in a workspace, in its editor) / read only, in place |
-| `fzfv` | Search names with a preview; Enter opens the file |
-| `Esc` then `c` | Pick a directory below here (directories only, each previewed) and change to it |
-| `rg TEXT` | Search contents, including hidden files |
-| `rga TEXT` | Also search files that Git ignores |
-| `rgv TEXT` | Browse the matching lines file by file, each file's in the preview; Enter opens Neovim (in a workspace, its editor) at the first, with all of them in the quickfix list |
+| `l` | **Names**, including hidden entries |
+| `ll` | **Long view**: sizes, Git status, relative ages |
+| `lll` | `ll` plus **directory totals, line counts, and each repository's branch** (slower) |
+| `llt` / `lld` | **Two-level tree** / **directories only** |
+| `lc` | **Lines of code** by language |
+| `v FILE` / `view FILE` | **Edit** (in a workspace, in its editor) / **read only**, in place |
+| `fzfv` | **Search** names with a preview; Enter opens the file |
+| `Esc` then `c` | **Pick** a directory below here (directories only, each previewed) and **change** to it |
+| `rg TEXT` | **Search** contents, including hidden files |
+| `rga TEXT` | Also **search** files that Git ignores |
+| `rgv TEXT` | **Browse** the matching lines file by file, each file's in the preview; Enter opens Neovim (in a workspace, its editor) at the first, with all of them in the quickfix list |
 
 In every picker with a preview (`fzfv`, `rgv`, `keys`, `Esc` then `c`): `Option+↓` / `Option+↑` scroll it by half a page and `Shift+↓` / `Shift+↑` by a line, Esc cancels. `fzfv` previews a file's first 500 lines, but renders a whole Markdown file.
 
@@ -259,15 +259,15 @@ Ghostty scrolls, searches, and copies terminal history with its own Mac keys, as
 
 | Press | Result |
 | --- | --- |
-| Trackpad or mouse wheel | Scroll |
-| `Cmd+↑` / `Cmd+↓` | Previous / next prompt, to read a command's output from its start |
-| `Cmd+Fn+↑` / `Cmd+Fn+↓` | Page up / down |
-| `Cmd+Fn+←` / `Cmd+Fn+→` | Top / bottom |
-| `Cmd+F`, then `Cmd+G` / `Cmd+Shift+G` | Search, then the next / previous match (`Esc` ends the search) |
-| `Cmd+E` / `Cmd+J` | Search for the selection / scroll to it |
-| `Cmd+C` | Copy the selection |
-| `Cmd+K` | Clear the screen and its history |
-| `Cmd+Shift+P` | Ghostty's command palette |
+| Trackpad or mouse wheel | **Scroll** |
+| `Cmd+↑` / `Cmd+↓` | **Previous** / **next** prompt, to read a command's output from its start |
+| `Cmd+Fn+↑` / `Cmd+Fn+↓` | **Page** up / down |
+| `Cmd+Fn+←` / `Cmd+Fn+→` | **Top** / **bottom** |
+| `Cmd+F`, then `Cmd+G` / `Cmd+Shift+G` | **Search**, then the **next** / **previous** match (`Esc` ends the search) |
+| `Cmd+E` / `Cmd+J` | **Search** for the selection / **scroll** to it |
+| `Cmd+C` | **Copy** the selection |
+| `Cmd+K` | **Clear** the screen and its history |
+| `Cmd+Shift+P` | Ghostty's **command palette** |
 
 - Drag to select; over a program that takes the mouse (Neovim, less), hold Shift while dragging.
 - Full-screen programs (Neovim, less, OpenCode) keep their own history: scroll inside them.
@@ -279,16 +279,16 @@ Render Markdown and read long text comfortably.
 
 | Run or press | Result |
 | --- | --- |
-| `mdv FILE` | Render Markdown in the pager (`Tab` offers Markdown files) |
-| `mdv -w 120 FILE` | Wrap at 120 columns instead |
-| `glow` | Browse every Markdown file below here, hidden and ignored ones too |
-| `Space` / `b` (in less) | Page down / up |
-| `/` then `n` / `N` (in less) | Search, next, previous |
-| `-S` then Enter (in less) | Toggle folding and chopping long lines |
-| `←` / `→` (in less) | Scroll horizontally |
-| `q` (in less) | Back to the shell |
-| `Shift`+drag | Select text while less owns the mouse |
-| `Space t m` (in Neovim) | Swap Markdown source and rendered view (`q` also leaves the view) |
+| `mdv FILE` | **Render** Markdown in the pager (`Tab` offers Markdown files) |
+| `mdv -w 120 FILE` | **Wrap** at 120 columns instead |
+| `glow` | **Browse** every Markdown file below here, hidden and ignored ones too |
+| `Space` / `b` (in less) | **Page** down / up |
+| `/` then `n` / `N` (in less) | **Search**, **next**, **previous** |
+| `-S` then Enter (in less) | **Toggle** folding and chopping long lines |
+| `←` / `→` (in less) | **Scroll** horizontally |
+| `q` (in less) | **Back** to the shell |
+| `Shift`+drag | **Select** text while less owns the mouse |
+| `Space t m` (in Neovim) | **Swap** Markdown source and rendered view (`q` also leaves the view) |
 
 - `b FILE` shows a file with syntax colors; `cat` is bat without decoration.
 - Previews render the saved file, not unsaved edits; very long renders can lose their beginning. Toggle again after resizing.
@@ -299,11 +299,11 @@ Update this setup when the shell reminds you: a week after the last full update,
 
 | Run | Result |
 | --- | --- |
-| `dotfiles update` | Update the repository, relink, apply the Brewfile, and update its npm packages |
-| `dotfiles bundle` | Apply the Brewfile and `local.Brewfile`, then update their npm packages |
-| `dotfiles link` | Relink configuration without touching packages |
-| `dotfiles doctor` | Environment health, with a fix for each problem |
-| `help COMMAND` | A command's help, even through an alias, whose expansion comes first; its manual when it has no `--help` |
+| `dotfiles update` | **Update** the repository, relink, apply the Brewfile, and update its npm packages |
+| `dotfiles bundle` | **Apply** the Brewfile and `local.Brewfile`, then update their npm packages |
+| `dotfiles link` | **Relink** configuration without touching packages |
+| `dotfiles doctor` | **Environment health**, with a fix for each problem |
+| `help COMMAND` | A command's **help**, even through an alias, whose expansion comes first; its manual when it has no `--help` |
 
 - `dots` is short for `dotfiles`; `dotsup` runs `dotfiles update`. Homebrew refreshes its package list once it is a day old; run `brew update` first for the very latest.
 - Personal overrides belong in the ignored `local` files described in the README.
