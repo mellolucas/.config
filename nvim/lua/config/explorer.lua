@@ -24,6 +24,12 @@ local api = require("nvim-tree.api")
 local function narrow()
   return vim.o.columns < 110
 end
+-- The sidebar's width: what a drag of its edge or Ctrl+W < / > last gave it,
+-- kept between sessions (ShaDa saves uppercase globals), and narrowed as
+-- needed to leave the code 80 columns; 30 until then
+local function width()
+  return math.min(vim.g.TREE_WIDTH or 30, math.max(30, vim.o.columns - 80))
+end
 
 local function windows()
   return vim.tbl_filter(function(win)
@@ -175,6 +181,7 @@ require("nvim-tree").setup({
   update_focused_file = { enable = true }, -- follow the file being edited
   filters = { custom = { "^\\.git$" } }, -- as rg and :grep skip it
   help = { sort_by = "desc" }, -- ? lists the keys by what they do
+  view = { width = width },
   renderer = {
     root_folder_label = ":t", -- the project's name, not its full path
     group_empty = true, -- single-folder chains on one line (src/main/java)
@@ -326,6 +333,10 @@ vim.api.nvim_create_autocmd({ "VimResized", "TabEnter" }, {
     local now, was = narrow(), vim.t.tree_narrow
     vim.t.tree_narrow = now
     if was == nil or now == was then
+      -- A sidebar that stays takes its width as the room allows
+      if not now and api.tree.is_visible() then
+        api.tree.resize()
+      end
       return
     end
     local tree = api.tree.is_visible() and api.tree.winid() or nil
@@ -351,9 +362,23 @@ vim.api.nvim_create_autocmd({ "VimResized", "TabEnter" }, {
       end
       api.tree.toggle({ focus = true, find_file = true })
     elseif tree then
-      api.tree.resize() -- split beside a file in the narrow window: back to 30 columns
+      api.tree.resize() -- split beside a file in the narrow window: back to its width
     elseif vim.t.tree_beside then
       api.tree.toggle({ focus = false, find_file = true })
+    end
+  end,
+})
+
+-- nvim-tree restores its own width whenever it opens a file or shows the tree;
+-- a width set by hand on the sidebar becomes the one it restores
+vim.api.nvim_create_autocmd("WinResized", {
+  callback = function()
+    local tree = api.tree.winid()
+    if tree and not narrow() and #windows() > 1 then
+      local now = vim.api.nvim_win_get_width(tree)
+      if now ~= width() then
+        vim.g.TREE_WIDTH = now
+      end
     end
   end,
 })

@@ -119,6 +119,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 | Press | Result |
 | --- | --- |
 | `Cmd+Shift+Enter` (in the editor) | Zoom the editor to the whole tab, where the tree joins the code as a sidebar; again for the agent and shell |
+| Drag the tree's edge / `Ctrl+W` then `<` or `>` | Resize the tree; it keeps the width, in later sessions too, leaving the code 80 columns |
 | `-` / `Esc` / `q` | From a file, to it in the tree / from the tree, back to the code / hide the tree |
 | `→` / `←` | Step into a folder or open a file / step out of a folder, closing it (on the top line, out of the root), as in Finder's list view |
 | `-` / `Ctrl+]` | Root: up to the parent folder, keeping yours open / into the folder under the cursor |
