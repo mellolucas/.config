@@ -78,11 +78,12 @@ local function cover()
     vim.t.tree_before = alternate ~= covered and vim.fn.buflisted(alternate) == 1 and alternate or nil
   end
 end
--- nvim-tree closes the tree's window, which closes a tab page the tree alone
--- fills when other tab pages exist; the covered file (or an empty window) shown
--- above it first keeps the tab page, as nvim-tree does for the last window of all
+-- Where the tree fills its tab page, the covered file (or an empty window)
+-- shown above it first takes its place: nvim-tree, counting floating windows
+-- (its own whole-name float too) and other tab pages', would close the tab
+-- page or fail to close the tree
 local function close()
-  if #windows() == 1 and #vim.api.nvim_list_tabpages() > 1 then
+  if #windows() == 1 then
     local covered = vim.t.tree_covered
     if covered and vim.api.nvim_buf_is_valid(covered) then
       vim.cmd.sbuffer(covered)

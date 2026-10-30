@@ -413,6 +413,38 @@ open_from_outside("h.txt", "b.txt")
 expect({ "h.txt" }, "files from outside, the covered one shown")
 assert(alternate() == "b.txt", "alternate after files from outside, the covered one shown: " .. alternate())
 
+-- The whole-name float leaves a full-window tree as it is without it, in a
+-- single tab page too: q and Esc give the covered file back, Ctrl+^ its
+-- previous file, a file from outside and Enter take the tree's place, and
+-- widening makes it the sidebar.
+local function float_over_tree(label)
+  press("-")
+  select(long)
+  vim.cmd("doautocmd <nomodeline> CursorMoved")
+  settle()
+  assert(help_window(), label .. ": no whole-name float to begin with")
+end
+float_over_tree("q")
+press("q")
+expect({ "h.txt" }, "q with the whole-name float")
+float_over_tree("Esc")
+press("<Esc>")
+expect({ "h.txt" }, "Esc with the whole-name float")
+local before = alternate()
+assert(before ~= "", "no previous file for the Ctrl+^ check")
+float_over_tree("Ctrl+^")
+press("<C-^>")
+expect({ before }, "Ctrl+^ with the whole-name float")
+float_over_tree("a file from outside")
+open_from_outside("i.txt")
+expect({ "i.txt" }, "a file from outside with the whole-name float")
+float_over_tree("Enter")
+press("<CR>")
+expect({ long }, "Enter with the whole-name float")
+float_over_tree("widening")
+resize(200)
+expect({ "tree", long }, "widening with the whole-name float")
+
 -- A drag of the sidebar's edge (here Ctrl+W >) sets the width it keeps:
 -- through opening a file and hiding and showing the tree, narrowing only to
 -- leave the code 80 columns. Neovim raises WinResized from its main loop,
