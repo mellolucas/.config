@@ -853,6 +853,8 @@ if [[ -n $rg_bin ]]; then
     setopt extendedglob
     # Only this fixture's options, never the host's ripgrep configuration
     unset RIPGREP_CONFIG_PATH
+    # Without a path, rg searches stdin when it's a pipe, as on CI runners
+    exec < /dev/null
     fixture=$test_root/rgv
     export TMPDIR=$test_root/rgv-tmp
     /bin/mkdir -p "$fixture/src" "$fixture/.hidden" "$fixture/.git" "$TMPDIR"
