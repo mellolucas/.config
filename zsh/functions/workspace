@@ -2,7 +2,6 @@
 
 emulate -L zsh
 
-local layout=${DOTFILES_WORKSPACE_LAYOUT:-full}
 local editor=${DOTFILES_WORKSPACE_EDITOR_CMD:-nvim .}
 local agent=${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}
 # An empty status or shell command is skipped.
@@ -22,8 +21,10 @@ usage: workspace [OPTIONS] [--] [DIR]
        workspace --task NAME [OPTIONS]
        workspace --done
 
-Lay out a coding workspace: an editor, an agent, and a shell, which runs the
-status command, then the shell command, as one command line. In Ghostty on
+Lay out a coding workspace: the editor above a shell on the left (60% of the
+width; the editor 65% of the height), and the agent on the right at full
+height. The shell runs the status command, then the shell command, as one
+command line. In Ghostty on
 macOS: in this tab when this shell is its only pane and Ghostty can tell which
 pane that is (this shell becomes the workspace's shell, moves to DIR, and runs
 its commands), else in a new tab. Inside tmux, the same with windows.
@@ -38,7 +39,6 @@ Arguments:
   DIR   Workspace directory. Defaults to the current directory.
 
 Options (override environment; also accept --option=VALUE):
-  --layout NAME  full (the default) or lean, below.
   --agent CMD    Command started in the agent pane (nonempty).
   --editor CMD   Command started in the editor pane (nonempty).
   --status CMD   Status command the shell starts with. Empty skips.
@@ -58,16 +58,7 @@ Tasks (in a Git repository):
                  uncommitted or untracked changes or files Git ignores, then
                  the branch once the main checkout's branch has its commits.
 
-Layouts:
-  full   editor left (60% width); on the right (40% width), the agent above
-         (65% height) and the shell below (35%)
-  lean   editor above the shell on the left (50% width, 50% height each);
-         agent right (50% width)
-
 Environment (set lasting defaults in zsh/local.zsh):
-  DOTFILES_WORKSPACE_LAYOUT='full'
-      Layout: full or lean.
-
   DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
       Command started in the editor pane.
 
@@ -84,7 +75,7 @@ Environment (set lasting defaults in zsh/local.zsh):
       Override the Ghostty AppleScript implementation path.
 EOF
       return 0 ;;
-    --layout|--agent|--editor|--status|--shell|--task|--layout=*|--agent=*|--editor=*|--status=*|--shell=*|--task=*)
+    --agent|--editor|--status|--shell|--task|--agent=*|--editor=*|--status=*|--shell=*|--task=*)
       option=${1%%=*}
       if [[ $1 == *=* ]]; then
         value=${1#*=}
@@ -105,7 +96,6 @@ EOF
         return 1
       fi
       case $option in
-        --layout) layout=$value ;;
         --agent) agent=$value ;;
         --editor) editor=$value ;;
         --status) status_cmd=$value ;;
@@ -185,10 +175,6 @@ if (( finish )); then
   return 0
 fi
 
-if [[ $layout != (full|lean) ]]; then
-  print -r -u2 -- "workspace: unknown layout: $layout (full or lean)"
-  return 1
-fi
 # The shell takes both commands as one line, so a status command that reads
 # the terminal cannot swallow the shell command as input
 local -a startup=(${status_cmd:+"$status_cmd"} ${shell_cmd:+"$shell_cmd"})
@@ -371,19 +357,12 @@ if [[ -z $script ]]; then
     # The window keeps the socket for the panes tmux's keys split from it
     # later (tmux/tmux.conf)
     tmux set-option -w -t "$main" @dotfiles_editor_socket "$socket" || return
-    # The other panes split from the shell, each taking a share of it.
-    if [[ $layout == lean ]]; then
-      # Even halves: the agent right, the editor above the shell
-      agent_pane=$(tmux split-window $with_socket -h -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      editor_pane=$(tmux split-window $with_socket $serving -v -b -l 50% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      focus=$main
-    else
-      # The editor left at 60% of the width, the agent above the shell at 65%
-      # of the height
-      editor_pane=$(tmux split-window $with_socket $serving -h -b -l 60% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      agent_pane=$(tmux split-window $with_socket -v -b -l 65% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
-      focus=$editor_pane
-    fi
+    # The other panes split from the shell, each taking a share of it: the
+    # agent right at 40% of the width, the editor above the shell at 65% of
+    # the height
+    agent_pane=$(tmux split-window $with_socket -h -l 40% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+    editor_pane=$(tmux split-window $with_socket $serving -v -b -l 65% -t "$main" -P -F '#{pane_id}' -c "$dir") || return
+    focus=$editor_pane
     # A reused shell runs its own commands below: typed into it, they could
     # reach a program run after workspace
     for pane command in "$editor_pane" "$editor" "$agent_pane" "$agent" "$main" "$shell_cmd"; do
@@ -415,11 +394,11 @@ if [[ -z $script ]]; then
   return
 fi
 
-# Window text area in pixels (CSI 14 t) for the full layout's ratio-based split
+# Window text area in pixels (CSI 14 t) for the layout's ratio-based split
 # sizing. Measured from the invoking pane: exact from an unsplit tab, undersized
 # from a split pane; on 0 the AppleScript leaves the splits even.
 local width=0 height=0
-if [[ $layout == full && -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
+if [[ -t 0 && ${(L)TERM_PROGRAM} == ghostty ]]; then
   local dimensions
   if dimensions=$(
     local tty saved reply='' char=''
@@ -468,7 +447,7 @@ fi
 output=$(
   /usr/bin/osascript "$script" "$dir" \
     "$editor" "$agent" "$shell_cmd" \
-    "$width" "$height" "$layout" "$mark" "$socket" \
+    "$width" "$height" "$mark" "$socket" \
     2>&1
 ) || {
   rc=$?

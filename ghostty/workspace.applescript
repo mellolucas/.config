@@ -1,7 +1,7 @@
 -- Ghostty workspace layout.
 --
 -- Usage:
---   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD SHELL_CMD CONTENT_WIDTH CONTENT_HEIGHT LAYOUT MARK SOCKET
+--   osascript workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD SHELL_CMD CONTENT_WIDTH CONTENT_HEIGHT MARK SOCKET
 --
 -- When the focused pane's title is MARK (the invoking shell titles its own
 -- pane) and it is its tab's only pane, lays out that tab, the pane becoming
@@ -11,26 +11,17 @@
 -- and the editor's pane DOTFILES_EDITOR_SERVE=1 too, for its Neovim to serve
 -- it (config.workspace).
 -- CONTENT_WIDTH/CONTENT_HEIGHT are the window text area in pixels (CSI 14 t);
--- when missing or 0 the full layout's splits stay even. LAYOUT is full (the
--- default) or lean.
+-- when missing or 0 the splits stay even.
 --
--- full (columns 60% / 40%, right column rows 65% / 35%; focus on the editor):
+-- Columns 60% / 40%, left column rows 65% / 35%; focus on the editor:
 --
 --   ┌───────────────────────────┬──────────────────┐
 --   │                           │                  │
---   │                           │      agent       │
 --   │          editor           │                  │
---   │                           ├──────────────────┤
---   │                           │      shell       │
+--   │                           │      agent       │
+--   ├───────────────────────────┤                  │
+--   │          shell            │                  │
 --   └───────────────────────────┴──────────────────┘
---
--- lean (even halves; focus on the shell):
---
---   ┌──────────────────┬──────────────────┐
---   │      editor      │                  │
---   ├──────────────────┤      agent       │
---   │      shell       │                  │
---   └──────────────────┴──────────────────┘
 
 use AppleScript version "2.4"
 use framework "AppKit"
@@ -38,7 +29,7 @@ use scripting additions
 
 on run argv
 	if (count of argv) < 3 then
-		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [SHELL_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT] [LAYOUT] [MARK] [SOCKET]"
+		error "usage: workspace.applescript WORKSPACE_DIR EDITOR_CMD AGENT_CMD [SHELL_CMD] [CONTENT_WIDTH] [CONTENT_HEIGHT] [MARK] [SOCKET]"
 	end if
 
 	set workspaceDir to item 1 of argv
@@ -48,20 +39,18 @@ on run argv
 	set shellCmd to ""
 	set contentWidth to 0
 	set contentHeight to 0
-	set layoutName to "full"
 	set markTitle to ""
 	set editorSocket to ""
 
 	if (count of argv) ≥ 4 then set shellCmd to item 4 of argv
 	if (count of argv) ≥ 5 then set contentWidth to (item 5 of argv) as integer
 	if (count of argv) ≥ 6 then set contentHeight to (item 6 of argv) as integer
-	if (count of argv) ≥ 7 then set layoutName to item 7 of argv
-	if (count of argv) ≥ 8 then set markTitle to item 8 of argv
-	if (count of argv) ≥ 9 then set editorSocket to item 9 of argv
+	if (count of argv) ≥ 7 then set markTitle to item 7 of argv
+	if (count of argv) ≥ 8 then set editorSocket to item 8 of argv
 
 	-- Splits start even; one divider move per axis reaches the target ratios:
 	-- resize_split moves the divider of the pane's nearest ancestor split
-	-- along that axis, so 50/50 -> 60/40 across and, in the right column,
+	-- along that axis, so 50/50 -> 60/40 across and, in the left column,
 	-- 50/50 -> 65/35 down. CSI 14 t counts device pixels but resize_split
 	-- moves points; with mixed displays the largest scale errs toward smaller
 	-- moves.
@@ -112,20 +101,12 @@ on run argv
 			set mainShell to focused terminal of workspaceTab
 		end if
 
-		-- The other panes split from the shell
-		if layoutName is "lean" then
-			-- Splits halve the pane they divide, so no resizing
-			set rightAgent to split mainShell direction right with configuration cfg
-			set leftEditor to split mainShell direction up with configuration editorCfg
-			set focusPane to mainShell
-		else
-			set leftEditor to split mainShell direction left with configuration editorCfg
-			set rightAgent to split mainShell direction up with configuration cfg
-			if widthDelta > 0 and heightDelta > 0 then
-				perform action ("resize_split:right," & widthDelta) on leftEditor
-				perform action ("resize_split:down," & heightDelta) on mainShell
-			end if
-			set focusPane to leftEditor
+		-- The other panes split from the shell, halving the pane they divide
+		set rightAgent to split mainShell direction right with configuration cfg
+		set leftEditor to split mainShell direction up with configuration editorCfg
+		if widthDelta > 0 and heightDelta > 0 then
+			perform action ("resize_split:right," & widthDelta) on leftEditor
+			perform action ("resize_split:down," & heightDelta) on leftEditor
 		end if
 
 		input text editorCmd to leftEditor
@@ -141,7 +122,7 @@ on run argv
 			send key "enter" to mainShell
 		end if
 
-		focus focusPane
+		focus leftEditor
 		set editorId to id of leftEditor
 	end tell
 	return editorId & linefeed & placement

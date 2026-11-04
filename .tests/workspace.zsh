@@ -8,14 +8,14 @@ self=${0:A}
 repo=${self:h:h}
 if [[ ${1:-} == --mark-child ]]; then
   # The Ghostty route from a terminal, with the script runner stubbed
-  unset DOTFILES_WORKSPACE_LAYOUT TMUX TMUX_PANE
+  unset TMUX TMUX_PANE
   OSTYPE=darwin23 TERM_PROGRAM=ghostty DOTFILES_WORKSPACE_SCRIPT=$self
   code=$(<"$repo/zsh/functions/workspace")
   executable_check='[[ -x /usr/bin/osascript ]]'
   code=${code/$executable_check/'[[ 1 == 1 ]]'}
   functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
-  workspace_osascript() { print -r -- "ARGUMENT:$9:END" >&3; }
-  workspace --layout lean 3>&1
+  workspace_osascript() { print -r -- "ARGUMENT:$8:END" >&3; }
+  workspace 3>&1
   print -r -- FINISHED
   exit
 fi
@@ -25,8 +25,6 @@ if [[ ${1:-} == --child ]]; then
   [[ $code == *'local width=0 height=0'*$'\nlocal output'* ]] || exit 1
   code="local width=0 height=0${${code#*'local width=0 height=0'}%%$'\nlocal output'*}"
   functions[query]="$code"$'\nprint -r -- "RESULT:$width:$height"'
-  # Only the full layout sizes its splits from the window
-  layout=full
   export TERM_PROGRAM=ghostty
   # Normalize macOS's transient PENDIN bit before comparing saved settings.
   stty echo echonl -icanon < /dev/tty
@@ -80,7 +78,7 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
 # argument list; the Ghostty route needs macOS, Ghostty, and no tmux.
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
-    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX TMUX_PANE
+    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD TMUX TMUX_PANE
   OSTYPE=darwin23 TERM_PROGRAM=ghostty
   export DOTFILES_WORKSPACE_SCRIPT=$self
   code=$(<"$repo/zsh/functions/workspace")
@@ -91,7 +89,7 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
   # Without a terminal the shell marks no pane, so the script opens a new tab.
   # The panes it starts get the socket their editor serves.
-  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode gg 0 0 full '' "$(socket_for "${PWD:A}")")
+  local -a expected=("$DOTFILES_WORKSPACE_SCRIPT" "${PWD:A}" 'nvim .' ocode gg 0 0 '' "$(socket_for "${PWD:A}")")
   dispatch() {
     local actual
     actual=$(workspace "$@" 3>&1 < /dev/null) || fail "dispatch: ${(qqq)@}"
@@ -134,22 +132,6 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   dispatch --editor "$expected[3]" --agent "$expected[4]" --status 'top command' --shell=
   expected[5]=''
   dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell=
-  # The layout reaches the script: lean by flag or environment, and the flag
-  # wins.
-  expected[8]=lean
-  dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= --layout lean
-  dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= --layout=lean
-  DOTFILES_WORKSPACE_LAYOUT=lean dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell=
-  expected[8]=full
-  DOTFILES_WORKSPACE_LAYOUT=lean dispatch --editor "$expected[3]" --agent "$expected[4]" --status '' --shell= \
-    --layout full
-  # Lean's shell takes the same line.
-  expected[5]='top command; bottom command' expected[8]=lean
-  dispatch --editor "$expected[3]" --agent "$expected[4]" --status 'top command' --shell 'bottom command' \
-    --layout lean
-  expected[5]='' expected[8]=full
-  reject --layout tiled
-  DOTFILES_WORKSPACE_LAYOUT=tiled reject
   # Metacharacters must remain literal data, not run in the launcher shell.
   expected[3]='$(exit 91); "quoted" * \\ $HOME'
   expected[4]='--literal=value'
@@ -161,9 +143,9 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   mkdir -- "$temporary/path with spaces" "$temporary/--directory"
   (
     builtin cd -- "$temporary"
-    expected[2]="${temporary:A}/path with spaces" expected[10]=$(socket_for "${temporary:A}/path with spaces")
+    expected[2]="${temporary:A}/path with spaces" expected[9]=$(socket_for "${temporary:A}/path with spaces")
     dispatch 'path with spaces' --editor="$expected[3]" --agent="$expected[4]" --status= --shell=
-    expected[2]="${temporary:A}/--directory" expected[10]=$(socket_for "${temporary:A}/--directory")
+    expected[2]="${temporary:A}/--directory" expected[9]=$(socket_for "${temporary:A}/--directory")
     dispatch --editor="$expected[3]" --agent="$expected[4]" --status= --shell= -- --directory
   )
   # Each workspace folder has its own socket, in a folder only its owner can
@@ -174,21 +156,19 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   (( (mode[1] & 8#777) == 8#700 )) || fail "the sockets' folder has mode $(( [#8] mode[1] & 8#777 ))"
   [[ $(socket_for "${PWD:A}") != $(socket_for "${temporary:A}/path with spaces") ]] || fail 'two folders share a socket'
   chmod 755 "$TMPDIR/nvim.$USERNAME"
-  expected[10]=''
+  expected[9]=''
   dispatch --editor="$expected[3]" --agent="$expected[4]" --status= --shell ''
   chmod 700 "$TMPDIR/nvim.$USERNAME"
-  expected[10]=$(socket_for "${PWD:A}")
+  expected[9]=$(socket_for "${PWD:A}")
   # Laid out around this shell (the script answers "same tab"), the shell
-  # moves to the workspace and runs its own commands there, in either layout:
-  # the status command, then the shell command. With a new tab, the script
-  # types them into that tab's shell, and this one stays where it was.
+  # moves to the workspace and runs its own commands there: the status
+  # command, then the shell command. With a new tab, the script types them
+  # into that tab's shell, and this one stays where it was.
   workspace_osascript() { print -r -- 'same tab'; }
   (
-    for layout in full lean; do
-      output=$(workspace --layout $layout --status 'print -r -- STATUS' --shell 'print -r -- OWN:$PWD' \
-        "$temporary/path with spaces" < /dev/null) || fail "$layout same tab"
-      [[ $output == $'STATUS\nOWN:'"${temporary:A}/path with spaces" ]] || fail "$layout same tab printed: $output"
-    done
+    output=$(workspace --status 'print -r -- STATUS' --shell 'print -r -- OWN:$PWD' \
+      "$temporary/path with spaces" < /dev/null) || fail 'same tab'
+    [[ $output == $'STATUS\nOWN:'"${temporary:A}/path with spaces" ]] || fail "same tab printed: $output"
     workspace --status '' --shell '' "$temporary/path with spaces" < /dev/null > /dev/null || fail 'same tab'
     [[ $PWD == "${temporary:A}/path with spaces" ]] || fail "same tab left the shell in $PWD"
   )
@@ -268,7 +248,7 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
 # branch once merged. The script runner is stubbed as above.
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
-    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX TMUX_PANE
+    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD TMUX TMUX_PANE
   for name in ${(M)${(k)parameters}:#GIT_*}; do unset "$name"; done
   # Git's own messages, untranslated
   export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null LC_ALL=C
@@ -440,7 +420,7 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
       rejected "workspace: --done works in a task's worktree, which workspace --task NAME opens" --done
     )
   done
-  rejected 'workspace: --done takes no other arguments' --done --layout lean
+  rejected 'workspace: --done takes no other arguments' --done --agent claude
   git -C "$checkout" checkout -q main
   # Uncommitted or untracked work: Git refuses, and everything stays as it
   # was, this shell too. Asked about first, before the files Git ignores (an
@@ -520,7 +500,7 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
 # .tests/tmux.zsh drives a real server.
 (
   unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
-    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD DOTFILES_WORKSPACE_LAYOUT TMUX TMUX_PANE
+    DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD TMUX TMUX_PANE
   # Never the Ghostty route here: it would open a real tab.
   export TERM_PROGRAM=fixture
   fpath=("$repo/zsh/functions" $fpath)
@@ -577,9 +557,11 @@ for mode in valid echo-off queued timeout; do
 done
 
 # From a terminal, the shell titles its own pane with a unique mark and passes
-# the same mark, for the script to find the pane.
+# the same mark, for the script to find the pane, after measuring the window.
 transcript=''
 zpty -b terminal zsh -f "$self" --mark-child
+wait_for $'\e[14t'
+zpty -w -n terminal $'\e[4;884;2552t'
 wait_for FINISHED
 mark=${${transcript#*$'\e]2;'}%%$'\a'*}
 [[ $transcript == *$'\e]2;'* && $mark == 'workspace '<->.<-> ]] || fail "pane mark: ${(qqq)transcript}"

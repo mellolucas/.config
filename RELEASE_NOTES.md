@@ -20,10 +20,10 @@ Changes since `v0.0.1`.
   type; `keys TOPIC` and `keys WORDS` work from the prompt, and
   `help COMMAND` shows any command's help, even through an alias. The
   guide's tables bold what each key does.
-- **Workspaces:** `workspace` leads with the editor, on the left 60% of a
-  Ghostty tab, beside the agent above a shell; it lays out the current tab
-  when its shell is alone there. `--layout lean` puts the editor above the
-  shell, beside the agent. Elsewhere, tmux lays out the same panes.
+- **Workspaces:** `workspace` leads with the editor, above a shell on the
+  left 60% of a Ghostty tab, beside the agent at full height; it lays out the
+  current tab when its shell is alone there. Elsewhere, tmux lays out the same
+  panes.
 - **Tasks:** `workspace --task NAME` lays out a task in a worktree and branch
   of its own beside the checkout, and reopens it with the agent's last
   session; `workspace --done` removes the worktree, and the branch once

@@ -29,7 +29,7 @@ The essentials, each a door to the pages that follow.
 
 ## Workspace: Start a workspace
 
-Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the editor on the left 60%, and on the right the agent above a shell that opens with the `gg` card; the lean layout gives the editor and the agent half the width each.
+Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the editor above a shell that opens with the `gg` card, on the left 60%, and the agent on the right at full height.
 
 | Run | Result |
 | --- | --- |
@@ -37,20 +37,19 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 | `workspace DIR` | **Lay out** another directory |
 | `workspace --task NAME` | **Start** or **reopen** task NAME in a worktree of its own, on branch `task/NAME` |
 | `workspace --done` | In a task, **remove** its worktree, and its branch once merged |
-| `workspace --layout lean` | Editor above the shell on the left, agent right, in **even halves** |
 | `workspace --agent CMD` | **Start** a different agent in the agent pane |
 | `workspace --status ggg` | The card with the **code summary** in the shell |
 | `workspace --status ''` | **Start** the shell without the card |
 | `workspace --help` | **Every option** and its default |
 | `v FILE:LINE` | From any of its panes, **open** the file in the workspace's editor at that line, and go there |
 
-- Focus starts in the editor (in the lean layout, in the shell); `Cmd+Option+arrows` move between the panes.
+- Focus starts in the editor; `Cmd+Option+arrows` move between the panes, and `Cmd+Ctrl+=` gives them even halves.
 - Run from a tab where your shell is the only pane, `workspace` lays out that tab around it, and your shell becomes the workspace's shell. Otherwise it opens a new tab, as it does when Ghostty can't tell which pane you're in (after you set a tab title by hand).
 - `workspace --task NAME` works anywhere in a repository: the worktree sits beside the main checkout, as `REPO.worktrees/NAME`, and its branch starts from the commit you're on. Rerun it to reopen the task: OpenCode, Claude Code, and Codex resume their last session there (Copilot CLI starts a new one), and a task folder deleted by hand comes back from its branch. `gg` lists the repository's tasks.
 - `workspace --done` moves your shell to the main checkout; close the task's other panes. It refuses while the task holds uncommitted or untracked changes, or files Git ignores (an `.env`, a local database), naming the command that deletes those when they're disposable, and keeps the branch until the main checkout's branch has its commits (`git branch -D task/NAME` deletes it anyway).
 - Files open in the workspace's one editor, which takes the focus: `v FILE` or `v FILE:LINE` from its shell (`v` alone goes to the editor), `rgv`'s and `fzfv`'s Enter, and agents through `edit FILE:LINE`, the command `v` runs. Outside a workspace, or while its editor is closed, `v` opens Neovim where you are, as `vi` and `vim` always do; Neovim started again in the editor's pane takes the files once more.
 - The editor opens on the project's file tree; `Cmd+Shift+Enter` zooms it to explore (`keys explore`).
-- For lasting defaults, set `DOTFILES_WORKSPACE_LAYOUT=lean` (on a laptop, say) or the commands in `zsh/local.zsh`.
+- For lasting defaults, set the commands in `zsh/local.zsh`.
 - Rerunning `workspace` (or `workspace --task NAME`) while that workspace's editor is open brings the workspace forward instead of building another.
 - Outside Ghostty, or on Linux, the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux, windows take the place of tabs.
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
@@ -135,7 +134,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 - A name longer than the tree is wide shows whole, over the code, while the cursor is on it.
 - Hidden with `q` while zoomed, the tree stays out of later zooms until you show it again.
 - The tree follows the file you're in and marks Git changes as they happen: `✗` modified, `★` new, `✓` staged, `➜` renamed; a folder shows the marks of what it holds.
-- `-` (from a file) and `Esc` (from the tree) move between the tree and the code at any width. `Cmd+Option+arrows` move between terminal panes: in a workspace, `Cmd+Option+→` from the tree heads for the agent and shell on the right, and `Cmd+Option+←` reaches the tree only because no pane sits to the editor's left.
+- `-` (from a file) and `Esc` (from the tree) move between the tree and the code at any width. `Cmd+Option+arrows` move between terminal panes: in a workspace, `Cmd+Option+→` from the tree heads for the agent on the right and `Cmd+Option+↓` for the shell below, and `Cmd+Option+←` reaches the tree only because no pane sits to the editor's left.
 - `Ctrl+^` (`Ctrl+6`) switches to your previous file, also from the tree; the tree is never one, and with no previous file it says so.
 - `Ctrl+V` and `Ctrl+X` split the code window; with only the tree showing, both open beside it. `Ctrl+W c` closes a split, while `Cmd+W` closes the whole editor pane.
 - Follow the code with `Ctrl+]` / `Ctrl+T`, `grr`, and `gO`, and search it with `Cmd+O` and `:grep` (`keys editor`).

@@ -202,8 +202,8 @@ output=$(workspace < /dev/null)
 [[ $(tmux list-sessions -F '#{session_name}' | LC_ALL=C sort) == $'proj_v1\nproj_v1-2\ntest\nwork dir' ]] ||
   fail "sessions: $(tmux list-sessions -F '#{session_name}')"
 
-# A workspace's panes by role, from their positions: the editor left, and on
-# the right the agent above the shell.
+# A workspace's panes by role, from their positions: the editor above the
+# shell on the left, and the agent on the right.
 local -A pane width height
 roles() {
   local line left top w h id role
@@ -212,8 +212,8 @@ roles() {
   pane=() width=() height=()
   for line in $found; do
     read -r left top w h id <<< "$line"
-    if (( left == 0 )); then role=editor
-    elif (( top == 0 )); then role=agent
+    if (( left > 0 )); then role=agent
+    elif (( top == 0 )); then role=editor
     else role=shell
     fi
     pane[$role]=$id width[$role]=$w height[$role]=$h
@@ -228,8 +228,8 @@ done
 [[ $(tmux display -p -t '=work dir:' '#{pane_id}') == $pane[editor] ]] || fail 'focus is not the editor'
 
 # From a terminal, the session takes its size before attaching, so the shares
-# hold: the editor 60% of the columns, the agent 65% of the rows, within two
-# cells.
+# hold: the editor 60% of the columns and 65% of the rows, the agent all of
+# them, within two cells.
 builtin cd -- "$HOME/sized"
 version[sized]='fixture 1.0' size[sized]='50 200'
 zpty -b sized 'trap - EXIT; stty rows 50 cols 200; workspace'
@@ -240,32 +240,19 @@ integer rows=$(tmux display -p -t '=sized:' '#{window_height}')
 (( columns == 200 )) || fail "attached at $columns columns"
 near() { (( $2 * 100 - $3 * $4 >= -200 && $2 * 100 - $3 * $4 <= 200 )) || fail "$1: $2 of $4"; }
 near 'editor width' $width[editor] 60 $columns
-near 'agent height' $height[agent] 65 $rows
+near 'editor height' $height[editor] 65 $rows
+near 'agent height' $height[agent] 100 $rows
 
-# The lean layout: the editor above the one shell, which runs the status and
-# then the shell command as one line, and the agent right, in even halves. The
-# status command reads the terminal, which must not take the shell command.
-mkdir -p "$HOME/lean"
-builtin cd -- "$HOME/lean"
-output=$(workspace --layout lean --status "read -t 1 -r reply; echo T''OP" < /dev/null)
-[[ $output == *' lean is ready;'* ]] || fail "lean: $output"
-local -A lean
-for line in ${(f)"$(tmux list-panes -t '=lean' -F '#{pane_left} #{pane_top} #{pane_id}')"}; do
-  read -r left top id <<< "$line"
-  if (( left > 0 )); then lean[agent]=$id
-  elif (( top > 0 )); then lean[shell]=$id
-  else lean[editor]=$id
-  fi
-done
-(( ${#lean} == 3 )) || fail "lean panes: ${(kv)lean}"
+# The shell runs the status and then the shell command as one line: a status
+# command that reads the terminal must not take the shell command.
+mkdir -p "$HOME/reading"
+builtin cd -- "$HOME/reading"
+output=$(workspace --status "read -t 1 -r reply; echo T''OP" < /dev/null)
+[[ $output == *' reading is ready;'* ]] || fail "reading: $output"
+roles reading
 for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM; do
-  wait_for "the lean $role pane did not run $output" "ran $lean[$role] $output"
+  wait_for "the $role pane did not run $output after a status command that reads" "ran $pane[$role] $output"
 done
-[[ $(tmux display -p -t '=lean:' '#{pane_id}') == $lean[shell] ]] || fail 'lean focus is not the shell'
-columns=$(tmux display -p -t '=lean:' '#{window_width}')
-rows=$(tmux display -p -t '=lean:' '#{window_height}')
-near 'lean editor width' $(tmux display -p -t $lean[editor] '#{pane_width}') 50 $columns
-near 'lean editor height' $(tmux display -p -t $lean[editor] '#{pane_height}') 50 $rows
 print -r -- 'ok: workspace sessions, commands, and proportions'
 
 # Every pane the workspace starts gets the socket its editor serves, one per
@@ -296,11 +283,11 @@ mkdir -p "$HOME/solo" "$HOME/elsewhere"
 tmux new-session -d -s solo -x 120 -y 40 -c "$HOME/elsewhere" 'zsh -f'
 solo=$(tmux display -p -t '=solo:' '#{pane_id}')
 type_line() { tmux send-keys -t "$1" -l -- "$2"; tmux send-keys -t "$1" Enter; }
-type_line $solo "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace --layout lean \
+type_line $solo "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace \
 --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status 'echo T''OP' --shell 'echo BOT''TOM' ${(q)HOME}/solo; \
 read -t 1 -r reply; echo READ:\$reply:; [[ \$PWD == ${(q)HOME}/solo ]] && echo MO''VED; \
 [[ \$DOTFILES_EDITOR_SOCKET == ${(q)$(socket_for $HOME/solo)} ]] && echo SOCK''ET"
-wait_for 'the lone pane did not become a lean workspace' '(( $(tmux list-panes -t "=solo:" | wc -l) == 3 ))'
+wait_for 'the lone pane did not become a workspace' '(( $(tmux list-panes -t "=solo:" | wc -l) == 3 ))'
 local -A here
 for line in ${(f)"$(tmux list-panes -t '=solo:' -F '#{pane_left} #{pane_top} #{pane_id}')"}; do
   read -r left top id <<< "$line"
@@ -314,8 +301,8 @@ for role output in editor EDITOR agent AGENT shell TOP shell BOTTOM shell READ::
   wait_for "the reused $role pane did not show $output" "ran $here[$role] $output"
 done
 [[ $(tmux list-windows -t '=solo' | wc -l) -eq 1 ]] || fail 'a lone pane got a new window'
-[[ $(tmux display -p -t '=solo:' '#{pane_id} #{window_name}') == "$solo solo" ]] ||
-  fail "reused window: $(tmux display -p -t '=solo:' '#{pane_id} #{window_name}')"
+[[ $(tmux display -p -t '=solo:' '#{pane_id} #{window_name}') == "$here[editor] solo" ]] ||
+  fail "reused window, focused: $(tmux display -p -t '=solo:' '#{pane_id} #{window_name}')"
 type_line $solo "workspace --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status '' ${(q)HOME}/elsewhere; \
 [[ \$PWD == ${(q)HOME}/solo ]] && echo STA''YED"
 wait_for 'beside other panes, workspace did not open a new window' \
@@ -323,7 +310,7 @@ wait_for 'beside other panes, workspace did not open a new window' \
 wait_for 'a new window moved the shell' "ran $solo STAYED"
 # Inside tmux, whose session keeps the environment it started with, every
 # pane the workspace starts there gets the socket too: around a lone shell
-# (lean) and in a new window (full).
+# and in a new window.
 for line in ${(f)"$(tmux list-panes -s -t '=solo' -F '#{window_name} #{pane_id}')"}; do
   read -r window id <<< "$line"
   type_line $id 'echo SOCK:$DOTFILES_EDITOR_SOCKET'

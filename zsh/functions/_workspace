@@ -4,7 +4,6 @@
 local -a tasks=(${${(f)"$(git for-each-ref --format='%(refname:strip=3)' refs/heads/task/ 2>/dev/null)"}:#*/*})
 
 _arguments -S \
-  '*--layout=[pane layout]:layout:(full lean)' \
   '*--agent=[command for the agent pane]:command:_cmdstring' \
   '*--editor=[command for the editor pane]:command:_cmdstring' \
   '*--status=[status command the shell starts with]:command:_cmdstring' \

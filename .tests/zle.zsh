@@ -327,7 +327,6 @@ wait_for 'ZLE-READY'
 complete 'workspace agent flag' 'workspace --agen' 'workspace --agent='
 complete 'workspace agent separate command' 'workspace --agent zle-test-co' 'workspace --agent zle-test-command'
 complete 'workspace editor equals command' 'workspace --editor=zle-test-co' 'workspace --editor=zle-test-command'
-complete 'workspace layout value' 'workspace --layout l' 'workspace --layout lean '
 complete 'workspace flags after directory' 'workspace dirs/visible --edi' 'workspace dirs/visible --editor='
 complete 'workspace directory after command' "workspace --agent 'zle-test-command arg' dirs/sec" "workspace --agent 'zle-test-command arg' dirs/.xxsecretxx/"
 complete 'workspace command argument' "workspace --editor 'mv prefix/al" "workspace --editor 'mv prefix/alpha"

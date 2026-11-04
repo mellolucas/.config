@@ -55,7 +55,7 @@ Open Ghostty, then:
 
 ## Daily use
 
-Start a project with **`workspace`**: the editor on the left, the agent above a shell on the right; `--layout lean` puts the editor above the shell, beside the agent. In a repository, `workspace --task NAME` lays out a task in a worktree and branch of its own beside the checkout, and reopens it later with the agent's last session; `workspace --done` removes the worktree, and the branch once it's merged. `v FILE:LINE`, `rgv`, `fzfv`, and agents (through `edit`) open files in the workspace's editor.
+Start a project with **`workspace`**: the editor above a shell on the left, the agent on the right at full height. In a repository, `workspace --task NAME` lays out a task in a worktree and branch of its own beside the checkout, and reopens it later with the agent's last session; `workspace --done` removes the worktree, and the branch once it's merged. `v FILE:LINE`, `rgv`, `fzfv`, and agents (through `edit`) open files in the workspace's editor.
 
 Run **`keys`** to browse the [field guide](GUIDE.md) with a preview of each page, or type to search every line; `keys TOPIC` opens a page (`keys git`), and `keys WORDS` searches from the prompt (`keys close tab`). `help COMMAND` shows any command's help, even through an alias.
 

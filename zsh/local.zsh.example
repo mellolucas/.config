@@ -5,7 +5,6 @@
 # start (some agents and editors) skip it.
 
 # Workspace defaults; command-line flags override these for one invocation.
-# export DOTFILES_WORKSPACE_LAYOUT='lean' # Editor and agent at half the width each
 # export DOTFILES_WORKSPACE_AGENT_CMD='claude'
 # export DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
 # export DOTFILES_WORKSPACE_STATUS_CMD='' # Start the workspace's shell without the gg card
