@@ -95,7 +95,7 @@ Changes since `v0.0.1`.
   `dotfiles cleanup`: `dotfiles doctor` notes what lies outside the XDG layout
   in `$HOME`.
 - Use `workspace` instead of `dotfiles workspace`, `dotfiles code`, or the
-  `dotsws` alias. One shell, below the agent, takes the place of the middle
+  `dotsws` alias. One shell, below the editor, takes the place of the middle
   column's two: set `DOTFILES_WORKSPACE_STATUS_CMD` and
   `DOTFILES_WORKSPACE_SHELL_CMD`, which it runs in turn, instead of
   `DOTFILES_WORKSPACE_MIDDLE_TOP_CMD` and
@@ -165,8 +165,9 @@ and Ubuntu. Fresh-machine installs are not yet validated on Linux.
 
 Known limits:
 
-- `workspace` sizes panes from the pane it runs in, and for the sharpest
-  display when displays of different scales are connected.
+- `workspace` sizes panes from the pane it runs in (from a split pane, nearer
+  even halves), and for the sharpest display when displays of different
+  scales are connected.
 - Markdown previews render the saved file, with approximate positioning, and
   Delta can truncate long lines.
 - On Linux, Ghostty keeps its own pane keys, and Neovim's windows are

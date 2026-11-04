@@ -2,7 +2,7 @@
 
 A Mac-first terminal workspace where each task gets its editor, agent, and shell: Neovim, a coding agent, and zsh side by side in Ghostty, set up in one command. The [goals in AGENTS.md](AGENTS.md#goals) say what matters.
 
-![A workspace in Ghostty: Neovim beside an agent and a shell](.github/workspace.png)
+![A workspace in Ghostty: Neovim above a shell, beside an agent](.github/workspace.png)
 
 ```sh
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/mellolucas/.config/HEAD/get.sh)"

@@ -44,7 +44,7 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 | `v FILE:LINE` | From any of its panes, **open** the file in the workspace's editor at that line, and go there |
 
 - Focus starts in the editor; `Cmd+Option+arrows` move between the panes, and `Cmd+Ctrl+=` gives them even halves.
-- Run from a tab where your shell is the only pane, `workspace` lays out that tab around it, and your shell becomes the workspace's shell. Otherwise it opens a new tab, as it does when Ghostty can't tell which pane you're in (after you set a tab title by hand).
+- Run from a tab where your shell is the only pane, `workspace` lays out that tab around it, and your shell becomes the workspace's shell. Otherwise it opens a new tab, as it does when Ghostty can't tell which pane you're in (after you set a tab title by hand); run from a split pane, it sizes that tab from the smaller pane, so its shares come out nearer even halves.
 - `workspace --task NAME` works anywhere in a repository: the worktree sits beside the main checkout, as `REPO.worktrees/NAME`, and its branch starts from the commit you're on. Rerun it to reopen the task: OpenCode, Claude Code, and Codex resume their last session there (Copilot CLI starts a new one), and a task folder deleted by hand comes back from its branch. `gg` lists the repository's tasks.
 - `workspace --done` moves your shell to the main checkout; close the task's other panes. It refuses while the task holds uncommitted or untracked changes, or files Git ignores (an `.env`, a local database), naming the command that deletes those when they're disposable, and keeps the branch until the main checkout's branch has its commits (`git branch -D task/NAME` deletes it anyway).
 - Files open in the workspace's one editor, which takes the focus: `v FILE` or `v FILE:LINE` from its shell (`v` alone goes to the editor), `rgv`'s and `fzfv`'s Enter, and agents through `edit FILE:LINE`, the command `v` runs. Outside a workspace, or while its editor is closed, `v` opens Neovim where you are, as `vi` and `vim` always do; Neovim started again in the editor's pane takes the files once more.
@@ -73,7 +73,7 @@ Ghostty's own Mac keys, as in Terminal and iTerm2. Without Ghostty, a `workspace
 - At an edge, `Cmd+Option+arrows` reach Neovim, which moves between its windows (normal mode); `Ctrl+W h/j/k/l` or `Ctrl+W` arrows always do, in tmux too.
 - `Cmd+W` closes a terminal pane, not a buffer.
 - `Option+←` / `Option+→` jump words, never panes.
-- In tmux, `Ctrl+B` then `Ctrl+arrows` resize, `E` evens out the sizes, `[` scrolls back (`keys browse`), `:` runs a tmux command, and `d` detaches; click a pane to focus it and drag a border to resize it.
+- In tmux, `Ctrl+B` then `Ctrl+arrows` resize, `E` evens out the pane and those beside it, `[` scrolls back (`keys browse`), `:` runs a tmux command, and `d` detaches; click a pane to focus it and drag a border to resize it.
 
 ## Editor: Edit in Neovim
 
@@ -129,7 +129,7 @@ Browse a project in the editor's file tree, beside its code when the editor has 
 | `[c` / `]c` | **Previous** / **next** changed file |
 | `?` | **Every key**, by what it does |
 
-- In a pane under 110 columns (a workspace's editor in a window under about 184), the tree and the code take turns: Enter, `Space`, `Tab`, or `→` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
+- In a pane under 110 columns (a workspace's editor, at 60% of the width, in a window under about 184), the tree and the code take turns: Enter, `Space`, `Tab`, or `→` on a file gives it the pane, `-` brings the tree back, and `Esc` returns to the file.
 - In the tree, `Space` previews at once; the `Space` leader keys work from the code.
 - A name longer than the tree is wide shows whole, over the code, while the cursor is on it.
 - Hidden with `q` while zoomed, the tree stays out of later zooms until you show it again.

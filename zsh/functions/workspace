@@ -23,7 +23,8 @@ usage: workspace [OPTIONS] [--] [DIR]
 
 Lay out a coding workspace: the editor above a shell on the left (60% of the
 width; the editor 65% of the height), and the agent on the right at full
-height. The shell runs the status command, then the shell command, as one
+height; in Ghostty, run from a split pane, the shares come out nearer even
+halves. The shell runs the status command, then the shell command, as one
 command line. In Ghostty on
 macOS: in this tab when this shell is its only pane and Ghostty can tell which
 pane that is (this shell becomes the workspace's shell, moves to DIR, and runs
