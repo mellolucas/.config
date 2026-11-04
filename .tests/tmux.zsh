@@ -351,15 +351,17 @@ tmux switch-client -c "$client" -t '=test:'
 print -r -- "ok: panes split later take their workspace window's socket, and other panes none"
 
 # A stand-in for an editor serving socket $1, accepting each connection as
-# Neovim does, from the socket's folder, as zsocket cuts a longer path
+# Neovim does, from the socket's folder, as zsocket cuts a longer path. One
+# connection waiting fills its queue, so it serves once it has taken the first
 stand_in=''
 serve() {
-  rm -f -- $1
+  rm -f -- $1 $1.taken
   ( builtin cd -q -- ${1:h} && zsocket -l ${1:t} || exit
     integer listener=$REPLY
-    while zsocket -a $listener; do exec {REPLY}>&-; done ) &
+    while zsocket -a $listener; do exec {REPLY}>&-; : >| ${1:t}.taken; done ) &
   stand_in=$!
   wait_for "the stand-in editor did not serve $1" "( builtin cd -q -- ${(q)1:h} && zsocket ${(q)1:t} ) 2>/dev/null"
+  wait_for "the stand-in editor did not take a connection on $1" "[[ -e ${(q)1}.taken ]]"
 }
 unserve() { kill $stand_in; wait $stand_in 2>/dev/null || :; stand_in=''; }
 # While its editor serves the socket, a folder's workspace comes forward in
