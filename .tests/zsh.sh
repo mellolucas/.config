@@ -1029,7 +1029,7 @@ if [[ -n $nvim_bin ]]; then
       rm -f "$test_root/editor-args"
       terminal "${(j: :)${(@q)edit_command}} ${(j: :)${(@q)argv}}"
     }
-    asked() { "$nvim_bin" --server "$socket" --remote-expr "$1" 2> /dev/null; }
+    asked() { "$nvim_bin" --headless --server "$socket" --remote-expr "$1" 2> /dev/null; }
     # The workspace's editor, serving the socket from the workspace's folder,
     # with the environment given; it goes when these checks end, as they may
     # before stop
@@ -1101,7 +1101,7 @@ if [[ -n $nvim_bin ]]; then
       print -r -- ID-43 > "$run/ws.ghostty"
       # Ghostty's stand-in, which also counts the editor's list as it focuses
       mkdir -p "$test_root/rgv-bin"
-      print -rl -- '#!/bin/sh' "'$nvim_bin' --server '$socket' --remote-expr 'len(getqflist())' > '$test_root/rgv-focused'" \
+      print -rl -- '#!/bin/sh' "'$nvim_bin' --headless --server '$socket' --remote-expr 'len(getqflist())' > '$test_root/rgv-focused'" \
         "exec '$bin/osascript' \"\$@\"" > "$test_root/rgv-bin/osascript"
       chmod +x "$test_root/rgv-bin/osascript"
       (
