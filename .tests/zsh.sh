@@ -774,8 +774,8 @@ fzf() {
   zmodload zsh/zpty
   bin=$test_root/fzfv-bin
   /bin/mkdir -p "$bin" "$test_root/fzfv"
-  print -rl -- '#!/bin/sh' 'case $4 in' "  '\$TMUX_PANE') echo %1 ;;" \
-    "  *) printf '%s\n' \"\$4\" > '$test_root/fzfv-opened' ;;" 'esac' > "$bin/nvim"
+  print -rl -- '#!/bin/sh' 'for expr; do :; done' 'case $expr in' "  '\$TMUX_PANE') echo %1 ;;" \
+    "  *) printf '%s\n' \"\$expr\" > '$test_root/fzfv-opened' ;;" 'esac' > "$bin/nvim"
   print -r -- '#!/bin/sh' > "$bin/tmux"
   print -rl -- '#!/bin/sh' "printf '%s\n' \"\$@\" > '$test_root/fzfv-editor'" > "$bin/editor"
   /bin/chmod +x "$bin"/*
@@ -1010,17 +1010,24 @@ if [[ -n $nvim_bin ]]; then
     edit_command=(/usr/bin/env -i HOME="$HOME" PATH="$bin:$repo/zsh/bin:${nvim_bin:h}:${zsh_bin:h}:/usr/bin:/bin"
       EDITOR='"editor with spaces" --clean "$HOME"' DOTFILES_EDITOR_SOCKET="$socket" "$repo/zsh/bin/edit")
     run_edit() { "${edit_command[@]}" "$@"; }
-    # The same on a terminal, until it ends
-    on_terminal() {
+    # A command on a terminal, until it ends; what it wrote there is in
+    # terminal_output
+    terminal() {
       local chunk
       local -i tries=0
-      rm -f "$test_root/editor-args"
-      zpty -b edit-terminal "${(j: :)${(@q)edit_command}} ${(j: :)${(@q)argv}}"
-      while zpty -t edit-terminal 2> /dev/null; do
-        (( ++tries < 500 )) || fail "edit on a terminal never ended: $*"
-        zpty -r -t edit-terminal chunk 2> /dev/null || sleep 0.01
+      terminal_output=''
+      zpty -b on-terminal "$*"
+      while zpty -t on-terminal 2> /dev/null; do
+        (( ++tries < 500 )) || fail "never ended on a terminal: $*"
+        if zpty -r -t on-terminal chunk 2> /dev/null; then terminal_output+=$chunk; else sleep 0.01; fi
       done
-      zpty -d edit-terminal
+      while zpty -r -t on-terminal chunk 2> /dev/null; do terminal_output+=$chunk; done
+      zpty -d on-terminal
+    }
+    # edit on a terminal
+    on_terminal() {
+      rm -f "$test_root/editor-args"
+      terminal "${(j: :)${(@q)edit_command}} ${(j: :)${(@q)argv}}"
     }
     asked() { "$nvim_bin" --server "$socket" --remote-expr "$1" 2> /dev/null; }
     # The workspace's editor, serving the socket from the workspace's folder,
@@ -1078,6 +1085,13 @@ if [[ -n $nvim_bin ]]; then
     output=$(run_edit sub/a.txt:2 2>&1) || fail "edit without a pane to focus: $output"
     expect "edit: can't focus the editor's pane from here" "$output" 'edit without a pane to focus'
     expect sub/a.txt:2 "$(shows)" 'edit without a pane to focus'
+    # On a terminal, as typed in a workspace's shell, the same: the editor's
+    # answers never reach that terminal
+    print -r -- ID-44 > "$run/ws.ghostty"
+    on_terminal b.txt:3
+    [[ $terminal_output != *$'\e'* ]] || fail "edit wrote to its terminal: ${(q+)terminal_output}"
+    [[ $(recorded osascript-args) == *ID-44 ]] || fail "edit on a terminal focused no Ghostty pane: $(recorded osascript-args)"
+    expect b.txt:3 "$(shows)" 'edit on a terminal'
 
     # rgv's Enter, from any folder, has edit focus the editor, then hands it
     # the list of matching lines, at the chosen file's first; the editor's
@@ -1104,6 +1118,10 @@ if [[ -n $nvim_bin ]]; then
           "$(asked 'bufname() . ":" . line(".") . " " . getqflist({"title": 0}).title . " " . join(map(getqflist(), {_, item -> bufname(item.bufnr) . ":" . item.lnum}))')" \
           'rgv in a workspace'
         [[ $(recorded osascript-args) == *ID-43 ]] || fail 'rgv in a workspace focused no editor'
+        # On a terminal, as typed in a workspace's shell, the editor's answers
+        # never reach that terminal
+        terminal 'rgv needle ..'
+        [[ $terminal_output != *$'\e'* ]] || fail "rgv wrote to its terminal: ${(q+)terminal_output}"
         asked "execute('autocmd BufEnter * throw \"broken\"')" > /dev/null
         pick=1 rc=0
         rgv needle .. 2> "$test_root/rgv-error" || rc=$?

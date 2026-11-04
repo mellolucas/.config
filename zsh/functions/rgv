@@ -100,11 +100,12 @@ zf_mkdir -m 700 "$shelf" || return
   local load="call setqflist([], ' ', {'title': 'rgv', 'efm': \"%f\t%l\t%m,%f\t%l\t\", 'lines': map(readfile('$list'), {_, record -> substitute(record, '^[^\t]*', '\\=fnamemodify(submatch(0), \":.\")', '')})}) | cc $firsts[i]"
   local quoted=${load//\'/\'\'} error
   # In a workspace whose editor is running, edit focuses it, then it takes the
-  # list (config.workspace), as edit opens files
+  # list (config.workspace), as edit opens files; remote calls run headless, as
+  # edit's do, so their answers carry no terminal setup
   if [[ -n ${DOTFILES_EDITOR_SOCKET-} ]] && (( $+commands[nvim] )) &&
-      nvim --server "$DOTFILES_EDITOR_SOCKET" --remote-expr 1 > /dev/null 2>&1; then
+      nvim --headless --server "$DOTFILES_EDITOR_SOCKET" --remote-expr 1 > /dev/null 2>&1; then
     edit
-    error=$(nvim --server "$DOTFILES_EDITOR_SOCKET" --remote-expr "v:lua.require'config.workspace'.open(['$quoted'])") || return
+    error=$(nvim --headless --server "$DOTFILES_EDITOR_SOCKET" --remote-expr "v:lua.require'config.workspace'.open(['$quoted'])") || return
     [[ -z $error ]] || { print -r -u2 -- "rgv: $error"; return 1 }
   elif [[ ${editor[1]:t} == nvim ]]; then
     "${editor[@]}" -c "$load"

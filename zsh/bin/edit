@@ -46,10 +46,12 @@ for arg; do
   fi
 done
 
-# A live editor answers with its tmux pane, empty outside tmux
+# A live editor answers with its tmux pane, empty outside tmux. Remote calls
+# run headless: from a terminal, Neovim would start its own interface there,
+# whose setup and queries would mix with the answers
 local socket=${DOTFILES_EDITOR_SOCKET-} pane
 if [[ -z $socket ]] || (( ! $+commands[nvim] )) ||
-    ! pane=$(nvim --server "$socket" --remote-expr '$TMUX_PANE' 2> /dev/null); then
+    ! pane=$(nvim --headless --server "$socket" --remote-expr '$TMUX_PANE' 2> /dev/null); then
   here ${lines[1]:++$lines[1]} ${files:+--} "${files[@]}"
 fi
 
@@ -74,5 +76,5 @@ for (( i = $#files; i > 0; i-- )); do
   quoted=${${files[i]:a}//\'/\'\'}
   drops+=("'drop ${lines[i]:++$lines[i] }' .. fnameescape(fnamemodify('$quoted', ':.'))")
 done
-error=$(nvim --server "$socket" --remote-expr "v:lua.require'config.workspace'.open([${(j:, :)drops}])") || exit
+error=$(nvim --headless --server "$socket" --remote-expr "v:lua.require'config.workspace'.open([${(j:, :)drops}])") || exit
 [[ -z $error ]] || { print -r -u2 -- "edit: $error"; exit 1 }
