@@ -2,7 +2,9 @@
 # Homebrew policy shared by shell startup and the installer.
 
 # Non-admin macOS users install casks into ~/Applications, which Homebrew
-# creates; an explicit --appdir= in HOMEBREW_CASK_OPTS wins.
+# creates; an explicit --appdir= in HOMEBREW_CASK_OPTS wins. They also get
+# HOMEBREW_NO_SUDO, so brew turns down what needs an administrator up front
+# instead of asking for a password; an empty value opts out.
 # zsh and bash set OSTYPE without forking; other shells ask uname.
 # shellcheck disable=SC3028
 case "${OSTYPE:-$(uname -s)}" in
@@ -14,6 +16,7 @@ case "${OSTYPE:-$(uname -s)}" in
           *' --appdir='*|*" '--appdir="*|*' "--appdir='*) ;;
           *) export HOMEBREW_CASK_OPTS="--appdir=\"$HOME/Applications\"${HOMEBREW_CASK_OPTS:+ $HOMEBREW_CASK_OPTS}" ;;
         esac
+        [ -n "${HOMEBREW_NO_SUDO+set}" ] || export HOMEBREW_NO_SUDO=1
         ;;
     esac
     ;;

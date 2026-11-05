@@ -542,14 +542,25 @@ done < "$repo/zsh/.zshrc"
           expect '' "${(j:|:)mkdir_args}" "$label creates nothing"
         done
       done
+      # Only a non-admin Mac gets HOMEBREW_NO_SUDO, and only where it's unset:
+      # an empty value is the opt-out.
+      for no_sudo in unset '' 1 0; do
+        unset HOMEBREW_NO_SUDO
+        [[ $no_sudo == unset ]] || export HOMEBREW_NO_SUDO=$no_sudo
+        expected=$no_sudo
+        [[ $OSTYPE == darwin* && $groups == *admin-helper* && $no_sudo == unset ]] && expected=1
+        source "$repo/zsh/homebrew.sh"
+        expect "$expected" "${HOMEBREW_NO_SUDO-unset}" "sudo policy: $OSTYPE / $groups / ${(qqq)no_sudo}"
+      done
     done
   done
 
   (
     OSTYPE=darwin id_rc=1
-    unset HOMEBREW_CASK_OPTS
+    unset HOMEBREW_CASK_OPTS HOMEBREW_NO_SUDO
     source "$repo/zsh/homebrew.sh"
     expect "$default" "$HOMEBREW_CASK_OPTS" 'failed group lookup does not grant admin status'
+    expect 1 "${HOMEBREW_NO_SUDO-unset}" 'failed group lookup turns sudo off for brew'
   )
 
   # Containers get the lean Brewfile unless one is chosen: Codespaces and dev
