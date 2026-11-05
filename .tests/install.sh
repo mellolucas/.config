@@ -73,8 +73,10 @@ check test ! -e "$XDG_CONFIG_HOME"
 mkdir -p "$test_root/cli-home" "$test_root/cli-bin"
 cat > "$test_root/cli-bin/brew" <<'EOF'
 #!/bin/sh
-# Reading the prefix is not provisioning.
-[ "$*" = --prefix ] && { printf '%s\n' "$HOME/prefix"; exit 0; }
+# Reading the prefix or repository is not provisioning.
+case "$*" in
+  --prefix | --repository) printf '%s\n' "$HOME/prefix"; exit 0 ;;
+esac
 printf 'brew invoked\n' >> "$HOME/provision.log"
 exit 1
 EOF
@@ -284,6 +286,7 @@ case "$*" in
     printf '@scope/tool\nplain-tool\n'
     ;;
   --prefix) printf '%s\n' "$HOME/prefix" ;;
+  --repository) printf '%s\n' "${BREW_REPOSITORY:-$HOME/prefix}" ;;
   *) exit 1 ;;
 esac
 EOF
@@ -518,6 +521,28 @@ else
     check test -e "$XDG_STATE_HOME/dotfiles/updated"
     check test "$(grep -c '^invoked$' "$HOME/brew.log")" = 1
     if grep -Fq 'belongs to' "$HOME/own.log"; then fail "this account's own Homebrew was called another's"; fi
+  )
+  # Intel's layout: root owns the prefix, /usr/local, and this account owns
+  # the repository within it, so the Homebrew is this account's.
+  (
+    export HOME="$test_root/intel-home" PATH="$test_root/package-bin:$PATH"
+    export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+    export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+    export BREW_REPOSITORY="$HOME/prefix/Homebrew"
+    # shellcheck source=/dev/null
+    . "$test_root/library.sh"
+    repo_dir="$test_root/repo" installer="$test_root/repo/install.sh"
+    # shellcheck source=/dev/null
+    . "$repo_dir/zsh/xdg.sh"
+    brew_bin() { printf '%s\n' "$test_root/package-bin/brew"; }
+    path_owner() { printf 'root\n'; }
+    mkdir -p "$BREW_REPOSITORY" "$XDG_CONFIG_HOME/homebrew"
+    : > "$XDG_CONFIG_HOME/homebrew/Brewfile"
+    chmod a-w "$HOME/prefix"
+    (bundle_dotfiles) > "$HOME/bundle.log" 2>&1 || :
+    chmod u+w "$HOME/prefix"
+    if grep -Fq 'belongs to' "$HOME/bundle.log"; then fail "Intel's root-owned prefix was taken for another account's Homebrew: $(cat "$HOME/bundle.log")"; fi
+    check test "$(grep -c '^invoked$' "$HOME/brew.log")" = 1
   )
 fi
 
@@ -1088,7 +1113,7 @@ mkdir -p "$test_root/foreign-prefix" "$test_root/doctor-bin"
 cat > "$test_root/foreign-brew" <<'EOF'
 #!/bin/sh
 case "$*" in
-  --prefix) printf '%s\n' "$FOREIGN_PREFIX" ;;
+  --prefix | --repository) printf '%s\n' "$FOREIGN_PREFIX" ;;
   config) ;;
   *) exit 1 ;;
 esac

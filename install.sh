@@ -238,12 +238,14 @@ path_owner() { ls -ld "$1" 2>/dev/null | awk '{ print $3 }'; }
 
 # The account owning a Homebrew this one can't write, as where an administrator
 # manages it by design (Homebrew for Mac Admins): packages come from that
-# account. Fails for this account's own Homebrew, or none.
+# account. Its repository tells, not its prefix: on Intel, /usr/local belongs to
+# root while the account owns /usr/local/Homebrew. Fails for this account's own
+# Homebrew, or none.
 homebrew_owner() {
   brew=$(brew_bin) || return 1
-  prefix=$("$brew" --prefix 2>/dev/null) || return 1
-  [ -n "$prefix" ] && [ -d "$prefix" ] && [ ! -w "$prefix" ] || return 1
-  owner=$(path_owner "$prefix")
+  repository=$("$brew" --repository 2>/dev/null) || return 1
+  [ -n "$repository" ] && [ -d "$repository" ] && [ ! -w "$repository" ] || return 1
+  owner=$(path_owner "$repository")
   [ -n "$owner" ] && [ "$owner" != "$(id -un)" ] || return 1
   printf '%s\n' "$owner"
 }
