@@ -80,7 +80,7 @@ jobs:
       - name: Cut off macOS's notarization lookup
         run: |
           set -eu
-          echo '0.0.0.0 api.apple-cloudkit.com' | sudo tee -a /etc/hosts > /dev/null
+          printf '0.0.0.0 api.apple-cloudkit.com\n:: api.apple-cloudkit.com\n' | sudo tee -a /etc/hosts > /dev/null
           sudo dscacheutil -flushcache
           sudo killall -HUP mDNSResponder || :
 
