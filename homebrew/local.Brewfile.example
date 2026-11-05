@@ -19,8 +19,10 @@
 
 # App Store apps, for those sold only there or needing its build (bought there,
 # iCloud sync), on a Mac signed in to an Apple account, where the Brewfile
-# installs mas; installing asks for your password, and `mas search NAME` finds
-# an app's id. Apps on both stay casks, updated on your schedule.
+# installs mas. mas runs sudo to install them, so on an account that isn't an
+# administrator, list their ids in HOMEBREW_BUNDLE_MAS_SKIP or leave them out;
+# `mas search NAME` finds an app's id. Apps on both stay casks, updated on your
+# schedule.
 # mas "Xcode", id: 497799835
 
 # Desktop apps for the agents: they update themselves, and may keep files in
