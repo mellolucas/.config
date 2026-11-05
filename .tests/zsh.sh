@@ -583,9 +583,10 @@ done < "$repo/zsh/.zshrc"
 repo, root, zsh = ARGV
 homes = ["#{root}/ordinary", "#{root}/O'Brien home"]
 inputs = [nil, '--no-quarantine', '--appdir=/custom', '"--appdir=/custom with spaces" --no-quarantine']
-policy = 'id() { echo staff; }; mkdir() { :; }; . "$1/zsh/homebrew.sh"; printf "%s" "${HOMEBREW_CASK_OPTS-}"'
+# zsh sets OSTYPE at startup over the environment's, so the script sets it.
+policy = 'OSTYPE=darwin; id() { echo staff; }; mkdir() { :; }; . "$1/zsh/homebrew.sh"; printf "%s" "${HOMEBREW_CASK_OPTS-}"'
 [zsh, '/bin/sh'].product(homes, inputs).each do |shell, home, input|
-  env = { 'HOME' => home, 'OSTYPE' => 'darwin', 'HOMEBREW_CASK_OPTS' => input }
+  env = { 'HOME' => home, 'HOMEBREW_CASK_OPTS' => input }
   output, error, status = Open3.capture3(env, shell, '-f', '-c', policy, 'cask-test', repo)
   label = "#{shell}: #{home.inspect} / #{input.inspect}"
   abort "#{label}: #{error}" unless status.success? && error.empty?
