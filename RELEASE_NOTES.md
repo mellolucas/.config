@@ -160,8 +160,10 @@ Changes since `v0.0.1`.
 
 ### Validation
 
-`sh .tests/run` passes on macOS and in a Debian container; CI runs it on macOS
-and Ubuntu. Fresh-machine installs are not yet validated on Linux.
+`sh .tests/run` passes on macOS, and on Ubuntu in CI, with Homebrew's tools;
+with Debian 13's older shellcheck, fzf, and tmux, the checks that use them
+fail. On Linux, `get.sh` links a fresh home, but full installs are not yet
+validated.
 
 Known limits:
 
