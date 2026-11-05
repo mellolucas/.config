@@ -522,6 +522,24 @@ else
     check test "$(grep -c '^invoked$' "$HOME/brew.log")" = 1
     if grep -Fq 'belongs to' "$HOME/own.log"; then fail "this account's own Homebrew was called another's"; fi
   )
+  # Another account's Homebrew gets no npm config of this one's, even where a
+  # shared group, such as admin, can write its etc.
+  (
+    export HOME="$test_root/group-etc" PATH="$test_root/package-bin:$PATH"
+    export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+    export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+    # shellcheck source=/dev/null
+    . "$test_root/library.sh"
+    repo_dir="$test_root/repo" installer="$test_root/repo/install.sh"
+    brew_bin() { printf '%s\n' "$test_root/package-bin/brew"; }
+    path_owner() { printf 'admin1\n'; }
+    mkdir -p "$HOME/prefix/etc"
+    chmod a-w "$HOME/prefix"
+    (link_npm_global_config) > "$HOME/link.log" 2>&1 || :
+    chmod u+w "$HOME/prefix"
+    check test ! -e "$HOME/prefix/etc/npmrc"
+    check test ! -L "$HOME/prefix/etc/npmrc"
+  )
   # Intel's layout: root owns the prefix, /usr/local, and this account owns
   # the repository within it, so the Homebrew is this account's.
   (

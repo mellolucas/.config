@@ -222,8 +222,10 @@ brew_bin() {
 
 # npm reads its global config even when Homebrew hides the shell's
 # NPM_CONFIG_CACHE from the npm it runs for Brewfile entries. A Homebrew this
-# user cannot write belongs to another account and is left alone.
+# user cannot write belongs to another account and is left alone, even where a
+# shared group can write its etc.
 npm_global_config() {
+  ! homebrew_owner > /dev/null || return 1
   brew=$(brew_bin) || return 1
   prefix=$("$brew" --prefix 2>/dev/null) || return 1
   [ -n "$prefix" ] || return 1
