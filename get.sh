@@ -80,8 +80,10 @@ network_hint() {
 }
 
 # Linux needs git and zsh first. On macOS, Homebrew's installer adds the
-# Command Line Tools, Git among them, without the dialog git would open; when
-# Homebrew itself fails after that, install.sh reports what it skipped.
+# Command Line Tools, Git among them, without the dialog git would open; that
+# takes an administrator's account, so on another one an administrator sets
+# them up once. When Homebrew itself fails after that, install.sh reports what
+# it skipped.
 ensure_prerequisites() {
   if [ "$(uname -s)" != Darwin ]; then
     missing=
@@ -95,6 +97,14 @@ ensure_prerequisites() {
   fi
 
   has_git && return 0
+  case " $(id -Gn 2>/dev/null) " in
+    *' admin '*) ;;
+    *)
+      printf 'error: this account is not an administrator, so it cannot install the Command Line Tools, which bring Git\n' >&2
+      printf 'hint: an administrator sets them and Homebrew up for it once: see Standard accounts in the README (%s#standard-accounts); then run the same command again\n' "$url" >&2
+      return 1
+      ;;
+  esac
   homebrew_installer=https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh
   printf 'installing Homebrew, which adds the Command Line Tools and Git...\n'
   script=$(curl -fsSL "$homebrew_installer") || {

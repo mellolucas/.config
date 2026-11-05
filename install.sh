@@ -233,6 +233,21 @@ npm_global_config() {
   printf '%s/etc/npmrc\n' "$prefix"
 }
 
+# shellcheck disable=SC2012 # one folder's owner; stat's flags differ by system
+path_owner() { ls -ld "$1" 2>/dev/null | awk '{ print $3 }'; }
+
+# The account owning a Homebrew this one can't write, as where an administrator
+# manages it by design (Homebrew for Mac Admins): packages come from that
+# account. Fails for this account's own Homebrew, or none.
+homebrew_owner() {
+  brew=$(brew_bin) || return 1
+  prefix=$("$brew" --prefix 2>/dev/null) || return 1
+  [ -n "$prefix" ] && [ -d "$prefix" ] && [ ! -w "$prefix" ] || return 1
+  owner=$(path_owner "$prefix")
+  [ -n "$owner" ] && [ "$owner" != "$(id -un)" ] || return 1
+  printf '%s\n' "$owner"
+}
+
 # A plain file there is this machine's own npm config, the only one
 # Homebrew-run npm reads; links are this repo's to manage.
 link_npm_global_config() {
@@ -355,7 +370,11 @@ install_dotfiles() {
     bundle_skipped='  Homebrew, which could not be installed
   the Brewfile, which needs Homebrew
 '
-    print_skipped install
+    standard=
+    if is_darwin && ! is_admin; then
+      standard='this account is not an administrator: one sets Homebrew up for it once (see Standard accounts in the README)'
+    fi
+    print_skipped install "$standard"
   fi
 
   if [ -n "$bundle_skipped" ]; then
@@ -368,10 +387,18 @@ install_dotfiles() {
   [ -z "$bundle_skipped" ] || exit 1
 }
 
-# Lists what bundle_skipped names, then the command that retries it.
+# Lists what bundle_skipped names, any hint of the caller's, then the command
+# that retries it.
 print_skipped() {
   printf '\nskipped:\n%s' "$bundle_skipped" >&2
+  [ -z "${2-}" ] || printf 'hint: %s\n' "$2" >&2
   printf 'hint: if a download failed, see Network access in the README; then run: dotfiles %s\n' "$1" >&2
+}
+
+# The shell's weekly update reminder counts from the last complete bundle.
+record_update() {
+  { mkdir -p "$xdg_state_home/dotfiles" && touch "$xdg_state_home/dotfiles/updated"; } 2>/dev/null ||
+    printf 'note: could not record this update in %s for the weekly update reminder\n' "$xdg_state_home/dotfiles" >&2
 }
 
 # Follows `brew bundle --global` Brewfile resolution (HOMEBREW_BUNDLE_FILE_GLOBAL
@@ -383,6 +410,13 @@ bundle_dotfiles() {
     printf 'error: Homebrew is not installed. Run: dotfiles install\n' >&2
     exit 1
   }
+  bundle_skipped=
+  if owner=$(homebrew_owner); then
+    printf 'note: Homebrew in %s belongs to %s, so packages come from that account; the Brewfile is not applied\n' \
+      "$("$brew" --prefix 2>/dev/null)" "$owner"
+    record_update
+    return 0
+  fi
   # Bundle finds npm on the caller's PATH, which lacks Homebrew on fresh installs.
   PATH="${brew%/*}:$PATH"
 
@@ -427,9 +461,7 @@ bundle_dotfiles() {
     print_skipped bundle
     return 0
   fi
-  # The shell's weekly update reminder counts from the last full bundle
-  { mkdir -p "$xdg_state_home/dotfiles" && touch "$xdg_state_home/dotfiles/updated"; } 2>/dev/null ||
-    printf 'note: could not record this update in %s for the weekly update reminder\n' "$xdg_state_home/dotfiles" >&2
+  record_update
 }
 
 # repo_dir must be its own work-tree top level: rev-parse alone also succeeds
@@ -826,7 +858,7 @@ doctor_version() {
   case "$version_status" in
     0) doctor_ok "$1" "$2" ;;
     2) doctor_note "$1" "version unknown (want $3.$4 or newer)" ;;
-    *) doctor_problem "$1" "$2, older than $3.$4; run: $5" ;;
+    *) doctor_problem "$1" "$2, older than $3.$4; $5" ;;
   esac
 }
 
@@ -879,8 +911,16 @@ doctor_dotfiles() {
 
   # Any command that needs Homebrew's Ruby shows whether it runs; a network
   # that blocks its downloads can stop it while every host still answers.
+  package_fix=
   if ! brew=$(brew_bin 2>/dev/null); then
-    doctor_problem Homebrew 'missing; run: dotfiles install'
+    if is_darwin && ! is_admin; then
+      doctor_problem Homebrew 'missing; an administrator sets it up for this account once (see Standard accounts in the README), then run: dotfiles install'
+    else
+      doctor_problem Homebrew 'missing; run: dotfiles install'
+    fi
+  elif owner=$(homebrew_owner); then
+    doctor_note Homebrew "$(tilde "$brew") belongs to $owner, so packages come from that account"
+    package_fix="packages come from $owner"
   elif brew_error=$(HOMEBREW_NO_AUTO_UPDATE=1 "$brew" config 2>&1 >/dev/null); then
     doctor_ok Homebrew "$(tilde "$brew")"
   else
@@ -909,34 +949,34 @@ doctor_dotfiles() {
   fi
 
   if command -v ghostty >/dev/null 2>&1; then
-    doctor_version ghostty "$(ghostty +version 2>/dev/null | awk 'NR == 1 { print $2 }' || true)" 1 3 'brew upgrade ghostty'
+    doctor_version ghostty "$(ghostty +version 2>/dev/null | awk 'NR == 1 { print $2 }' || true)" 1 3 "${package_fix:-run: brew upgrade ghostty}"
   elif is_darwin; then
-    doctor_problem ghostty 'missing; run: dotfiles bundle'
+    doctor_problem ghostty "missing; ${package_fix:-run: dotfiles bundle}"
   fi
 
   if command -v nvim >/dev/null 2>&1; then
-    doctor_version nvim "$(nvim --version 2>/dev/null | awk 'NR == 1 { sub(/^v/, "", $2); print $2 }' || true)" 0 12 'brew upgrade neovim'
+    doctor_version nvim "$(nvim --version 2>/dev/null | awk 'NR == 1 { sub(/^v/, "", $2); print $2 }' || true)" 0 12 "${package_fix:-run: brew upgrade neovim}"
   else
-    doctor_problem nvim 'missing; run: dotfiles bundle'
+    doctor_problem nvim "missing; ${package_fix:-run: dotfiles bundle}"
   fi
 
   if command -v tmux >/dev/null 2>&1; then
     # Releases carry a letter (3.7c); development builds a prefix (next-3.8).
     # From 3.6, panes get truecolor and light/dark notifications by themselves.
-    doctor_version tmux "$(tmux -V 2>/dev/null | awk '{ sub(/^next-/, "", $2); sub(/[a-z]+$/, "", $2); print $2 }' || true)" 3 6 'brew upgrade tmux'
+    doctor_version tmux "$(tmux -V 2>/dev/null | awk '{ sub(/^next-/, "", $2); sub(/[a-z]+$/, "", $2); print $2 }' || true)" 3 6 "${package_fix:-run: brew upgrade tmux}"
   else
-    doctor_problem tmux 'missing; run: dotfiles bundle'
+    doctor_problem tmux "missing; ${package_fix:-run: dotfiles bundle}"
   fi
 
   # The workspace's default agent (ocode)
   if command_path=$(command -v opencode); then
     doctor_ok opencode "$(tilde "$command_path")"
   else
-    doctor_problem opencode 'missing; run: dotfiles bundle'
+    doctor_problem opencode "missing; ${package_fix:-run: dotfiles bundle}"
   fi
 
   if ! command -v gh >/dev/null 2>&1; then
-    doctor_problem 'GitHub CLI' 'missing; run: dotfiles bundle'
+    doctor_problem 'GitHub CLI' "missing; ${package_fix:-run: dotfiles bundle}"
   elif gh auth status >/dev/null 2>&1; then
     doctor_ok 'GitHub CLI' 'logged in'
   else
@@ -953,8 +993,10 @@ doctor_dotfiles() {
   if is_darwin; then
     if clt=$(xcode-select -p 2>/dev/null); then
       doctor_ok 'Xcode CLT' "$clt"
-    else
+    elif is_admin; then
       doctor_problem 'Xcode CLT' 'missing; run: xcode-select --install'
+    else
+      doctor_problem 'Xcode CLT' 'missing; an administrator installs them for this account (see Standard accounts in the README)'
     fi
     is_admin || doctor_note casks "go to $(tilde "$HOME/Applications"), as this user isn't an admin"
   fi

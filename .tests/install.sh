@@ -170,6 +170,50 @@ for failure in download installer; do
   check grep -Fq 'dotfiles doctor' "$log"
 done
 
+# Without Homebrew on a Mac account that isn't an administrator, the policy
+# keeps Homebrew's installer from asking for sudo (it installs only where an
+# administrator prepared the prefix), and the skipped list points to the
+# README's Standard accounts; an administrator's account gets neither.
+for account in standard admin; do
+  set +e
+  (
+    set -e
+    export HOME="$test_root/bootstrap-$account"
+    export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+    export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+    unset HOMEBREW_NO_SUDO HOMEBREW_CASK_OPTS
+    # shellcheck source=/dev/null
+    . "$test_root/library.sh"
+    repo_dir="$test_root/repo" installer="$test_root/repo/install.sh"
+    brew_bin() { return 1; }
+    is_darwin() { :; }
+    groups='staff admin everyone'
+    [ "$account" = admin ] || groups='staff everyone'
+    id() { if [ "$*" = -Gn ]; then printf '%s\n' "$groups"; else command id "$@"; fi; }
+    # shellcheck disable=SC2034 # the policy reads it
+    OSTYPE=darwin23
+    # shellcheck source=/dev/null
+    . "$repo_dir/zsh/homebrew.sh"
+    curl() {
+      # shellcheck disable=SC2016
+      printf '%s\n' 'printf "installer HOMEBREW_NO_SUDO=%s\n" "${HOMEBREW_NO_SUDO-unset}"; exit 1'
+    }
+    with_layout install_dotfiles
+  ) > "$test_root/bootstrap-$account.log" 2>&1
+  rc=$?
+  set -e
+  log="$test_root/bootstrap-$account.log"
+  [ "$rc" = 1 ] || fail "install without Homebrew on a $account account exited $rc: $(cat "$log")"
+  check grep -Fq 'Network access' "$log"
+  if [ "$account" = standard ]; then
+    check grep -Fqx 'installer HOMEBREW_NO_SUDO=1' "$log"
+    check grep -q '^hint: .*not an administrator.*Standard accounts' "$log"
+  else
+    check grep -Fqx 'installer HOMEBREW_NO_SUDO=unset' "$log"
+    if grep -Fq 'Standard accounts' "$log"; then fail 'an administrator was sent to Standard accounts'; fi
+  fi
+done
+
 with_layout install_dotfiles > "$test_root/install.log"
 check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
@@ -441,6 +485,41 @@ fi
     check test ! -L "$HOME/prefix/etc/npmrc"
   fi
 )
+
+# A Homebrew another account owns, as where an administrator manages it by
+# design, is left to that account: bundle says whose it is, runs nothing, and
+# counts as done for the update reminder. One this account owns but can't
+# write is no other account's: bundle goes ahead and Homebrew names the fix.
+if [ "$(id -u)" -eq 0 ]; then
+  printf "SKIP: another account's Homebrew in bundle (root writes anywhere)\n"
+else
+  (
+    export HOME="$test_root/foreign-home" PATH="$test_root/package-bin:$PATH"
+    export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+    export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+    # shellcheck source=/dev/null
+    . "$test_root/library.sh"
+    repo_dir="$test_root/repo" installer="$test_root/repo/install.sh"
+    # shellcheck source=/dev/null
+    . "$repo_dir/zsh/xdg.sh"
+    brew_bin() { printf '%s\n' "$test_root/package-bin/brew"; }
+    path_owner() { printf 'helpdesk\n'; }
+    mkdir -p "$HOME/prefix" "$XDG_CONFIG_HOME/homebrew"
+    : > "$XDG_CONFIG_HOME/homebrew/Brewfile"
+    chmod a-w "$HOME/prefix"
+    rc=0
+    (bundle_dotfiles && printf '%s' "$bundle_skipped" > "$HOME/skipped") > "$HOME/bundle.log" 2>&1 || rc=$?
+    path_owner() { id -un; }
+    (bundle_dotfiles) > "$HOME/own.log" 2>&1 || :
+    chmod u+w "$HOME/prefix"
+    [ "$rc" = 0 ] || fail "bundle with another account's Homebrew exited $rc: $(cat "$HOME/bundle.log")"
+    check test ! -s "$HOME/skipped"
+    check grep -Fq "Homebrew in $HOME/prefix belongs to helpdesk, so packages come from that account" "$HOME/bundle.log"
+    check test -e "$XDG_STATE_HOME/dotfiles/updated"
+    check test "$(grep -c '^invoked$' "$HOME/brew.log")" = 1
+    if grep -Fq 'belongs to' "$HOME/own.log"; then fail "this account's own Homebrew was called another's"; fi
+  )
+fi
 
 # Instructions of the user's own in an agent's home stay byte for byte, never
 # backed up, through link and uninstall; the other agents get the shared file,
@@ -1002,6 +1081,63 @@ if complete_doctor > "$test_root/doctor.log" 2>&1; then
 fi
 check doctor_says ✗ Brewfile "$test_root/Brewfile" HOMEBREW_BUNDLE_FILE_GLOBAL
 
+# Another account's Homebrew is a note naming it, and the packages missing or
+# too old there come from that account, not dotfiles bundle.
+: > "$test_root/Brewfile"
+mkdir -p "$test_root/foreign-prefix" "$test_root/doctor-bin"
+cat > "$test_root/foreign-brew" <<'EOF'
+#!/bin/sh
+case "$*" in
+  --prefix) printf '%s\n' "$FOREIGN_PREFIX" ;;
+  config) ;;
+  *) exit 1 ;;
+esac
+EOF
+printf '#!/bin/sh\nexit 2\n' > "$test_root/doctor-bin/xcode-select"
+chmod +x "$test_root/foreign-brew" "$test_root/doctor-bin/xcode-select"
+if [ "$(id -u)" -eq 0 ]; then
+  printf "SKIP: another account's Homebrew in doctor (root writes anywhere)\n"
+else
+  chmod a-w "$test_root/foreign-prefix"
+  (
+    PATH="$HOME/.local/bin:/usr/bin:/bin"
+    export FOREIGN_PREFIX="$test_root/foreign-prefix"
+    # shellcheck disable=SC2034 # read by the sourced doctor_dotfiles
+    HOMEBREW_BUNDLE_FILE_GLOBAL="$test_root/Brewfile"
+    brew_bin() { printf '%s\n' "$test_root/foreign-brew"; }
+    path_owner() { printf 'helpdesk\n'; }
+    is_darwin() { return 1; }
+    login_shell() { printf '/usr/bin/zsh\n'; }
+    gh() { :; }
+    tmux() { printf 'tmux 3.5a\n'; }
+    git_identity() { :; }
+    with_layout doctor_dotfiles
+  ) > "$test_root/doctor.log" 2>&1 || :
+  chmod u+w "$test_root/foreign-prefix"
+  check doctor_says ! Homebrew 'belongs to helpdesk' 'packages come from that account'
+  check doctor_says ✗ tmux 3.5 3.6 'packages come from helpdesk'
+  if [ -x /usr/bin/nvim ] || [ -x /bin/nvim ]; then
+    printf 'SKIP: doctor without Neovim (the system has one)\n'
+  else
+    check doctor_says ✗ nvim missing 'packages come from helpdesk'
+  fi
+  if grep -Fq 'dotfiles bundle' "$test_root/doctor.log"; then fail "doctor sent another account's packages to dotfiles bundle"; fi
+fi
+# A Mac account that isn't an administrator, without Homebrew or the Command
+# Line Tools, is told an administrator sets them up, not to install them.
+(
+  PATH="$test_root/doctor-bin:/usr/bin:/bin"
+  brew_bin() { return 1; }
+  is_darwin() { :; }
+  is_admin() { return 1; }
+  login_shell() { printf '/bin/zsh\n'; }
+  git_identity() { :; }
+  with_layout doctor_dotfiles
+) > "$test_root/doctor.log" 2>&1 || :
+check doctor_says ✗ Homebrew missing administrator 'Standard accounts' 'dotfiles install'
+check doctor_says ✗ 'Xcode CLT' missing administrator 'Standard accounts'
+check doctor_says ! casks Applications
+
 # Codespaces and dev containers install unattended in bash: install switches
 # the login shell to zsh through passwordless sudo, and nowhere else.
 (
@@ -1028,7 +1164,8 @@ check doctor_says ✗ Brewfile "$test_root/Brewfile" HOMEBREW_BUNDLE_FILE_GLOBAL
 # get.sh runs as its one-liner does, from zsh, bash, or sh, and from dash,
 # Debian's sh. Git's own URL rewriting points its clone at a local seed, and
 # stand-ins answer for curl (serving Homebrew's installer), brew, npm,
-# xcode-select, uname (Darwin unless a check says Linux), and git, which asks
+# xcode-select, uname (Darwin unless a check says Linux), id (an
+# administrator's groups unless a check says otherwise), and git, which asks
 # for the Command Line Tools until they are there, as macOS's /usr/bin/git does.
 get="$repo/get.sh"
 get_url=https://github.com/mellolucas/.config
@@ -1083,8 +1220,14 @@ cat > "$test_root/get-bin/uname" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$UNAME"
 EOF
+cat > "$test_root/get-bin/id" <<'EOF'
+#!/bin/sh
+[ "$*" != -Gn ] || { printf '%s\n' "$ID_GROUPS"; exit 0; }
+exec /usr/bin/id "$@"
+EOF
 chmod +x "$test_root/get-bin/curl" "$test_root/get-bin/xcode-select" \
-  "$test_root/get-bin/git" "$test_root/get-bin/brew" "$test_root/get-bin/uname"
+  "$test_root/get-bin/git" "$test_root/get-bin/brew" "$test_root/get-bin/uname" \
+  "$test_root/get-bin/id"
 ln -s "$test_root/package-bin/npm" "$test_root/get-bin/npm"
 mkdir -p "$test_root/get-clt/usr/bin"
 ln -s "$REAL_GIT" "$test_root/get-clt/usr/bin/git"
@@ -1096,6 +1239,7 @@ run_get() (
   unset DOTFILES_DIR XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME \
     FAIL_BUNDLE FAIL_CURL HOMEBREW_BUNDLE_NO_UPGRADE NONINTERACTIVE BASH_ENV ENV
   export GET="$get" UNAME=Darwin CLT="$test_root/get-clt" PATH="$test_root/get-bin:$PATH" \
+    ID_GROUPS='staff admin everyone' \
     GIT_ALLOW_PROTOCOL=file GIT_CONFIG_COUNT=1 \
     GIT_CONFIG_KEY_0="url.file://$seed.insteadOf" GIT_CONFIG_VALUE_0="$get_url"
   # shellcheck disable=SC2163 # each is NAME=VALUE
@@ -1305,6 +1449,17 @@ check test "$rc" = 1
 check grep -Fq "$get_url#network-access" "$home.log"
 check test ! -e "$home/code/mellolucas/.config"
 check test ! -e "$home/.local"
+
+# A Mac account that isn't an administrator can't install the Command Line
+# Tools: get.sh runs no installer, points to the README's Standard accounts,
+# and installs nothing.
+home="$test_root/get-standard"
+rc=0
+run_get HOME="$home" CLT="$home.clt" ID_GROUPS='staff everyone' zsh > "$home.log" 2>&1 || rc=$?
+check test "$rc" = 1
+check grep -q '^error: .*not an administrator.*Command Line Tools' "$home.log"
+check grep -Fq "$get_url#standard-accounts" "$home.log"
+check test -z "$(ls -A "$home")"
 
 # A download cut short runs nothing: cut before the last line, it only
 # defines functions; cut within that line, it is a syntax error.
