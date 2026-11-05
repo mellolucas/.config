@@ -34,19 +34,22 @@ setopt hist_verify
 setopt extended_history
 
 # ---- Completion ----
-# Demote brew site-functions so zsh's native _git (with descriptions) beats brew's bash-completion wrapper
+# Demote brew site-functions so zsh's native _git (with descriptions) beats brew's bash-completion wrapper,
+# keeping them only where zsh's own audit trusts them: compinit would ask about
+# another account's, as where an administrator manages Homebrew, in every shell
+autoload -Uz compinit compaudit
 _brew_site_functions=${HOMEBREW_PREFIX:-/opt/homebrew}/share/zsh/site-functions
 fpath=(${fpath:#$_brew_site_functions})
-[[ -d $_brew_site_functions ]] && fpath+=("$_brew_site_functions")
+[[ -d $_brew_site_functions ]] && compaudit "$_brew_site_functions" &> /dev/null &&
+  fpath+=("$_brew_site_functions")
 unset _brew_site_functions
 
-autoload -Uz compinit
 compinit -d "$XDG_CACHE_HOME/zsh/zcompdump"
 # Completion caches (Homebrew's _brew turns them on) go beside the dump, not to
 # zsh's default, ZDOTDIR, which is this repository's zsh folder
 zstyle ':completion:*' cache-path "$XDG_CACHE_HOME/zsh/zcompcache"
 # zsh's SCCS completion claims delta ahead of git-delta's, demoted above
-(( $+commands[delta] )) && compdef _delta delta
+(( $+functions[compdef] && $+commands[delta] )) && compdef _delta delta
 # rgv takes rg's options and paths
 (( $+_comps[rg] )) && compdef rgv=rg
 # Include dotfiles in completion without changing ordinary wildcard expansion.

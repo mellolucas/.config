@@ -1426,6 +1426,20 @@ if (( $#brews )); then
 else
   print -r -- 'SKIP: login PATH order (Homebrew not installed)'
 fi
+# Homebrew completions zsh's own audit rejects, as it does another account's,
+# stay out of fpath, so compinit asks nothing and completes; trusted ones come
+# last. World-writable stands in for another owner, which needs root.
+fixture_brew=$test_root/brew-completions
+/bin/mkdir -p "$fixture_brew/share/zsh/site-functions"
+print -r -- '#compdef fixture-tool' > "$fixture_brew/share/zsh/site-functions/_fixture-tool"
+for mode trusted in 755 1 777 0; do
+  /bin/chmod $mode "$fixture_brew/share/zsh/site-functions"
+  completion_out=$(cd "$startup_home" && /usr/bin/env -i HOME="$startup_home" TERM=xterm-256color \
+    HOMEBREW_PREFIX="$fixture_brew" PATH=/usr/bin:/bin:/usr/sbin:/sbin "$zsh_bin" -ic \
+    'print -r -- $(( fpath[(I)$HOMEBREW_PREFIX/share/zsh/site-functions] == $#fpath )) $+functions[compdef]' 2>&1 < /dev/null)
+  expect "$trusted 1" "$completion_out" "Homebrew completions in a folder of mode $mode"
+done
+/bin/chmod 755 "$fixture_brew/share/zsh/site-functions"
 # From Ghostty over SSH: a host without its terminfo entry gets xterm-256color,
 # which tmux accepts; an entry on the host, or Ghostty's TERMINFO, keeps it.
 /bin/mkdir -p "$test_root/terminfo"
