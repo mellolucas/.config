@@ -15,6 +15,11 @@ Changes since `v0.0.1`.
   reminds you to run `dotsup`. `dotfiles doctor` marks each check and names a
   fix for each problem, from a missing Git identity to a Homebrew that can't
   run, and notes stray hidden files in `$HOME`.
+- **Standard accounts:** on a Mac account that isn't an administrator, `brew`
+  never asks for sudo, and `get.sh`, `install`, and `dotfiles doctor` say what
+  an administrator sets up once, as Homebrew's own guides describe. A Homebrew
+  another account owns, as where an administrator manages it, is named as
+  where packages come from, not treated as broken.
 - **A field guide:** `keys start` shows the essentials in a minute; `keys`
   browses the guide's pages with a preview and searches every line as you
   type; `keys TOPIC` and `keys WORDS` work from the prompt, and

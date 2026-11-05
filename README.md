@@ -16,7 +16,7 @@ On a Mac, these install the setup, start a shell that has it, and show the essen
 
 macOS is the primary platform; Linux, WSL, and GitHub Codespaces get best-effort support for the essentials, with tmux where Ghostty is absent ([Without Ghostty](#without-ghostty)), and fresh Linux installs aren't validated yet.
 
-`get.sh` clones this repository to `~/code/mellolucas/.config` and runs its installer; on a Mac without the Command Line Tools, Homebrew's installer adds them, Git included, first. If something fails, run the same command again: it reuses the checkout. Keep the `sh -c` form, which leaves Homebrew's installer a terminal to ask for your password.
+`get.sh` clones this repository to `~/code/mellolucas/.config` and runs its installer; on a Mac without the Command Line Tools, Homebrew's installer adds them, Git included, first, when your account is an administrator ([Standard accounts](#standard-accounts) covers the others). If something fails, run the same command again: it reuses the checkout. Keep the `sh -c` form, which leaves Homebrew's installer a terminal to ask for your password.
 
 - To clone elsewhere, start the command with `DOTFILES_DIR=~/path/to/checkout`, outside `$XDG_CONFIG_HOME` (normally `~/.config`), which the installer links into.
 - To set up only the configuration (as root on a server, or on Alpine), end the command with `-- link`: arguments after `--` go to the installer.
@@ -35,6 +35,12 @@ Installation links each configuration directory into `$XDG_CONFIG_HOME`, adds th
 ### Linux and WSL
 
 Install Git and zsh first; on Ubuntu and WSL, `sudo apt install zsh build-essential procps curl file git` covers Homebrew's needs too. On WSL, keep the checkout in the Linux file system, not under `/mnt/c`. After installing, make zsh your login shell: `chsh -s "$(command -v zsh)"`.
+
+### Standard accounts
+
+On a Mac account that isn't an administrator, an administrator sets up two things once: the Command Line Tools, and a Homebrew your account owns, as Homebrew's guides describe ([Installation](https://docs.brew.sh/Installation#running-without-sudo), [Homebrew for Mac Admins](https://docs.brew.sh/Homebrew-for-Mac-Admins)). Its package, `Homebrew.pkg`, makes the account logged in at the Mac's screen the owner, whoever runs it, while its shell installer makes the account running it the owner. `Homebrew.pkg` has no notarization ticket attached, so where a network blocks macOS's online check, macOS refuses a copy downloaded in a browser: choose Open Anyway in System Settings › Privacy & Security, or run `sudo installer -pkg Homebrew.pkg -target /` in Terminal. Then run the command above from your account.
+
+On such an account, casks go to `~/Applications` and `brew` never asks for sudo, so casks that run an installer package, and App Store apps, come from an administrator. Where Homebrew belongs to another account by design, packages come from that account, and `dotfiles doctor` says whose it is.
 
 ### Package sets
 
@@ -112,7 +118,7 @@ Notes:
 - What a zsh reads depends on how it starts: every zsh reads `~/.zshenv` (the XDG layout, tool homes, and `~/.local/bin`), login shells add `zsh/.zprofile` (Homebrew's `PATH`), and interactive shells add `zsh/.zshrc`, which sets up Homebrew too and loads `zsh/local.zsh` last. A plain `zsh -c` that an app starts (some agents and editors) therefore gets neither Homebrew's `PATH` nor `local.zsh` unless it inherits them, and `zsh -lc` gets Homebrew but not `local.zsh`.
 - `git config --global` writes to the tracked `git/config`; use `git config --file "$XDG_CONFIG_HOME/git/config.d/local"` for machine settings.
 - zsh ignores `~/.zshrc` and `~/.zprofile`, as this setup sets `ZDOTDIR`; `dotfiles doctor` flags them so their lines can move to `zsh/local.zsh`.
-- Non-admin macOS users get casks in `~/Applications`; an explicit `--appdir=` in `HOMEBREW_CASK_OPTS` wins.
+- On a Mac account that isn't an administrator, this setup's shells and `dotfiles` commands send casks to `~/Applications` (an explicit `--appdir=` in `HOMEBREW_CASK_OPTS` wins) and set `HOMEBREW_NO_SUDO` (an empty value opts out).
 - Git 2.35 or newer is required for the `zdiff3` merge conflict style.
 - Homebrew's `python3` refuses global `pip install`; use `python3 -m venv` for packages. Plain `python` is not linked.
 - OpenCode saves settings changed in its interface to the tracked `opencode/cli.json`; commit or discard them like any edit, or keep machine-only ones in `OPENCODE_CLI_CONFIG_CONTENT` (JSON, exported in `zsh/local.zsh`). Its `service.json` holds a per-machine password and stays ignored.
