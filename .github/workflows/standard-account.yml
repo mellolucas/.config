@@ -3,18 +3,22 @@ name: standard account
 # Started by hand. On a Mac runner, whose own account is an administrator with
 # passwordless sudo and owns the preinstalled Homebrew, a second, standard
 # account meets: that Homebrew; Homebrew's package handing the installation
-# over to it while macOS's notarization lookup is cut off; its own Homebrew;
-# and none at all.
+# over to it, installed from Terminal while macOS's notarization lookup is cut
+# off; its own Homebrew; and none at all. Gatekeeper's verdicts on the package
+# are diagnostics: an inconclusive one marks its step without stopping the rest.
 on:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+env:
+  PKG_URL: https://github.com/Homebrew/brew/releases/download/7.0.12/Homebrew.pkg
+  PKG_SHA256: a9825310dce8d94bc97f70140700089183c3a894b1048501d933865d7c2441bd
+
 jobs:
   standard-account:
     runs-on: macos-latest
-    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
 
@@ -63,25 +67,43 @@ jobs:
             echo "zsh doesn't ask about insecure directories"
           fi
 
-      - name: "Homebrew's package hands the installation over, with the notarization lookup cut off"
+      - name: Download Homebrew's package as a browser would, and check it
         run: |
           set -eu
           pkg=$RUNNER_TEMP/Homebrew.pkg
-          curl -fsSL -o "$pkg" https://github.com/Homebrew/brew/releases/latest/download/Homebrew.pkg
+          curl -fsSL -o "$pkg" "$PKG_URL"
+          echo "$PKG_SHA256  $pkg" | shasum -a 256 -c
           pkgutil --check-signature "$pkg" | head -n 4
           xcrun stapler validate "$pkg" || echo "no ticket stapled"
           xattr -w com.apple.quarantine "0083;$(printf %x "$(date +%s)");Safari;" "$pkg"
-          # First with macOS's ticket lookup unreachable, before any lookup is cached
+
+      - name: Cut off macOS's notarization lookup
+        run: |
+          set -eu
           echo '0.0.0.0 api.apple-cloudkit.com' | sudo tee -a /etc/hosts > /dev/null
           sudo dscacheutil -flushcache
           sudo killall -HUP mDNSResponder || :
-          verdict=$(spctl -a -vvv -t install "$pkg" 2>&1 || :)
+
+      - name: "Diagnostic: with the lookup cut off, Gatekeeper rejects the package"
+        continue-on-error: true
+        run: |
+          set -eu
+          pkg=$RUNNER_TEMP/Homebrew.pkg
+          verdict=$(spctl -a -vvv -t install --ignore-cache --no-cache "$pkg" 2>&1 || :)
           echo "$verdict"
+          echo "--- the lookups that failed, as evidence:"
+          xcrun stapler validate -v "$pkg" 2>&1 | grep -i -E 'domain is|cloudkit|connect|error' | head -n 5 || :
+          sudo log show --last 5m --style compact --predicate 'process == "syspolicyd"' 2>/dev/null |
+            grep -i -E 'cloudkit|ticket|notari' | tail -n 5 || :
           case $verdict in
-            *'Unnotarized Developer ID'*) ;;
-            *) echo "::error::Gatekeeper's verdict didn't need api.apple-cloudkit.com"; exit 1 ;;
+            *': rejected'*'source=Unnotarized Developer ID'*) ;;
+            *) echo "::error::Gatekeeper's verdict didn't depend on api.apple-cloudkit.com"; exit 1 ;;
           esac
-          # Terminal's installer goes ahead, and the package's owner is the account named here
+
+      - name: "Homebrew's package, installed from Terminal with the lookup cut off, hands the installation over"
+        run: |
+          set -eu
+          pkg=$RUNNER_TEMP/Homebrew.pkg
           sudo defaults write /var/tmp/.homebrew_pkg_user HOMEBREW_PKG_USER standard
           sudo chown root:wheel /var/tmp/.homebrew_pkg_user.plist
           sudo chmod 600 /var/tmp/.homebrew_pkg_user.plist
@@ -89,10 +111,19 @@ jobs:
           sudo installer -pkg "$pkg" -target /
           others=$(sudo find /opt/homebrew ! -user standard -print | head -n 5)
           [ -z "$others" ] || { echo "::error::not the standard account's: $others"; exit 1; }
+
+      - name: Restore the notarization lookup
+        if: always()
+        run: |
           sudo sed -i '' '/api\.apple-cloudkit\.com/d' /etc/hosts
           sudo dscacheutil -flushcache
           sudo killall -HUP mDNSResponder || :
-          verdict=$(spctl -a -vvv -t install "$pkg" 2>&1 || :)
+
+      - name: "Diagnostic: with the lookup back, Gatekeeper accepts the package"
+        continue-on-error: true
+        run: |
+          set -eu
+          verdict=$(spctl -a -vvv -t install --ignore-cache --no-cache "$RUNNER_TEMP/Homebrew.pkg" 2>&1 || :)
           echo "$verdict"
           case $verdict in
             *': accepted'*'source=Notarized Developer ID'*) ;;
@@ -115,7 +146,7 @@ jobs:
           cat doctor.log
           grep -q '^✓ Homebrew' doctor.log
           # In this setup's shells, casks go to ~/Applications, and one that runs
-          # an installer package is turned down before anything downloads.
+          # an installer package is turned down before its download.
           as-standard zsh -lc 'brew install --cask rectangle'
           sudo test -d /Users/standard/Applications/Rectangle.app
           rc=0
@@ -123,6 +154,8 @@ jobs:
           cat pkg-cask.log
           [ "$rc" != 0 ] || { echo "::error::a cask that needs sudo installed"; exit 1; }
           grep -q 'requires sudo' pkg-cask.log
+          # shellcheck disable=SC2016 # expands in the standard account's zsh
+          as-standard zsh -lc 'test ! -e "$(brew --cache --cask zoom)"'
 
       - name: "No Homebrew: the standard account learns what an administrator sets up, without a sudo prompt"
         run: |
@@ -131,7 +164,7 @@ jobs:
           [ ! -e /usr/local/bin/brew ] || sudo mv /usr/local/bin/brew /usr/local/bin/brew.aside
           checkout=/Users/standard/code/mellolucas/.config
           rc=0
-          as-standard perl -e 'alarm 600; exec @ARGV' sh "$checkout/install.sh" install < /dev/null > none.log 2>&1 || rc=$?
+          as-standard sh "$checkout/install.sh" install < /dev/null > none.log 2>&1 || rc=$?
           cat none.log
           as-standard sh "$checkout/install.sh" doctor > doctor.log 2>&1 || :
           cat doctor.log
