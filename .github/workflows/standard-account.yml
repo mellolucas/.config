@@ -1,0 +1,145 @@
+name: standard account
+
+# Started by hand. On a Mac runner, whose own account is an administrator with
+# passwordless sudo and owns the preinstalled Homebrew, a second, standard
+# account meets: that Homebrew; Homebrew's package handing the installation
+# over to it while macOS's notarization lookup is cut off; its own Homebrew;
+# and none at all.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  standard-account:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Create a standard account with a copy of this checkout
+        run: |
+          set -eu
+          sudo sysadminctl -addUser standard -fullName Standard -password "$(openssl rand -hex 16)" -home /Users/standard
+          sudo createhomedir -c -u standard > /dev/null
+          groups=$(id -Gn standard)
+          echo "standard's groups: $groups"
+          case " $groups " in
+            *' admin '*) echo "::error::the standard account is an administrator"; exit 1 ;;
+          esac
+          sudo mkdir -p /Users/standard/code/mellolucas
+          sudo cp -R "$GITHUB_WORKSPACE" /Users/standard/code/mellolucas/.config
+          sudo chown -R standard:staff /Users/standard/code
+          # Runs a command as the standard account, from an empty environment.
+          cat > "$RUNNER_TEMP/as-standard" <<'EOF'
+          #!/bin/sh
+          exec sudo -u standard env -i HOME=/Users/standard USER=standard LOGNAME=standard \
+            SHELL=/bin/zsh LANG=en_US.UTF-8 HOMEBREW_NO_AUTO_UPDATE=1 \
+            PATH=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/as-standard"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: "The administrator's Homebrew: packages come from that account"
+        run: |
+          set -eu
+          ls -ld /opt/homebrew
+          checkout=/Users/standard/code/mellolucas/.config
+          rc=0
+          as-standard sh "$checkout/install.sh" install < /dev/null > owned.log 2>&1 || rc=$?
+          cat owned.log
+          [ "$rc" = 0 ] || { echo "::error::install exited $rc"; exit 1; }
+          grep -q 'belongs to runner, so packages come from that account' owned.log
+          sudo test -L /Users/standard/.zshenv
+          as-standard sh "$checkout/install.sh" doctor > doctor.log 2>&1 || :
+          cat doctor.log
+          grep -q '^! Homebrew .*belongs to runner' doctor.log
+          # Recorded, not required: zsh's completion check and folders another account owns
+          as-standard script -q /dev/null zsh -i -c 'print started' < /dev/null > zsh.log 2>&1 || :
+          if grep -q 'insecure directories' zsh.log; then
+            echo "zsh asks about insecure directories"
+          else
+            echo "zsh doesn't ask about insecure directories"
+          fi
+
+      - name: "Homebrew's package hands the installation over, with the notarization lookup cut off"
+        run: |
+          set -eu
+          pkg=$RUNNER_TEMP/Homebrew.pkg
+          curl -fsSL -o "$pkg" https://github.com/Homebrew/brew/releases/latest/download/Homebrew.pkg
+          pkgutil --check-signature "$pkg" | head -n 4
+          xcrun stapler validate "$pkg" || echo "no ticket stapled"
+          xattr -w com.apple.quarantine "0083;$(printf %x "$(date +%s)");Safari;" "$pkg"
+          # First with macOS's ticket lookup unreachable, before any lookup is cached
+          echo '0.0.0.0 api.apple-cloudkit.com' | sudo tee -a /etc/hosts > /dev/null
+          sudo dscacheutil -flushcache
+          sudo killall -HUP mDNSResponder || :
+          verdict=$(spctl -a -vvv -t install "$pkg" 2>&1 || :)
+          echo "$verdict"
+          case $verdict in
+            *'Unnotarized Developer ID'*) ;;
+            *) echo "::error::Gatekeeper's verdict didn't need api.apple-cloudkit.com"; exit 1 ;;
+          esac
+          # Terminal's installer goes ahead, and the package's owner is the account named here
+          sudo defaults write /var/tmp/.homebrew_pkg_user HOMEBREW_PKG_USER standard
+          sudo chown root:wheel /var/tmp/.homebrew_pkg_user.plist
+          sudo chmod 600 /var/tmp/.homebrew_pkg_user.plist
+          sudo chmod -N /var/tmp/.homebrew_pkg_user.plist
+          sudo installer -pkg "$pkg" -target /
+          others=$(sudo find /opt/homebrew ! -user standard -print | head -n 5)
+          [ -z "$others" ] || { echo "::error::not the standard account's: $others"; exit 1; }
+          sudo sed -i '' '/api\.apple-cloudkit\.com/d' /etc/hosts
+          sudo dscacheutil -flushcache
+          sudo killall -HUP mDNSResponder || :
+          verdict=$(spctl -a -vvv -t install "$pkg" 2>&1 || :)
+          echo "$verdict"
+          case $verdict in
+            *': accepted'*'source=Notarized Developer ID'*) ;;
+            *) echo "::error::Gatekeeper didn't accept the package with the lookup back"; exit 1 ;;
+          esac
+
+      - name: The standard account installs with its own Homebrew
+        run: |
+          set -eu
+          checkout=/Users/standard/code/mellolucas/.config
+          as-standard brew --version
+          as-standard brew install hello
+          as-standard /opt/homebrew/bin/hello
+          rc=0
+          as-standard env HOMEBREW_BUNDLE_FILE_GLOBAL=/Users/standard/.config/homebrew/core.Brewfile \
+            sh "$checkout/install.sh" install < /dev/null > own.log 2>&1 || rc=$?
+          cat own.log
+          [ "$rc" = 0 ] || { echo "::error::install exited $rc"; exit 1; }
+          as-standard sh "$checkout/install.sh" doctor > doctor.log 2>&1 || :
+          cat doctor.log
+          grep -q '^✓ Homebrew' doctor.log
+          # In this setup's shells, casks go to ~/Applications, and one that runs
+          # an installer package is turned down before anything downloads.
+          as-standard zsh -lc 'brew install --cask rectangle'
+          sudo test -d /Users/standard/Applications/Rectangle.app
+          rc=0
+          as-standard zsh -lc 'brew install --cask zoom' > pkg-cask.log 2>&1 || rc=$?
+          cat pkg-cask.log
+          [ "$rc" != 0 ] || { echo "::error::a cask that needs sudo installed"; exit 1; }
+          grep -q 'requires sudo' pkg-cask.log
+
+      - name: "No Homebrew: the standard account learns what an administrator sets up, without a sudo prompt"
+        run: |
+          set -eu
+          sudo mv /opt/homebrew /opt/homebrew.aside
+          [ ! -e /usr/local/bin/brew ] || sudo mv /usr/local/bin/brew /usr/local/bin/brew.aside
+          checkout=/Users/standard/code/mellolucas/.config
+          rc=0
+          as-standard perl -e 'alarm 600; exec @ARGV' sh "$checkout/install.sh" install < /dev/null > none.log 2>&1 || rc=$?
+          cat none.log
+          as-standard sh "$checkout/install.sh" doctor > doctor.log 2>&1 || :
+          cat doctor.log
+          [ "$rc" = 1 ] || { echo "::error::install exited $rc"; exit 1; }
+          grep -q 'Insufficient permissions' none.log
+          grep -q 'not an administrator.*Standard accounts' none.log
+          if grep -q 'Checking for .sudo. access' none.log; then
+            echo "::error::Homebrew's installer tried sudo"
+            exit 1
+          fi
+          grep -q '^✗ Homebrew .*administrator' doctor.log
