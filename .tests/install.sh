@@ -553,7 +553,7 @@ else
     # shellcheck source=/dev/null
     . "$repo_dir/zsh/xdg.sh"
     brew_bin() { printf '%s\n' "$test_root/package-bin/brew"; }
-    path_owner() { printf 'root\n'; }
+    path_owner() { if [ "$1" = "$HOME/prefix" ]; then printf 'root\n'; else id -un; fi; }
     mkdir -p "$BREW_REPOSITORY" "$XDG_CONFIG_HOME/homebrew"
     : > "$XDG_CONFIG_HOME/homebrew/Brewfile"
     chmod a-w "$HOME/prefix"
