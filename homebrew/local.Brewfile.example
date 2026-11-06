@@ -1,6 +1,6 @@
 # Optional machine/project tools. Copy to local.Brewfile and enable what you use.
-# Editor tools, Go, Node, Bun, Python, OpenCode, Claude Code, Copilot CLI and
-# Codex are shared.
+# Editor tools, Go, Node, Bun, Python, OpenCode, Claude Code, Copilot CLI,
+# Codex, and the GitHub Copilot app are shared.
 
 # Alternative workspace agents (workspace --agent 'kiro-cli chat')
 # cask "kiro-cli" if OS.mac?
@@ -25,7 +25,7 @@
 # schedule.
 # mas "Xcode", id: 497799835
 
-# Desktop apps for the agents: they update themselves, and may keep files in
+# The other agents' desktop apps: they update themselves, and may keep files in
 # ~/.claude and ~/.codex rather than the agents' XDG homes
 # cask "claude" if OS.mac?
 # cask "chatgpt" if OS.mac?

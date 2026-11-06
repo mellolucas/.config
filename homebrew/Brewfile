@@ -23,6 +23,9 @@ cask "claude-code" if OS.mac?
 # Their casks are unnotarized, so macOS blocks them; npm installs are not quarantined
 npm "@github/copilot"
 npm "@openai/codex"
+# Copilot outside the terminal (automations, Projects, computer use), sharing
+# Copilot CLI's ~/.copilot; it updates itself
+cask "github-copilot-app" if OS.mac?
 
 cask "obsidian" if OS.mac?
 
