@@ -1,0 +1,408 @@
+#!/usr/bin/env zsh
+# A command rather than a function, so agents' shells have it too
+emulate -R zsh
+setopt extended_glob
+zmodload -F zsh/system b:zsystem
+
+usage() {
+  cat <<'EOF'
+usage: devshell [CMD [ARG]...]
+       devshell --remove DIR
+
+Open a login shell in this project's dev container, or run CMD there, in the
+folder matching this one. The project is the Git repository or worktree around
+this folder, with .devcontainer/devcontainer.json or .devcontainer.json at its
+top. Its container starts first when needed, and on macOS so does Colima, the
+VM Docker runs in: a new one shares ~/code alone, with 4 GiB of memory. A
+container whose setup failed is made anew. In a dev container or a codespace
+already, CMD runs right here.
+
+A dev container runs commands its repository chose, some on this Mac
+(initializeCommand), and reaches the folders Colima shares: devshell asks once,
+in a terminal, before starting one for a repository, and its worktrees share
+the answer. The repositories trusted so far are listed by their Git folders,
+one per line, in ~/.local/state/devshell/trusted.
+
+Git in the container trusts the folders mounted there, whose owners the mount
+can misreport: devshell adds safe.directory=* to GIT_CONFIG_PARAMETERS for its
+commands, and sets GIT_CONFIG_PARAMETERS to it for the container's setup.
+
+Options:
+  --remove DIR   Remove the dev container devshell started for the project at
+                 DIR, its compose services, and the image built for it, as
+                 workspace --done does for a task; the next devshell there
+                 makes it anew, with any change to its devcontainer.json. On
+                 macOS, Colima then stops if no container runs. One Docker
+                 can't reach now goes the next time devshell can.
+  -h, --help     Show this help.
+EOF
+}
+
+fail() {
+  print -r -u2 -- "devshell: $1"
+  [[ -z ${2-} ]] || print -r -u2 -- "hint: $2"
+  exit 1
+}
+
+tilde() { print -rn -- ${1/#$HOME/\~}; }
+
+local state=${XDG_STATE_HOME:-$HOME/.local/state}/devshell
+local -i lock_fd=0
+local -a noted
+
+# Docker's CLI, else Podman's, which the Dev Containers CLI drives alike
+local engine=docker
+(( $+commands[docker] || ! $+commands[podman] )) || engine=podman
+local -a cli=()
+[[ $engine == docker ]] || cli=(--docker-path podman)
+
+reachable() { $engine info > /dev/null 2>&1; }
+
+# Docker's context names the engine its containers live in: Colima's, Docker
+# Desktop's, and OrbStack's each have one, and Colima's exists only while it
+# runs
+local context
+find_context() {
+  context=$engine
+  [[ $engine != docker ]] || context=$(docker context show 2> /dev/null)
+  context=${context:-default}
+}
+
+# One devshell at a time starts or removes containers and Colima: the others
+# wait, then find them running
+lock() {
+  mkdir -p -- $state
+  : >> $state/lock
+  zsystem flock -t 600 -f lock_fd $state/lock ||
+    fail 'another devshell kept starting containers for 10 minutes'
+}
+unlock() { (( ! lock_fd )) || zsystem flock -u $lock_fd; }
+
+# A record notes the container devshell started for a folder, made or found:
+# the folder, its id, and its state: ready once set up, failed when its setup
+# failed, which the CLI wouldn't run again, or retired when --remove couldn't
+# reach it. Records are kept by Docker context, so one engine's never touch
+# another's, and each folder's key names its record and its log. devshell
+# removes no other container.
+key_of() { print -r -- ${"$(print -rn -- $1 | cksum)"%% *}; }
+record_of() { print -r -- $state/managed/$context/$(key_of $1); }
+# Folder $1's record: container $2, state $3
+note() {
+  mkdir -p -- $state/managed/$context
+  print -rl -- $1 $2 $3 > $(record_of $1)
+}
+# Folder $1's record, in $noted; fails without one
+recorded() {
+  local record=$(record_of $1)
+  noted=()
+  [[ -f $record ]] || return 1
+  noted=("${(@f)$(<$record)}")
+}
+
+# Folder $1's recorded container goes, if Docker still has it under that
+# folder's label, then the record; with $2 (whole), its compose services and
+# the image the CLI built for it go too (pulled images stay, for the next).
+# Fails, saying so, while Docker can't list, inspect, or remove it, and the
+# record stays for another try.
+remove_recorded() {
+  local dir=$1 whole=${2-} id listed details project image
+  recorded $dir || return 0
+  id=$noted[2]
+  if [[ -n $id ]]; then
+    listed=$($engine ps -aq --no-trunc --filter id=$id 2> /dev/null) || {
+      print -r -u2 -- "devshell: Docker couldn't list the dev container of $(tilde $dir)"
+      return 1
+    }
+    if [[ -n $listed ]]; then
+      details=$($engine inspect --format '{{index .Config.Labels "devcontainer.local_folder"}}|{{index .Config.Labels "com.docker.compose.project"}}|{{.Config.Image}}' $id 2> /dev/null) || {
+        print -r -u2 -- "devshell: Docker couldn't inspect the dev container of $(tilde $dir)"
+        return 1
+      }
+      # Under another folder's label, the id isn't this folder's container
+      if [[ ${details%%|*} == $dir ]]; then
+        project=${${details#*|}%%|*} image=${details##*|}
+        if [[ -n $whole && -n $project ]]; then
+          $engine compose --project-name $project down --remove-orphans > /dev/null 2>&1 || {
+            print -r -u2 -- "devshell: Docker couldn't stop the services of $(tilde $dir)"
+            return 1
+          }
+          listed=$($engine ps -aq --no-trunc --filter id=$id 2> /dev/null) || {
+            print -r -u2 -- "devshell: Docker couldn't list the dev container of $(tilde $dir)"
+            return 1
+          }
+        fi
+        if [[ -n $listed ]] && ! $engine rm -f $id > /dev/null 2>&1; then
+          print -r -u2 -- "devshell: Docker couldn't remove the dev container of $(tilde $dir)"
+          return 1
+        fi
+        # An image another container still uses stays
+        [[ -z $whole || $image != vsc-* ]] || $engine image rm $image > /dev/null 2>&1
+        print -r -- "devshell: removed the dev container of $(tilde $dir)"
+      fi
+    fi
+  fi
+  rm -f -- $(record_of $dir) $state/$(key_of $dir).log
+}
+
+# Colima's config, where Colima looks: COLIMA_HOME when it exists, else
+# ~/.colima when that does, else XDG_CONFIG_HOME
+colima_config() {
+  local home=${COLIMA_HOME-}
+  if [[ -z $home || ! -e $home ]]; then
+    home=$HOME/.colima
+    [[ -e $home || -z ${XDG_CONFIG_HOME+set} ]] || home=$XDG_CONFIG_HOME/colima
+  fi
+  print -r -- $home/default/colima.yaml
+}
+
+# The folders Colima's VM shares, as Colima reads its config: the locations in
+# its mounts, the home folder for an empty list ([]), and none without one; a
+# VM not made yet will share ~/code (start_colima)
+shared_folders() {
+  local config=$(colima_config) line value
+  local -i listed=0
+  local -a folders=()
+  if [[ ! -f $config ]]; then
+    print -r -- ${${:-$HOME/code}:A}
+    return
+  fi
+  for line in "${(@f)$(<$config)}"; do
+    if [[ $line == (#b)mounts:(*) ]]; then
+      if [[ ${${${match[1]%%\#*}##[[:space:]]#}%%[[:space:]]#} == '[]' ]]; then
+        print -r -- ${HOME:A}
+        return
+      fi
+      listed=1
+      continue
+    fi
+    (( listed )) || continue
+    # The next top-level key ends the list
+    [[ $line != [[:alpha:]_]* ]] || break
+    [[ $line == (#b)[[:space:]]#(-[[:space:]]##|)location:[[:space:]]#(*) ]] || continue
+    value=$match[2]
+    case $value in
+      (\"*) value=${${value#\"}%%\"*} ;;
+      (\'*) value=${${value#\'}%%\'*} ;;
+      (*) value=${${value%%[[:space:]]\#*}%%[[:space:]]#} ;;
+    esac
+    [[ $value != \~(|/*) ]] || value=$HOME${value#\~}
+    [[ -z $value ]] || folders+=(${value:A})
+  done
+  print -rl -- $folders
+}
+
+# A new VM shares ~/code alone: a privileged container, as Docker inside a dev
+# container runs, can read whatever the VM shares
+start_colima() {
+  local -a flags=()
+  [[ -f $(colima_config) ]] || flags=(--memory 4 --mount "$HOME/code:w" --mount-inotify)
+  local log=$state/colima.log
+  print -r -u2 -- 'devshell: starting Colima, the VM Docker runs in'
+  colima start $flags > $log 2>&1 || {
+    tail -n 12 -- $log >&2
+    fail "Colima didn't start; its log: $(tilde $log)"
+  }
+  find_context
+}
+
+# Colima stops once Docker says no container runs, as when workspace --done
+# removes a task
+stop_colima_if_idle() {
+  [[ $OSTYPE == darwin* && $engine == docker ]] && (( $+commands[colima] )) || return 0
+  [[ $context == colima ]] || return 0
+  local running
+  running=$(docker ps -q 2> /dev/null) && [[ -z $running ]] || return 0
+  colima stop > /dev/null 2>&1 && print -r -- 'devshell: stopped Colima, as no container runs'
+}
+
+case ${1-} in
+  -h|--help)
+    usage
+    exit 0 ;;
+  --remove)
+    (( $# == 2 )) || fail 'usage: devshell --remove DIR'
+    # The project around DIR, as below, or a folder already deleted, its links
+    # resolved in what's left of it
+    local dir
+    dir=$(git -C $2 rev-parse --show-toplevel 2> /dev/null) || dir=$2
+    dir=${dir:A}
+    # Only containers devshell started go, and only removing one stops Colima.
+    # Docker reaches those of its current context while it runs; the others,
+    # or all while it's stopped (Colima's context comes and goes with Colima),
+    # are retired, to go the next time devshell runs with theirs
+    local -a records=($state/managed/*/$(key_of $dir)(N))
+    (( $#records )) || exit 0
+    lock
+    find_context
+    local record current=$(record_of $dir)
+    local -i reached=0 retired=0
+    ! reachable || reached=1
+    for record in $state/managed/*/$(key_of $dir)(N); do
+      (( reached )) && [[ $record == $current ]] && continue
+      noted=("${(@f)$(<$record)}")
+      print -rl -- $noted[1] $noted[2] retired > $record
+      retired=1
+    done
+    (( ! retired )) || print -r -- "devshell: the dev container of $(tilde $dir) goes the next time devshell can reach it"
+    if (( reached )) && [[ -f $current ]]; then
+      remove_recorded $dir whole || exit 1
+      stop_colima_if_idle
+    fi
+    exit 0 ;;
+esac
+
+if [[ ${CODESPACES-} == true || ${REMOTE_CONTAINERS-} == true || -e /.dockerenv || -e /run/.containerenv ]]; then
+  (( $# )) || { print -r -- 'devshell: this shell is in a dev container already'; exit 0; }
+  exec "$@"
+fi
+
+local top
+top=$(git rev-parse --show-toplevel 2> /dev/null) || top=$PWD
+top=${top:A}
+local -a configs=($top/.devcontainer/devcontainer.json(N) $top/.devcontainer.json(N))
+(( $#configs )) || fail "no dev container in $(tilde $top)" \
+  'a project has one in .devcontainer/devcontainer.json or .devcontainer.json'
+(( $+commands[devcontainer] )) || fail 'the Dev Containers CLI is missing' 'run: dotfiles bundle'
+if (( ! $+commands[$engine] )); then
+  [[ $OSTYPE != darwin* ]] || fail 'Docker is missing' 'run: dotfiles bundle'
+  fail 'neither Docker nor Podman is installed' 'an administrator installs Docker Engine or Podman once'
+fi
+
+# Trusted by the repository's Git folder, which a task's worktree shares with
+# its main checkout, and each submodule has of its own
+local repository common shown trusted=$state/trusted
+if common=$(git -C $top rev-parse --path-format=absolute --git-common-dir 2> /dev/null); then
+  repository=${common:A}
+else
+  repository=$top
+fi
+shown=$top
+[[ $repository != */.git ]] || shown=${repository%/.git}
+if ! grep -Fqx -- $repository $trusted 2> /dev/null; then
+  [[ -t 0 && -t 2 ]] || fail "$(tilde $shown) isn't trusted yet: its dev container runs commands the repository chose, some on this Mac" \
+    'run devshell in a terminal there, once, to decide'
+  print -r -u2 -- "devshell: $(tilde $shown)'s dev container runs commands the repository chose, some on this Mac (initializeCommand), and can reach the folders Colima shares."
+  if ! read -q "?Trust this repository? [y/N] "; then
+    print -u2
+    fail 'not trusted, so nothing started'
+  fi
+  print -u2
+  mkdir -p -- $state
+  print -r -- $repository >> $trusted
+fi
+
+# The context, as another devshell may have started Colima while this one
+# waited
+lock
+find_context
+
+# On macOS, Colima runs Docker unless another engine already answers. Its
+# containers see only the folders its VM shares: anywhere else, an empty one
+local -i colima=0
+[[ $OSTYPE == darwin* && $engine == docker ]] && (( $+commands[colima] )) && colima=1
+if (( colima )) && { ! reachable || [[ $context == colima ]]; }; then
+  local folder
+  local -i shared=0
+  for folder in ${(f)"$(shared_folders)"}; do
+    [[ $folder == / || $top == $folder || $top == $folder/* ]] && shared=1 && break
+  done
+  (( shared )) || fail "Colima doesn't share $(tilde $top) with containers" \
+    "move it under ~/code, or add it to mounts in $(tilde $(colima_config)), then: colima restart"
+fi
+if ! reachable; then
+  (( colima )) || fail "$engine can't reach its engine" 'start Docker or Podman'
+  start_colima
+fi
+
+# The containers devshell started for folders deleted meanwhile, tasks'
+# worktrees say, go now, as do those --remove couldn't reach
+local record
+for record in $state/managed/$context/*(N); do
+  noted=("${(@f)$(<$record)}")
+  [[ $noted[3] == retired || ( -n $noted[1] && ! -e $noted[1] ) ]] || continue
+  remove_recorded $noted[1] whole >&2 || :
+done
+
+# Compose services by folder, so two repositories' tasks of the same name stay
+# apart, as do two tasks of a project whose compose file sets its own name,
+# unless COMPOSE_PROJECT_NAME is set already
+local key=$(key_of $top) name=${(L)top:t}
+name=${${name//[^a-z0-9_-]/-}##[-_]#}
+export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-${name:-project}-$key}
+
+# Git, in the container, trusts the folders mounted there, whose owners the
+# mount can misreport: its command-line settings, as git -c makes, gain
+# safe.directory, for the setup's commands and, after any already there, for
+# each command devshell runs
+local -a git_trust=(--remote-env "GIT_CONFIG_PARAMETERS='safe.directory=*'")
+
+# Straight to the command in the container devshell set up, while it runs.
+# Otherwise this folder's container goes first when it can't serve: with its
+# compose services and image when --remove asked, or when it's another
+# config's or gone; alone when its setup failed, which the CLI wouldn't run
+# again. Then the CLI starts this folder and config's container, or makes one
+local container listed
+local -a running=(${${(f)"$($engine ps -q --no-trunc --filter "label=devcontainer.local_folder=$top" \
+  --filter "label=devcontainer.config_file=$configs[1]" 2> /dev/null)"}:#})
+if recorded $top && [[ $noted[3] == ready ]] && (( ${running[(Ie)$noted[2]]} )); then
+  container=$noted[2]
+else
+  if [[ $noted[3] == retired ]]; then
+    remove_recorded $top whole >&2 || exit 1
+  elif (( $#noted )); then
+    listed=$($engine ps -aq --no-trunc --filter id=$noted[2] \
+      --filter "label=devcontainer.config_file=$configs[1]" 2> /dev/null) ||
+      fail "Docker couldn't list the dev container of $(tilde $top)"
+    if [[ -z $listed ]]; then
+      remove_recorded $top whole >&2 || exit 1
+    elif [[ $noted[3] == failed ]]; then
+      remove_recorded $top >&2 || exit 1
+    fi
+  fi
+  local -a flags=($cli --workspace-folder $top $git_trust)
+  # The CLI writes a lockfile beside the config, which only a project
+  # tracking one wants
+  [[ -n $(git -C $top ls-files -- .devcontainer/devcontainer-lock.json .devcontainer-lock.json 2> /dev/null) ]] ||
+    flags+=(--no-lockfile)
+  # A worktree's Git data lives in the main checkout's, at the same path in
+  # the container as here
+  local git_dir
+  { read -r git_dir; read -r common } <<< "$(git -C $top rev-parse --absolute-git-dir --path-format=absolute --git-common-dir 2> /dev/null)"
+  [[ -z $common || $git_dir == $common ]] || flags+=(--mount "type=bind,source=$common,target=$common")
+  local log=$state/$key.log result
+  local -i rc=0
+  print -r -u2 -- "devshell: starting the dev container of $(tilde $top)"
+  # In a terminal, the build shows as it goes
+  if [[ -t 2 ]]; then
+    result=$(devcontainer up $flags 2> >(tee -- $log >&2)) || rc=$?
+  else
+    result=$(devcontainer up $flags 2> $log) || rc=$?
+  fi
+  if (( rc )) || [[ $result != (#b)*'"outcome":"success"'*'"containerId":"'([^\"]##)'"'* ]]; then
+    # A container its setup left behind is recorded, so the next devshell
+    # makes it anew, and workspace --done removes it
+    running=(${${(f)"$($engine ps -aq --no-trunc --filter "label=devcontainer.local_folder=$top" \
+      --filter "label=devcontainer.config_file=$configs[1]" 2> /dev/null)"}:#})
+    (( ! $#running )) || note $top $running[1] failed
+    [[ -t 2 ]] || tail -n 15 -- $log >&2
+    [[ $result != (#b)*'"message":"'([^\"]#)'"'* ]] || print -r -u2 -- $match[1]
+    fail "the dev container didn't start; its log: $(tilde $log)" 'dotfiles doctor checks Docker'
+  fi
+  container=$match[1]
+  note $top $container ready
+fi
+unlock
+
+# The command runs in that container, from the folder matching this one, which
+# must be there; the terminal's settings are those the container understands,
+# as Ghostty's SSH integration sends
+local here=${PWD:A} relative=.
+[[ $here != $top/* ]] || relative=${here#$top/}
+local -a run=(devcontainer exec $cli --workspace-folder $top --container-id $container
+  --remote-env TERM=xterm-256color --remote-env COLORTERM=truecolor)
+local prelude=$'export GIT_CONFIG_PARAMETERS="${GIT_CONFIG_PARAMETERS:+$GIT_CONFIG_PARAMETERS }\'safe.directory=*\'"\ncd -- "$1" || exit\nshift'
+if (( $# )); then
+  exec $run sh -c "$prelude"$'\nexec "$@"' devshell $relative "$@"
+fi
+exec $run sh -c "$prelude"$'\nshell=$(getent passwd "$(id -un)" 2> /dev/null | cut -d: -f7)\nexec "${shell:-${SHELL:-/bin/sh}}" -l' \
+  devshell $relative

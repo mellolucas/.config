@@ -64,6 +64,7 @@ with git 'git helpers' sh .tests/git.sh
 with 'zsh git' 'zsh helpers' sh .tests/zsh.sh
 with zsh 'line editor' zsh -f .tests/zle.zsh
 with zsh 'workspace' zsh -f .tests/workspace.zsh
+with 'zsh git' 'devshell' zsh -f .tests/devshell.zsh
 with 'zsh tmux' 'tmux' zsh -f .tests/tmux.zsh
 with 'nvim git' 'nvim commands' nvim --headless -u NONE -l .tests/nvim.lua
 with nvim 'file tree' nvim --headless -u NONE -i NONE -l .tests/tree.lua
