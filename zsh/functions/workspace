@@ -7,6 +7,8 @@ local agent=${DOTFILES_WORKSPACE_AGENT_CMD:-ocode}
 # An empty status or shell command is skipped.
 local status_cmd=${DOTFILES_WORKSPACE_STATUS_CMD-gg}
 local shell_cmd=${DOTFILES_WORKSPACE_SHELL_CMD:-}
+# A shell command given, even an empty one, keeps the shell out of a dev container
+local -i own_shell=$#shell_cmd
 local dir=$PWD option value task='' line
 local -i finish=0 arguments=$#
 local -a directories=()
@@ -25,7 +27,9 @@ Lay out a coding workspace: the editor above a shell on the left (60% of the
 width; the editor 65% of the height), and the agent on the right at full
 height; in Ghostty, run from a split pane, the shares come out nearer even
 halves. The shell runs the status command, then the shell command, as one
-command line. In Ghostty on
+command line; in a project with a dev container (devcontainer.json), it then
+moves into the container (devshell --help), unless --shell gives it a command,
+even an empty one, or DOTFILES_WORKSPACE_SHELL_CMD does. In Ghostty on
 macOS: in this tab when this shell is its only pane and Ghostty can tell which
 pane that is (this shell becomes the workspace's shell, moves to DIR, and runs
 its commands), else in a new tab. Inside tmux, the same with windows.
@@ -57,7 +61,8 @@ Tasks (in a Git repository):
   --done         Alone, in a task's worktree: move this shell to the main
                  checkout and remove the worktree, refused while it holds
                  uncommitted or untracked changes or files Git ignores, then
-                 the branch once the main checkout's branch has its commits.
+                 its dev container (devshell --remove), and the branch once
+                 the main checkout's branch has its commits.
 
 Environment (set lasting defaults in zsh/local.zsh):
   DOTFILES_WORKSPACE_EDITOR_CMD='nvim .'
@@ -100,7 +105,7 @@ EOF
         --agent) agent=$value ;;
         --editor) editor=$value ;;
         --status) status_cmd=$value ;;
-        --shell) shell_cmd=$value ;;
+        --shell) shell_cmd=$value own_shell=1 ;;
         --task) task=$value ;;
       esac ;;
     --done) finish=1 ;;
@@ -127,12 +132,20 @@ if (( finish )); then
     print -u2 -- "workspace: --done works in a task's worktree, which workspace --task NAME opens"
     return 1
   fi
+  top=${top:A}
   local branch=${ref#refs/heads/} checkout listed
+  local -i removal=0
   # The task's editor socket, named as below
   local socket=$run/ws-${"$(print -rn -- ${top:A} | cksum)"%% *}.sock
-  local -a ignored
-  # The main checkout is the first worktree Git lists
-  checkout=${${(0)"$(git worktree list --porcelain -z)"}[1]#worktree }
+  local -a ignored worktrees
+  # The main checkout is the first worktree Git lists. Git keeps the task where
+  # it made it: a dev container mounts it elsewhere, without the main checkout
+  worktrees=(${${(M)${(0)"$(git worktree list --porcelain -z)"}:#worktree *}#worktree })
+  checkout=$worktrees[1]
+  if (( ! ${${worktrees:A}[(Ie)$top]} )); then
+    print -u2 -- 'workspace: leave the dev container first (exit), then run: workspace --done'
+    return 1
+  fi
   # Git refuses to remove a worktree holding uncommitted or untracked work
   # (below), and says so first. It doesn't count the files it ignores (an
   # .env, a local database) as work, and would delete them with the worktree
@@ -165,6 +178,9 @@ if (( finish )); then
   (( ! ${+_git_glance_last} )) || _git_glance_last=$(git rev-parse --show-toplevel 2> /dev/null)
   unset DOTFILES_EDITOR_SOCKET DOTFILES_EDITOR_SERVE
   print -r -- "workspace: removed task ${branch#task/}'s worktree; its other panes can be closed"
+  # Any dev container devshell made for it goes too, and Colima stops if no
+  # container runs; a failure there is this command's, once the branch is done
+  (( ! $+commands[devshell] )) || devshell --remove "$top" || removal=$?
   # The branch goes once the main checkout's branch has its commits: git
   # branch -d would also take one whose upstream alone has them, as once
   # pushed
@@ -173,13 +189,14 @@ if (( finish )); then
   else
     print -r -- "workspace: kept branch $branch, not merged into ${$(git symbolic-ref --short -q HEAD):-HEAD}; to delete it anyway: git branch -D $branch"
   fi
-  return 0
+  return $removal
 fi
 
 # The shell takes both commands as one line, so a status command that reads
-# the terminal cannot swallow the shell command as input
+# the terminal cannot swallow the shell command as input. In a project with a
+# dev container, unless the shell has a command of its own, the line ends in
+# devshell, which takes the shell into the container (below)
 local -a startup=(${status_cmd:+"$status_cmd"} ${shell_cmd:+"$shell_cmd"})
-shell_cmd=${(j:; :)startup}
 
 if (( ${#directories} > 1 )); then
   print -u2 -- 'workspace: expected at most one directory'
@@ -279,6 +296,15 @@ fi
   return 1
 }
 dir=${dir:A}
+
+local project
+project=$(git -C "$dir" rev-parse --show-toplevel 2> /dev/null) || project=$dir
+if (( ! own_shell && $+commands[devshell] && $+commands[devcontainer] )) &&
+    [[ -f $project/.devcontainer/devcontainer.json || -f $project/.devcontainer.json ]] &&
+    [[ ${CODESPACES-} != true && ${REMOTE_CONTAINERS-} != true && ! -e /.dockerenv && ! -e /run/.containerenv ]]; then
+  startup+=(devshell)
+fi
+shell_cmd=${(j:; :)startup}
 
 # Every pane the workspace starts gets the socket its editor serves
 # (config.workspace) for edit and rgv: one per workspace folder, in Neovim's

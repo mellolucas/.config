@@ -16,11 +16,15 @@ if [[ ${1:-} != --fixture ]]; then
   temporary=$(mktemp -d "${TMPDIR:-/tmp}/tmux-test.XXXXXXXX")
   temporary=${temporary:A}
   trap 'command rm -rf -- "$temporary"' EXIT
-  mkdir -p "$temporary"/{config,data,state,cache,zsh,run}
+  mkdir -p "$temporary"/{config,data,state,cache,zsh,run,bin}
+  # A devshell that does nothing, ahead of any real one: workspace --done
+  # never reaches this machine's containers
+  print -rl -- '#!/bin/sh' 'exit 0' > "$temporary/bin/devshell"
+  chmod +x "$temporary/bin/devshell"
   ln -s "$repo/tmux" "$temporary/config/tmux"
   # An empty .zshrc also keeps zsh's new-user menu away.
   : > "$temporary/zsh/.zshrc"
-  /usr/bin/env -i HOME="$temporary" PATH="$PATH" TERM=xterm-256color SHELL="$commands[zsh]" \
+  /usr/bin/env -i HOME="$temporary" PATH="$temporary/bin:$PATH" TERM=xterm-256color SHELL="$commands[zsh]" \
     ZDOTDIR="$temporary/zsh" XDG_CONFIG_HOME="$temporary/config" XDG_DATA_HOME="$temporary/data" \
     XDG_STATE_HOME="$temporary/state" XDG_CACHE_HOME="$temporary/cache" TMUX_TMPDIR="$temporary" \
     TMPDIR="$temporary/run" "$commands[zsh]" -f "$self" --fixture

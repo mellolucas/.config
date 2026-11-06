@@ -228,6 +228,41 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   )
   workspace_osascript() { print -rl -- "${(@qqq)@}" >&3; }
 
+  # In a project with a dev container, the shell's line ends in devshell,
+  # which takes the shell into it; a subfolder counts by its repository's top.
+  # Not when the shell has a command of its own, this is a container already,
+  # or devshell or the Dev Containers CLI is missing.
+  (
+    unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
+      DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD
+    stubs=$temporary/container-bin project=${temporary:A}/project
+    mkdir -p $stubs $project/.devcontainer $project/sub
+    print -r -- '{}' > $project/.devcontainer/devcontainer.json
+    for tool in devshell devcontainer; do
+      print -r -- '#!/bin/sh' > $stubs/$tool
+      chmod +x $stubs/$tool
+    done
+    ln -s $commands[git] $stubs/git
+    GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null $stubs/git init -q $project
+    PATH=$stubs:/usr/bin:/bin
+    builtin cd -- $project
+    expected=("$DOTFILES_WORKSPACE_SCRIPT" $project 'nvim .' ocode 'gg; devshell' 0 0 '' "$(socket_for $project)")
+    dispatch
+    expected[5]=devshell
+    dispatch --status ''
+    expected[5]='gg; own'
+    dispatch --shell own
+    expected[5]=gg
+    dispatch --shell ''
+    expected[2]=$project/sub expected[5]='gg; devshell' expected[9]=$(socket_for $project/sub)
+    dispatch sub
+    expected[2]=$project expected[5]=gg expected[9]=$(socket_for $project)
+    REMOTE_CONTAINERS=true dispatch
+    rm $stubs/devcontainer
+    rehash
+    dispatch
+  )
+
   # An option without its value (an empty status is valid), two directories, a missing one
   reject --status
   reject . .
@@ -266,6 +301,11 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   trap 'command rm -rf -- "$temporary"' EXIT
   # Git looks for no repository above the fixtures
   export GIT_CEILING_DIRECTORIES=$temporary
+  # devshell records what it's asked, ahead of any real one
+  mkdir -p "$temporary/container-bin"
+  print -rl -- '#!/bin/sh' "printf '%s\\n' \"\$*\" >> '$temporary/devshell.log'" > "$temporary/container-bin/devshell"
+  chmod +x "$temporary/container-bin/devshell"
+  PATH=$temporary/container-bin:$PATH
   mkdir -p "$temporary/outside"
   checkout=$temporary/code/owner/repo tasks=$temporary/code/owner/repo.worktrees
   git init -q -b main "$checkout"
@@ -489,6 +529,32 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   [[ $(<"$temporary/output") == *$'\n''workspace: kept branch task/pushed, not merged into main; to delete it anyway: git branch -D task/pushed' ]] ||
     fail "pushed: $(<"$temporary/output")"
   git show-ref -q --verify refs/heads/task/pushed || fail 'the pushed, unmerged branch went'
+  # Each task's dev container goes too, after the worktree: workspace --done
+  # asks devshell to remove any it made, its config there or not, and fails as
+  # devshell does, once the branch is done. Where Git keeps the task elsewhere,
+  # as a dev container mounts it, --done says to leave the container first; in
+  # a codespace, where Git's paths hold, it ends the task.
+  laid_out "$tasks/box" ocode --task box
+  builtin cd -- "$tasks/box"
+  known=$(state)
+  recorded_path=$(<"$checkout/.git/worktrees/box/gitdir")
+  print -r -- "$temporary/elsewhere/box/.git" > "$checkout/.git/worktrees/box/gitdir"
+  if workspace --done > "$temporary/output" 2>&1; then fail '--done ran where Git keeps the task elsewhere'; fi
+  [[ $(<"$temporary/output") == 'workspace: leave the dev container first (exit), then run: workspace --done' ]] ||
+    fail "--done in a container: $(<"$temporary/output")"
+  print -r -- $recorded_path > "$checkout/.git/worktrees/box/gitdir"
+  [[ $(state) == $known ]] || fail "--done in a container changed Git's state: $(state)"
+  : > "$temporary/devshell.log"
+  CODESPACES=true workspace --done > "$temporary/output" 2>&1 || fail "removing a task: $(<"$temporary/output")"
+  [[ ! -e $tasks/box && $(<"$temporary/devshell.log") == "--remove $tasks/box" ]] ||
+    fail "removing a task, devshell was asked: $(<"$temporary/devshell.log" 2>/dev/null)"
+  laid_out "$tasks/stuck" ocode --task stuck
+  builtin cd -- "$tasks/stuck"
+  print -rl -- '#!/bin/sh' 'exit 42' > "$temporary/container-bin/devshell"
+  workspace --done > "$temporary/output" 2>&1 && fail 'a failed removal of the dev container passed'
+  (( $? == 42 )) && [[ ! -e $tasks/stuck && $(<"$temporary/output") == *'Deleted branch task/stuck'* ]] ||
+    fail "a failed removal of the dev container: $(<"$temporary/output")"
+  print -rl -- '#!/bin/sh' "printf '%s\\n' \"\$*\" >> '$temporary/devshell.log'" > "$temporary/container-bin/devshell"
   # A task named beyond ASCII ends as any other.
   builtin cd -- "$tasks/café"
   workspace --done > "$temporary/output" 2>&1 || fail "café: $(<"$temporary/output")"
