@@ -80,6 +80,13 @@ Changes since `v0.0.1`.
   desktop app for Copilot (automations, Projects, computer use), which
   updates itself and shares Copilot CLI's skills, instructions, and sessions
   in `~/.copilot`.
+- **Dev containers:** in a project with one (`.devcontainer`), `workspace`
+  opens its shell pane inside the container, and `devshell` enters it from
+  any shell (`devshell CMD` runs a command there, as agents do for builds and
+  tests), once you trust the repository, as its dev container runs commands
+  it chose. On macOS, Colima runs Docker in a VM started on demand, a new one
+  sharing `~/code` alone, and stops once `workspace --done` leaves no
+  container running.
 - **Colors:** Catppuccin Mocha in dark mode and Latte in light, following the
   system's appearance in Ghostty, Neovim (even while running), OpenCode, fzf,
   bat, Delta, Glow (its code blocks keep Latte), and the prompt.
@@ -161,6 +168,21 @@ Changes since `v0.0.1`.
   keeping `~/.copilot`'s version of anything both have. Terminals and tmux
   sessions started before the update still point Copilot at the old place:
   start new ones (or run `unset COPILOT_HOME`), then run `dotfiles link`.
+- Colima runs dev containers in place of Apple's `container`, which the
+  workstation leaves out. To keep it, with the containers made with it,
+  add its line from `homebrew/local.Brewfile.example` to `local.Brewfile`;
+  `brew uninstall container` removes it.
+- Docker's CLI reads `~/.config/docker`, where `dotfiles link` starts a
+  config naming Homebrew's plugin folder: move what else `~/.docker` holds
+  (contexts, `certs.d`) there, and copy your old `config.json`'s entries into
+  the new one. Docker Desktop keeps its own files in `~/.docker`: to keep
+  using them, set `export DOCKER_CONFIG=~/.docker` in `zsh/local.zsh`.
+- Lima, and so Colima, keeps its VMs in `~/.local/share/lima`. To keep a VM
+  in `~/.lima` or `~/.colima`, set `export LIMA_HOME=~/.lima` (or
+  `~/.colima/_lima`) in `zsh/local.zsh`. Otherwise delete it where it is
+  (`LIMA_HOME=~/.colima/_lima colima delete`, or
+  `LIMA_HOME=~/.lima limactl delete NAME`), then `docker context rm -f colima`;
+  `devshell` makes a new one, sharing `~/code`, in the XDG folders.
 - Move `~/.node_repl_history` and `~/.python_history` to `~/.local/state`
   (as `node_repl_history` and `python_history`), and `~/.npmrc` to
   `~/.config/npm/npmrc`. `~/.npm`, `~/Library/Caches/Homebrew`,
@@ -183,7 +205,10 @@ Homebrew's tools. In a Debian 13 container, `get.sh -- link` sets up a fresh
 home, and the suite fails only the checks that use Debian's older shellcheck,
 fzf, and tmux. Full installs are not yet validated on Linux. On macOS, the
 GitHub Copilot app installs and runs sessions on a standard account; its
-computer use and voice dictation are not yet validated.
+computer use and voice dictation are not yet validated. Dev containers run on
+macOS 27 on Apple silicon with Colima 0.10.3 and Docker 29, from a checkout
+and from a task's worktree; Docker and Podman on Linux are detected but not
+yet validated.
 
 Known limits:
 
@@ -197,3 +222,14 @@ Known limits:
 - In tmux, Command keys never arrive: its own keys follow its prefix,
   `Ctrl+B`, Neovim's windows are `Ctrl+W h/j/k/l`, and Neovim follows a
   light/dark switch once tmux rereads the terminal's colors.
+- Colima's VM, while it runs, holds its memory and can keep up to about half
+  of macOS's open-file table after a container reads large folders;
+  `colima stop` frees both. Edits made on the Mac reach the container's file
+  watchers as changes to existing files; files created or deleted there go
+  unseen, so watchers that must see them need polling.
+- A dev container keeps a project's toolchain off the Mac without walling off
+  code you don't trust: what runs inside can write the repository's Git hooks
+  and settings, which Git on the Mac then runs.
+- devshell knows engines by their Docker context, so pointing `DOCKER_HOST`
+  at another engine under the same context can strand a container it
+  started; `docker ps` there still lists it.

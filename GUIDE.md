@@ -36,12 +36,15 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 | `workspace` | **Lay out** the current directory |
 | `workspace DIR` | **Lay out** another directory |
 | `workspace --task NAME` | **Start** or **reopen** task NAME in a worktree of its own, on branch `task/NAME` |
-| `workspace --done` | In a task, **remove** its worktree, and its branch once merged |
+| `workspace --done` | In a task, **remove** its worktree and dev container, and its branch once merged |
 | `workspace --agent CMD` | **Start** a different agent in the agent pane |
 | `workspace --status ggg` | The card with the **code summary** in the shell |
 | `workspace --status ''` | **Start** the shell without the card |
 | `workspace --help` | **Every option** and its default |
 | `v FILE:LINE` | From any of its panes, **open** the file in the workspace's editor at that line, and go there |
+| `devshell` | In a project with a dev container, **open a shell** inside it |
+| `devshell CMD` | **Run** a command in the dev container: `devshell go test ./...` |
+| `devshell --remove .` | **Remove** the project's dev container; the next `devshell` builds it anew, with any change to `devcontainer.json` |
 
 - Focus starts in the editor; `Cmd+Option+arrows` move between the panes, and `Cmd+Ctrl+=` gives them even halves.
 - Run from a tab where your shell is the only pane, `workspace` lays out that tab around it, and your shell becomes the workspace's shell. Otherwise it opens a new tab, as it does when Ghostty can't tell which pane you're in (after you set a tab title by hand); run from a split pane, it sizes that tab from the smaller pane, so its shares come out nearer even halves.
@@ -54,6 +57,7 @@ Open a project as one Ghostty tab on macOS, or as tmux panes elsewhere: the edit
 - Outside Ghostty, or on Linux, the layout is a tmux session named after the directory; rerun `workspace` there to reattach after closing the terminal. Inside tmux, windows take the place of tabs.
 - `Ctrl+Tab` / `Ctrl+Shift+Tab` or `Cmd+1`…`Cmd+9` switch Ghostty tabs, and `Cmd+Option+W` closes one. After a restart Ghostty restores tabs as plain shells: run `workspace` again.
 - Tab completes `workspace`'s flags, directories, and task names.
+- In a project with a dev container (`.devcontainer/devcontainer.json`), the shell pane opens inside it, after the `gg` card: builds and tests there use the project's own tools. `exit` comes back to the Mac, where `v`, `rgv`, and `workspace --done` work. The first time, `devshell` asks whether you trust the repository, as its dev container runs commands it chose, some on the Mac. The first use builds the container and, on macOS, starts Colima, which a new VM makes share `~/code` alone; `workspace --done` removes a task's container, and Colima stops once no container runs (`colima stop` anytime).
 
 ## Panes: Move between panes
 
