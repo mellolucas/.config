@@ -44,7 +44,7 @@ On such an account, casks go to `~/Applications`, and Homebrew itself never asks
 
 ### Package sets
 
-The lean set, `homebrew/core.Brewfile`, holds the essentials on every platform: Git, Neovim, the shell tools, tmux, gh, and OpenCode. `homebrew/Brewfile` adds the workstation: the language servers; the Go, Node, Bun, and Python runtimes; Copilot CLI and Codex, from npm because macOS blocks their unnotarized Homebrew casks; on macOS, Ghostty, Claude Code, Obsidian, and the App Store CLI (when signed in to an Apple Account); and Apple's Container on Apple silicon with macOS 26+.
+The lean set, `homebrew/core.Brewfile`, holds the essentials on every platform: Git, Neovim, the shell tools, tmux, gh, and OpenCode. `homebrew/Brewfile` adds the workstation: the language servers; the Go, Node, Bun, and Python runtimes; Copilot CLI and Codex, from npm because macOS blocks their unnotarized Homebrew casks; on macOS, Ghostty, Claude Code, the GitHub Copilot app, Obsidian, and the App Store CLI (when signed in to an Apple Account); and Apple's Container on Apple silicon with macOS 26+.
 
 GitHub Codespaces, dev containers, and Docker or Podman containers bring their own toolchains and get only the lean set. To choose it elsewhere, such as on a server you run rather than develop on, export `HOMEBREW_BUNDLE_FILE_GLOBAL="${XDG_CONFIG_HOME:-$HOME/.config}/homebrew/core.Brewfile"` before the first install, and keep that line in `zsh/local.zsh`.
 
@@ -54,7 +54,7 @@ Open Ghostty, then:
 
 1. Copy `~/.config/git/config.d/personal.example` (or `work.example`) to `personal` (or `work`) beside it, and fill in your identity and signing key (its comments show how to create one); Git refuses to commit until an identity exists.
 2. Run `gh auth login`; Git uses it for GitHub credentials.
-3. Log in to each agent you use (`opencode`, `claude`, `copilot`, `codex`) through its own flow.
+3. Log in to each agent you use (`opencode`, `claude`, `copilot`, `codex`, and the GitHub Copilot app) through its own flow.
 4. If you use Time Machine, run `tmutil addexclusion ~/.cache` once: it skips `~/Library/Caches`, not `~/.cache`.
 5. Run `dotfiles doctor`: it checks the links, login shell, Homebrew, tools, GitHub login, and Git identity, names a fix for each problem, and ends with "no problems found".
 6. In a project, run `workspace`.
@@ -66,6 +66,8 @@ Start a project with **`workspace`**: the editor above a shell on the left, the 
 Run **`keys`** to browse the [field guide](GUIDE.md) with a preview of each page, or type to search every line; `keys TOPIC` opens a page (`keys git`), and `keys WORDS` searches from the prompt (`keys close tab`). `help COMMAND` shows any command's help, even through an alias.
 
 Agents: OpenCode is the workspace default; Claude Code, Copilot CLI (also `gh copilot`), and Codex are installed too. All four read `agents/instructions.md`, this setup's notes for every repository (how to show you a file, the tools at hand, and no pushing or rewriting shared history unless asked): Codex as `AGENTS.md`, Claude Code as `CLAUDE.md`, and Copilot CLI as `copilot-instructions.md`, each linked in its home, and OpenCode through its config. To keep your own instructions instead, put a file in place of an agent's link; the installer leaves it. Agents notify you when they finish or need you while you're elsewhere (inside tmux, only from panes in sight); Copilot CLI's notifications start off: run `copilot config notifications on` and `copilot config terminalNotifications on`.
+
+On macOS, the GitHub Copilot app works outside the terminal, with automations, Projects, and computer use. It needs a Copilot plan or a model provider of your own, and on Copilot Business or Enterprise the GitHub Copilot app policy, which is on by default and separate from Copilot CLI's. It shares Copilot CLI's skills, MCP servers, instructions, and sessions through `~/.copilot`, and its Sessions settings can list the CLI's sessions too. To work in a checkout or a `workspace --task` worktree, add it with Open local folder and choose Current checkout; New worktree puts its own in `~/.copilot/copilot-worktrees` by default. Its settings live in the app; worth choosing there once: a Catppuccin palette, whether it starts at login, and for voice dictation a shortcut other than Option+Space, which would take that key from typing. Computer use, in public preview, stays off until turned on under Computer Use in its settings, and needs Accessibility and Screen Recording; on a standard account, granting them may take an administrator unless MDM allows it.
 
 Colors follow Catppuccin, Mocha in dark mode and Latte in light, switching with the system appearance in Ghostty, Neovim (once its pane regains focus), OpenCode, fzf, bat, Delta, Glow, and the prompt; Glow's code blocks keep Latte colors in dark mode.
 
@@ -79,9 +81,9 @@ dotfiles doctor    # Check the setup; names fixes and exits 1 on problems
 dotfiles uninstall # Remove the links this repository owns; packages, backups, and data stay
 ```
 
-Nothing checks for updates in the background: a week after the last complete `install`, `update`, or `bundle`, the first shell of each day reminds you to run `dotsup` (`dotfiles update`). The Brewfile owns package updates: Ghostty's and Copilot CLI's updaters are off, OpenCode only notifies, and Obsidian's updater can be turned off in its settings. Homebrew refreshes its package list once it is a day old; `brew update` refreshes it at once. Homebrew Bundle never upgrades Brewfile `npm` entries, so `update` and `bundle` do, without install scripts and only to releases at least a day old. `update` needs a clean checkout that can fast-forward; `update --discard` resets local changes instead.
+This setup checks for nothing in the background: a week after the last complete `install`, `update`, or `bundle`, the first shell of each day reminds you to run `dotsup` (`dotfiles update`). The Brewfile owns package updates, except that the GitHub Copilot app updates itself: Ghostty's and Copilot CLI's updaters are off, OpenCode only notifies, and Obsidian's updater can be turned off in its settings. Homebrew refreshes its package list once it is a day old; `brew update` refreshes it at once. Homebrew Bundle never upgrades Brewfile `npm` entries, so `update` and `bundle` do, without install scripts and only to releases at least a day old. `update` needs a clean checkout that can fast-forward; `update --discard` resets local changes instead.
 
-Neovim plugins are the one thing Homebrew does not update: run `:lua vim.pack.update()` in Neovim, review the changes, `:write` to apply them (`:quit` skips), then commit the changed `nvim/nvim-pack-lock.json`.
+Homebrew does not update Neovim's plugins: run `:lua vim.pack.update()` in Neovim, review the changes, `:write` to apply them (`:quit` skips), then commit the changed `nvim/nvim-pack-lock.json`.
 
 ## Without Ghostty
 
@@ -97,11 +99,12 @@ Where Ghostty is absent (GitHub Codespaces, WSL, SSH sessions, other terminals),
 
 ## Where files live
 
-Every file sits in the XDG home that matches its nature: configuration in `~/.config`, data in `~/.local/share`, state such as history in `~/.local/state`, caches in `~/.cache`, and your own commands in `~/.local/bin`. `zsh/xdg.sh` points tools without XDG support there, for shells and the installer alike: Copilot CLI, Codex, and Claude Code keep their homes in `~/.local/share` (`copilot`, `codex`, `claude`), Codex its database in `~/.local/state/codex`, and npm, Node, Python, and Go follow the same split.
+Every file sits in the XDG home that matches its nature: configuration in `~/.config`, data in `~/.local/share`, state such as history in `~/.local/state`, caches in `~/.cache`, and your own commands in `~/.local/bin`. `zsh/xdg.sh` points tools without XDG support there, for shells and the installer alike: Codex and Claude Code keep their homes in `~/.local/share` (`codex`, `claude`), Codex its database in `~/.local/state/codex`, and npm, Node, Python, and Go follow the same split.
 
 Besides the XDG homes, `$HOME` holds only the `.zshenv` link; `dotfiles doctor` notes any other hidden entry. The exceptions:
 
 - The operating system's own files, `~/.ssh` (OpenSSH), and the AWS CLI's caches in `~/.aws`, which those tools hardcode.
+- Copilot's home, `~/.copilot`, which Copilot CLI shares with the GitHub Copilot app (the app, started outside a shell, reads no `COPILOT_HOME`), and the app's local-model cache and logs in `~/.github-copilot-cli`.
 - macOS apps keep Apple's `~/Library` layout, and so do command-line tools that default there, unless a documented setting moves the whole category to the tool's Linux location: Homebrew's downloads and logs and Go's build cache move to `~/.cache`, while Go's settings and telemetry, gopls, Biome, and Copilot's cache stay in `~/Library`.
 - Homebrew hides npm's variables from the npm it runs for Brewfile entries, so the installer links `homebrew/npmrc` as npm's global config in Homebrew's prefix, which keeps npm's cache in `~/.cache/npm` (a fixed path, whatever `XDG_CACHE_HOME` says). It is the only npm config those runs read, so registry or certificate settings for Brewfile entries go there, not in `~/.config/npm/npmrc`: replace the link with your own copy of `homebrew/npmrc`, and the installer keeps it.
 
@@ -138,7 +141,7 @@ On a managed network, these are the hosts to ask for:
 | When | Hosts |
 | --- | --- |
 | Install | `raw.githubusercontent.com` (`get.sh` and Homebrew's installer), `github.com` (this repository, Homebrew, Neovim's plugins), and on macOS `swscan.apple.com` and `swcdn.apple.com` (the Command Line Tools) |
-| Install and update | `formulae.brew.sh` and `api.github.com` (Homebrew's package lists), `ghcr.io` and `pkg-containers.githubusercontent.com` (Homebrew's packages and its own Ruby), `registry.npmjs.org` (Copilot CLI, Codex), `release.files.ghostty.org` (Ghostty), `downloads.claude.ai` (Claude Code), `release-assets.githubusercontent.com` (Obsidian) |
+| Install and update | `formulae.brew.sh` and `api.github.com` (Homebrew's package lists), `ghcr.io` and `pkg-containers.githubusercontent.com` (Homebrew's packages and its own Ruby), `registry.npmjs.org` (Copilot CLI, Codex), `release.files.ghostty.org` (Ghostty), `downloads.claude.ai` (Claude Code), `release-assets.githubusercontent.com` (Obsidian, the GitHub Copilot app) |
 | Daily | Each agent's own service (its documentation lists the hosts), `www.schemastore.org` and `json.schemastore.org` (YAML schemas), `proxy.golang.org` and `sum.golang.org` (Go modules) |
 
 A network that inspects downloads can answer from a host yet cut or hold back a file, and some release a file once they have analyzed it, so a later retry can pass. Homebrew, npm, and Git name the URL that failed; `install`, `update`, and `bundle` carry on past failed packages and list what they skipped; `dotfiles doctor` reports a Homebrew that can't run. Where a network decrypts traffic with its own certificate authority, add it to the system's trusted certificates; Bun also needs `export NODE_USE_SYSTEM_CA=1` in `zsh/local.zsh`, and npm settings for Brewfile entries go in Homebrew's npm config ([Where files live](#where-files-live)).

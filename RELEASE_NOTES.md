@@ -76,6 +76,10 @@ Changes since `v0.0.1`.
   while you're elsewhere, as do shell commands of 10 s or more; inside tmux,
   only panes in sight notify. The guide lists each one's scroll, search, and
   copy keys.
+- **GitHub Copilot app:** on macOS, the workstation Brewfile adds GitHub's
+  desktop app for Copilot (automations, Projects, computer use), which
+  updates itself and shares Copilot CLI's skills, instructions, and sessions
+  in `~/.copilot`.
 - **Colors:** Catppuccin Mocha in dark mode and Latte in light, following the
   system's appearance in Ghostty, Neovim (even while running), OpenCode, fzf,
   bat, Delta, Glow (its code blocks keep Latte), and the prompt.
@@ -140,15 +144,23 @@ Changes since `v0.0.1`.
   the last word (`Esc` then `.`).
 - In `HOMEBREW_CASK_OPTS`, write `--appdir=/path`; Homebrew ignores
   `--appdir /path`.
-- Agent homes moved to `~/.local/share/copilot`, `codex`, and `claude`. On a
-  machine set up earlier, quit the agents and move those folders aside as
-  backups (`codex` to `codex.backup`, say): `dotfiles link` creates them for
-  the shared instructions, and agents run since may have saved logins or
-  sessions there. Move `~/.copilot`, `~/.codex`, and `~/.claude` into their
-  places, and `~/.claude.json` into `claude`; then run `dotfiles link` to
-  link the instructions inside again. Claude Code may ask you to log in
+- Codex's and Claude Code's homes moved to `~/.local/share/codex` and
+  `claude`; Copilot keeps `~/.copilot`, which the GitHub Copilot app shares.
+  On a machine set up earlier, quit the agents and move those two folders
+  aside as backups (`codex` to `codex.backup`, say): `dotfiles link` creates
+  them for the shared instructions, and agents run since may have saved logins
+  or sessions there. Move `~/.codex` and `~/.claude` into their places, and
+  `~/.claude.json` into `claude`; then run `dotfiles link` to link the
+  instructions inside again. Claude Code may ask you to log in
   again. Links that already point there can simply be removed. Move Codex's
   `*.sqlite*` files to `~/.local/state/codex` while Codex is stopped.
+- Where a setup in between moved Copilot's home to `~/.local/share/copilot`,
+  move it back: quit Copilot and its app, move any `~/.copilot` aside (to
+  `~/.copilot.backup`, say), and move `~/.local/share/copilot` to
+  `~/.copilot`. If the app ran meanwhile, merge the backup into `~/.copilot`,
+  keeping `~/.copilot`'s version of anything both have. Terminals and tmux
+  sessions started before the update still point Copilot at the old place:
+  start new ones (or run `unset COPILOT_HOME`), then run `dotfiles link`.
 - Move `~/.node_repl_history` and `~/.python_history` to `~/.local/state`
   (as `node_repl_history` and `python_history`), and `~/.npmrc` to
   `~/.config/npm/npmrc`. `~/.npm`, `~/Library/Caches/Homebrew`,
@@ -169,7 +181,9 @@ Changes since `v0.0.1`.
 `sh .tests/run` passes on macOS, and CI runs it on macOS and Ubuntu with
 Homebrew's tools. In a Debian 13 container, `get.sh -- link` sets up a fresh
 home, and the suite fails only the checks that use Debian's older shellcheck,
-fzf, and tmux. Full installs are not yet validated on Linux.
+fzf, and tmux. Full installs are not yet validated on Linux. On macOS, the
+GitHub Copilot app installs and runs sessions on a standard account; its
+computer use and voice dictation are not yet validated.
 
 Known limits:
 

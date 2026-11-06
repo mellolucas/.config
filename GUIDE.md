@@ -163,7 +163,7 @@ Agents run full screen and keep their own history; each scrolls, searches, and c
 | Codex | `PageUp` / `PageDown` / `Ctrl+Home` / `Ctrl+End` / `F3` / select with the mouse |
 
 - `Home` / `End` are `Fn+←` / `Fn+→` on Mac keyboards.
-- Each agent keeps its home under `~/.local/share` (for example `~/.local/share/copilot`); log in through its own flow.
+- Agents keep their homes under `~/.local/share` (for example `~/.local/share/codex`), but Copilot keeps `~/.copilot`, which the GitHub Copilot app shares; log in through each one's own flow.
 - When an agent finishes or needs you while you're in another pane or app, macOS notifies you (allow Ghostty's notifications when it first asks); Copilot CLI's start off, and the README shows how to turn them on. Shell commands of 10 s or more notify the same way when they finish, and their bell marks the pane with a border. Inside tmux, only panes in sight notify.
 - In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C`.
 - Agents read the repository's `AGENTS.md` and, in every repository, `~/.config/agents/instructions.md`: how to show you a file (`edit FILE:LINE`), the tools at hand, and no pushing or rewriting shared history unless you ask.
