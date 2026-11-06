@@ -12,6 +12,9 @@
 # tap "hashicorp/tap"
 # brew "hashicorp/tap/terraform"
 
+# Apple's container runtime, a VM per container (dev containers use Colima)
+# brew "container" if OS.mac? && Hardware::CPU.arm? && MacOS.version >= :tahoe
+
 # Personal applications
 # cask "discord" if OS.mac?
 # cask "steam" if OS.mac?

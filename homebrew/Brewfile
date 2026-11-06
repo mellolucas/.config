@@ -3,7 +3,16 @@
 brew "mas" if OS.mac? && system("defaults read MobileMeAccounts Accounts >/dev/null 2>&1")
 
 cask "ghostty" if OS.mac?
-brew "container" if OS.mac? && Hardware::CPU.arm? && MacOS.version >= :tahoe
+
+# Dev containers (devshell): the Dev Containers CLI; on macOS, Colima runs
+# Docker's engine in a VM, with Docker's CLI, its compose and buildx, and the
+# Keychain for registry logins. On Linux, Docker or Podman comes from the system.
+brew "devcontainer"
+brew "colima" if OS.mac?
+brew "docker" if OS.mac?
+brew "docker-compose" if OS.mac?
+brew "docker-buildx" if OS.mac?
+brew "docker-credential-helper" if OS.mac?
 
 brew "lua-language-server"
 brew "biome"
