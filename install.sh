@@ -263,6 +263,21 @@ link_npm_global_config() {
   link_path "$repo_dir/homebrew/npmrc" "$npmrc"
 }
 
+# Docker's CLI finds compose and buildx in Homebrew's prefix only through its
+# config, where Docker also keeps contexts and logins: a new one starts with the
+# folder Apple silicon's Homebrew keeps them in (Intel's, /usr/local, is one
+# Docker looks in anyway). An existing config is Docker's to change.
+docker_cli_config() {
+  is_darwin || return 0
+  config="$DOCKER_CONFIG/config.json"
+  if [ -e "$config" ] || [ -L "$config" ]; then
+    return 0
+  fi
+  mkdir -p "$DOCKER_CONFIG"
+  printf '{\n  "cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]\n}\n' > "$config"
+  printf 'created %s\n' "$config"
+}
+
 # Where each agent reads its user-wide instructions: a file of the name it
 # expects in its home (zsh/xdg.sh), linked to the shared agents/instructions.md.
 # Copilot's home is ~/.copilot even where COPILOT_HOME says otherwise: its
@@ -362,7 +377,9 @@ link_dotfiles() {
 
   link_path "$installer" "$user_bin_home/dotfiles"
   link_path "$repo_dir/zsh/bin/edit" "$user_bin_home/edit"
+  link_path "$repo_dir/zsh/bin/devshell" "$user_bin_home/devshell"
   agent_instructions link_agent_instructions
+  docker_cli_config
   link_npm_global_config
 }
 
@@ -885,6 +902,7 @@ doctor_dotfiles() {
     doctor_problem 'dotfiles command' "missing; run: $(tilde "$repo_dir")/install.sh link"
   fi
   doctor_link 'edit command' "$repo_dir/zsh/bin/edit" "$user_bin_home/edit"
+  doctor_link 'devshell command' "$repo_dir/zsh/bin/devshell" "$user_bin_home/devshell"
 
   # Loops run in this shell, not a pipe, so their problems count.
   links=0
@@ -981,6 +999,16 @@ doctor_dotfiles() {
     doctor_problem opencode "missing; ${package_fix:-run: dotfiles bundle}"
   fi
 
+  # devshell builds dev containers with buildx and starts compose's: on macOS,
+  # Docker's CLI finds Homebrew's through its config (docker_cli_config)
+  if is_darwin && command -v docker >/dev/null 2>&1; then
+    if docker compose version >/dev/null 2>&1 && docker buildx version >/dev/null 2>&1; then
+      doctor_ok 'Docker plugins' 'compose, buildx'
+    else
+      doctor_problem 'Docker plugins' "Docker can't find compose or buildx; add \"cliPluginsExtraDirs\": [\"$(brew --prefix 2>/dev/null || printf /opt/homebrew)/lib/docker/cli-plugins\"] to $(tilde "$DOCKER_CONFIG")/config.json"
+    fi
+  fi
+
   if ! command -v gh >/dev/null 2>&1; then
     doctor_problem 'GitHub CLI' "missing; ${package_fix:-run: dotfiles bundle}"
   elif gh auth status >/dev/null 2>&1; then
@@ -1063,6 +1091,7 @@ uninstall_dotfiles() {
 
   remove_owned_link "$user_bin_home/dotfiles" "$installer"
   remove_owned_link "$user_bin_home/edit" "$repo_dir/zsh/bin/edit"
+  remove_owned_link "$user_bin_home/devshell" "$repo_dir/zsh/bin/devshell"
   agent_instructions unlink_agent_instructions
   if npmrc=$(npm_global_config); then
     remove_owned_link "$npmrc" "$repo_dir/homebrew/npmrc"

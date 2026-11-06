@@ -32,7 +32,7 @@ cp "$repo/install.sh" "$test_root/repo/install.sh"
 cp "$repo/zsh/.zshenv" "$repo/zsh/homebrew.sh" "$repo/zsh/xdg.sh" "$test_root/repo/zsh/"
 mkdir -p "$test_root/repo/homebrew" "$test_root/repo/zsh/bin" "$test_root/repo/agents"
 cp "$repo/homebrew/npmrc" "$test_root/repo/homebrew/npmrc"
-cp "$repo/zsh/bin/edit" "$test_root/repo/zsh/bin/edit"
+cp "$repo/zsh/bin/edit" "$repo/zsh/bin/devshell" "$test_root/repo/zsh/bin/"
 cp "$repo/agents/instructions.md" "$test_root/repo/agents/instructions.md"
 # Where each agent reads its user-wide instructions: under XDG_DATA_HOME, but
 # Copilot's in its own ~/.copilot, which its desktop app shares.
@@ -232,6 +232,7 @@ check test -L "$XDG_CONFIG_HOME/zsh"
 check test -L "$HOME/.zshenv"
 check test -L "$HOME/.local/bin/dotfiles"
 check test "$(readlink "$HOME/.local/bin/edit")" = "$repo_dir/zsh/bin/edit"
+check test "$(readlink "$HOME/.local/bin/devshell")" = "$repo_dir/zsh/bin/devshell"
 for file in $agent_files; do
   check test "$(readlink "$(agent_path "$file")")" = "$repo_dir/agents/instructions.md"
 done
@@ -252,6 +253,7 @@ check test ! -L "$HOME/.zshenv"
 check test ! -e "$HOME/.zshenv"
 check test ! -L "$HOME/.local/bin/dotfiles"
 check test ! -L "$HOME/.local/bin/edit"
+check test ! -L "$HOME/.local/bin/devshell"
 for file in $agent_files; do
   check test ! -L "$(agent_path "$file")"
 done
@@ -963,6 +965,25 @@ for scenario in equal equal-dirty ahead ahead-dirty behind dirty-behind diverged
   esac
 done
 
+# On macOS, linking starts Docker's config with the folder Homebrew keeps its
+# compose and buildx in; a config already there is Docker's, and Linux gets
+# none.
+(
+  DOCKER_CONFIG="$test_root/docker-config"
+  is_darwin() { :; }
+  docker_cli_config > "$test_root/docker.log"
+  check grep -Fq '"cliPluginsExtraDirs": ["/opt/homebrew/lib/docker/cli-plugins"]' "$DOCKER_CONFIG/config.json"
+  check grep -Fqx "created $DOCKER_CONFIG/config.json" "$test_root/docker.log"
+  printf '{"auths": {}}\n' > "$DOCKER_CONFIG/config.json"
+  docker_cli_config > "$test_root/docker.log"
+  check test "$(cat "$DOCKER_CONFIG/config.json")" = '{"auths": {}}'
+  check test ! -s "$test_root/docker.log"
+  rm -r "$DOCKER_CONFIG"
+  is_darwin() { return 1; }
+  docker_cli_config
+  check test ! -e "$DOCKER_CONFIG"
+)
+
 # git_identity follows Git's own rules: under useConfigOnly, nothing configured
 # fails and a name with an email succeeds.
 (
@@ -1203,6 +1224,30 @@ fi
 check doctor_says ✗ Homebrew missing administrator 'Standard accounts' 'dotfiles install'
 check doctor_says ✗ 'Xcode CLT' missing administrator 'Standard accounts'
 check doctor_says ! casks Applications
+# On macOS, doctor checks that Docker's CLI finds compose and buildx, which
+# devshell needs, and names the setting that shows Docker where they are.
+for plugins in found missing; do
+  (
+    PATH=/usr/bin:/bin
+    brew_bin() { return 1; }
+    is_darwin() { :; }
+    login_shell() { printf '/bin/zsh\n'; }
+    git_identity() { :; }
+    docker() {
+      [ "$plugins" = found ] || return 1
+      case "$1 $2" in
+        'compose version' | 'buildx version') return 0 ;;
+      esac
+      return 1
+    }
+    with_layout doctor_dotfiles
+  ) > "$test_root/doctor.log" 2>&1 || :
+  if [ "$plugins" = found ]; then
+    check doctor_says ✓ 'Docker plugins' compose buildx
+  else
+    check doctor_says ✗ 'Docker plugins' "can't find compose or buildx" cliPluginsExtraDirs lib/docker/cli-plugins docker/config.json
+  fi
+done
 
 # Codespaces and dev containers install unattended in bash: install switches
 # the login shell to zsh through passwordless sudo, and nowhere else.
