@@ -265,11 +265,13 @@ link_npm_global_config() {
 
 # Where each agent reads its user-wide instructions: a file of the name it
 # expects in its home (zsh/xdg.sh), linked to the shared agents/instructions.md.
-# OpenCode reads that file through opencode/opencode.jsonc instead.
+# Copilot's home is ~/.copilot even where COPILOT_HOME says otherwise: its
+# desktop app reads that one. OpenCode reads the shared file through
+# opencode/opencode.jsonc instead.
 agent_instructions() {
   "$@" Codex "$CODEX_HOME/AGENTS.md"
   "$@" Claude "$CLAUDE_CONFIG_DIR/CLAUDE.md"
-  "$@" Copilot "$COPILOT_HOME/copilot-instructions.md"
+  "$@" Copilot "$HOME/.copilot/copilot-instructions.md"
 }
 
 # A plain file there is the user's own; links are this repo's to manage.
@@ -1006,8 +1008,9 @@ doctor_dotfiles() {
   fi
 
   # Hidden entries the layout expects in $HOME: the hidden top level of each
-  # XDG and command home, the zsh entrypoint, the OS's own files, and the
-  # homes OpenSSH and the AWS CLI hardcode
+  # XDG and command home, the zsh entrypoint, the OS's own files, the homes
+  # OpenSSH and the AWS CLI hardcode, and the two the GitHub Copilot app keeps:
+  # Copilot's home and its local models' cache
   layout=
   for root in "$xdg_config_home" "$xdg_data_home" "$xdg_state_home" "$xdg_cache_home" "$user_bin_home"; do
     case "$root" in
@@ -1022,7 +1025,7 @@ doctor_dotfiles() {
       *" $name "*) continue ;;
     esac
     case "$name" in
-      .zshenv|.ssh|.aws|.Trash|.CFUserTextEncoding|.DS_Store) continue ;;
+      .zshenv|.ssh|.aws|.copilot|.github-copilot-cli|.Trash|.CFUserTextEncoding|.DS_Store) continue ;;
       # Linux homes start with these from /etc/skel
       .bashrc|.profile|.bash_logout) is_darwin || continue ;;
     esac

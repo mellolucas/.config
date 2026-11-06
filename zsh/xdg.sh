@@ -4,8 +4,8 @@
 
 # Agents keep config, sessions, and logs in one home, so it lives with data;
 # Codex splits off its database as state. Codex will not start until its homes
-# exist, so the installer creates them.
-export COPILOT_HOME="${COPILOT_HOME:-$XDG_DATA_HOME/copilot}"
+# exist, so the installer creates them. Copilot keeps ~/.copilot, which its
+# desktop app reads: apps started outside a shell get no COPILOT_HOME.
 export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$XDG_DATA_HOME/claude}"
 export CODEX_HOME="${CODEX_HOME:-$XDG_DATA_HOME/codex}"
 export CODEX_SQLITE_HOME="${CODEX_SQLITE_HOME:-$XDG_STATE_HOME/codex}"

@@ -25,6 +25,8 @@ unset HOMEBREW_BUNDLE_FILE_GLOBAL
 xdg_vars=$(sed -n 's/^export \([A-Z_][A-Z0-9_]*\)=.*/\1/p' "$repo/zsh/xdg.sh")
 # shellcheck disable=SC2086 # one variable name per word
 unset $xdg_vars
+# Copilot's home follows each test's HOME, never the caller's COPILOT_HOME.
+unset COPILOT_HOME
 mkdir -p "$HOME" "$test_root/repo/zsh" "$test_root/bin"
 cp "$repo/install.sh" "$test_root/repo/install.sh"
 cp "$repo/zsh/.zshenv" "$repo/zsh/homebrew.sh" "$repo/zsh/xdg.sh" "$test_root/repo/zsh/"
@@ -32,8 +34,15 @@ mkdir -p "$test_root/repo/homebrew" "$test_root/repo/zsh/bin" "$test_root/repo/a
 cp "$repo/homebrew/npmrc" "$test_root/repo/homebrew/npmrc"
 cp "$repo/zsh/bin/edit" "$test_root/repo/zsh/bin/edit"
 cp "$repo/agents/instructions.md" "$test_root/repo/agents/instructions.md"
-# Where each agent reads its user-wide instructions, under XDG_DATA_HOME
+# Where each agent reads its user-wide instructions: under XDG_DATA_HOME, but
+# Copilot's in its own ~/.copilot, which its desktop app shares.
 agent_files='codex/AGENTS.md claude/CLAUDE.md copilot/copilot-instructions.md'
+agent_path() {
+  case "$1" in
+    copilot/*) printf '%s\n' "$HOME/.$1" ;;
+    *) printf '%s\n' "$XDG_DATA_HOME/$1" ;;
+  esac
+}
 
 # Load function definitions without the CLI dispatcher.
 test "$(grep -c '^# CLI dispatcher\.$' "$repo/install.sh")" = 1
@@ -57,15 +66,16 @@ fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 check() { "$@" || fail "$*"; }
 
 # The zsh entrypoint is quiet, needs no PATH, creates nothing, and loads the
-# tool homes from beside its link target.
+# tool homes from beside its link target; Copilot keeps its own ~/.copilot.
 # shellcheck disable=SC2016
-check env -u ZDOTDIR ENTRYPOINT="$repo/zsh/.zshenv" zsh -f -c '
+env -u ZDOTDIR ENTRYPOINT="$repo/zsh/.zshenv" zsh -f -c '
   PATH=""
   . "$ENTRYPOINT"
   [[ $ZDOTDIR == "$XDG_CONFIG_HOME/zsh" ]] &&
     [[ $CODEX_HOME == "$XDG_DATA_HOME/codex" ]] &&
+    (( ! ${+COPILOT_HOME} )) &&
     [[ $NPM_CONFIG_CACHE == "$XDG_CACHE_HOME/npm" ]]
-' > "$test_root/env.log" 2>&1
+' > "$test_root/env.log" 2>&1 || fail "the zsh entrypoint set up another environment: $(cat "$test_root/env.log")"
 check test ! -s "$test_root/env.log"
 check test ! -e "$XDG_CONFIG_HOME"
 
@@ -222,7 +232,7 @@ check test -L "$HOME/.zshenv"
 check test -L "$HOME/.local/bin/dotfiles"
 check test "$(readlink "$HOME/.local/bin/edit")" = "$repo_dir/zsh/bin/edit"
 for file in $agent_files; do
-  check test "$(readlink "$XDG_DATA_HOME/$file")" = "$repo_dir/agents/instructions.md"
+  check test "$(readlink "$(agent_path "$file")")" = "$repo_dir/agents/instructions.md"
 done
 check test -d "$XDG_DATA_HOME/codex"
 check test -d "$XDG_STATE_HOME/codex"
@@ -242,7 +252,7 @@ check test ! -e "$HOME/.zshenv"
 check test ! -L "$HOME/.local/bin/dotfiles"
 check test ! -L "$HOME/.local/bin/edit"
 for file in $agent_files; do
-  check test ! -L "$XDG_DATA_HOME/$file"
+  check test ! -L "$(agent_path "$file")"
 done
 check test -L "$XDG_CONFIG_HOME/foreign"
 check test -f "$test_root/foreign"
@@ -347,8 +357,8 @@ $npm_update"
       check test -d "$XDG_STATE_HOME/codex"
       # Each agent's instructions link the shared file, and the rerun left them.
       for file in $agent_files; do
-        check test "$(readlink "$XDG_DATA_HOME/$file")" = "$repo_dir/agents/instructions.md"
-        check grep -Fqx "ok: $XDG_DATA_HOME/$file already linked" "$HOME/dispatch.log"
+        check test "$(readlink "$(agent_path "$file")")" = "$repo_dir/agents/instructions.md"
+        check grep -Fqx "ok: $(agent_path "$file") already linked" "$HOME/dispatch.log"
       done
     fi
     if [ "$operation" = link ]; then
@@ -580,11 +590,11 @@ fi
   check test ! -L "$own"
   check cmp "$own" "$HOME/own.md"
   for file in codex/AGENTS.md copilot/copilot-instructions.md; do
-    check test "$(readlink "$XDG_DATA_HOME/$file")" = "$repo_dir/agents/instructions.md"
+    check test "$(readlink "$(agent_path "$file")")" = "$repo_dir/agents/instructions.md"
   done
   "$installer" uninstall >> "$HOME/dispatch.log" 2>&1
   for file in codex/AGENTS.md copilot/copilot-instructions.md; do
-    check test ! -L "$XDG_DATA_HOME/$file"
+    check test ! -L "$(agent_path "$file")"
   done
   check test ! -L "$own"
   check cmp "$own" "$HOME/own.md"
@@ -1001,7 +1011,7 @@ doctor_says() (
   exit 1
 )
 : > "$HOME/.zshrc"
-mkdir "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache"
+mkdir "$HOME/.codex" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.github-copilot-cli"
 ln -s "$test_root/missing" "$HOME/.dangling"
 mkdir -p "$XDG_CONFIG_HOME"
 rm -rf "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/edit"
@@ -1009,7 +1019,7 @@ ln -s "$test_root/missing" "$XDG_CONFIG_HOME/zsh"
 ln -s "$repo_dir/retired" "$XDG_CONFIG_HOME/retired"
 # Codex's instructions stay linked; Claude's become the user's own, and
 # Copilot's go missing.
-rm "$XDG_DATA_HOME/claude/CLAUDE.md" "$XDG_DATA_HOME/copilot/copilot-instructions.md"
+rm "$XDG_DATA_HOME/claude/CLAUDE.md" "$HOME/.copilot/copilot-instructions.md"
 printf '# Mine\n' > "$XDG_DATA_HOME/claude/CLAUDE.md"
 if (
   # A hidden custom XDG home is part of the layout; the default name is not.
@@ -1019,7 +1029,11 @@ if (
 ) > "$test_root/doctor.log" 2>&1; then
   fail 'doctor exited 0 with problems'
 fi
-check doctor_says ! home '.cache .copilot .dangling .zshrc ..legacy'
+check doctor_says ! home '.cache .codex .dangling .zshrc ..legacy'
+# Copilot's own home, from linking its instructions, and the GitHub Copilot
+# app's local models' cache are no clutter.
+check test -d "$HOME/.copilot"
+if grep -E -q '^! home .*\.(copilot|github-copilot-cli)' "$test_root/doctor.log"; then fail "doctor counted the GitHub Copilot app's folders as clutter"; fi
 # shellcheck disable=SC2088 # the label shows a literal ~
 check doctor_says ! '~/.zshrc' ZDOTDIR zsh/local.zsh
 if grep -Fq .zprofile "$test_root/doctor.log"; then fail 'doctor reported an absent .zprofile'; fi
@@ -1042,7 +1056,7 @@ fi
 # Every problem marked counts.
 marked=$(grep -c '^✗ ' "$test_root/doctor.log")
 check grep -Fqx "$marked problems found" "$test_root/doctor.log"
-rm -r "$HOME/.zshrc" "$HOME/.copilot" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.dangling"
+rm -r "$HOME/.zshrc" "$HOME/.codex" "$HOME/.ssh" "$HOME/..legacy" "$HOME/.cache" "$HOME/.tool-cache" "$HOME/.dangling" "$HOME/.github-copilot-cli"
 rm "$XDG_CONFIG_HOME/zsh"
 run_doctor > "$test_root/doctor.log" 2>&1 || true
 check doctor_says ✓ home
@@ -1084,16 +1098,24 @@ check test "$(tail -n 1 "$test_root/doctor.log")" = 'no problems found'
 check doctor_says ✓ links '3 in'
 check doctor_says ✓ 'edit command' .local/bin/edit
 check doctor_says ✓ opencode
-check doctor_says ✓ 'Copilot instructions' data/copilot/copilot-instructions.md
+check doctor_says ✓ 'Copilot instructions' .copilot/copilot-instructions.md
 check doctor_says ✓ 'Claude instructions' 'your own'
 check doctor_says ✓ 'Git identity'
+# A COPILOT_HOME in the caller's environment, as in shells started before an
+# update, moves neither Copilot's link nor doctor's check off ~/.copilot.
+rm "$HOME/.copilot/copilot-instructions.md"
+(export COPILOT_HOME="$XDG_DATA_HOME/copilot"; with_layout link_dotfiles) > "$test_root/link.log"
+check test "$(readlink "$HOME/.copilot/copilot-instructions.md")" = "$repo_dir/agents/instructions.md"
+check test ! -e "$XDG_DATA_HOME/copilot"
+(export COPILOT_HOME="$XDG_DATA_HOME/copilot"; complete_doctor) > "$test_root/doctor.log" 2>&1 || fail "doctor found problems with a stale COPILOT_HOME: $(cat "$test_root/doctor.log")"
+check doctor_says ✓ 'Copilot instructions' .copilot/copilot-instructions.md
 # Clutter in $HOME alone is a note, not a problem.
 : > "$HOME/.zshrc"
-mkdir "$HOME/.copilot"
+mkdir "$HOME/.codex"
 complete_doctor > "$test_root/doctor.log" 2>&1 || fail "doctor counted home clutter as a problem: $(cat "$test_root/doctor.log")"
-check doctor_says ! home .copilot .zshrc
+check doctor_says ! home .codex .zshrc
 check test "$(tail -n 1 "$test_root/doctor.log")" = 'no problems found'
-rm -r "$HOME/.zshrc" "$HOME/.copilot"
+rm -r "$HOME/.zshrc" "$HOME/.codex"
 # A Homebrew that can't run, as when it can't download what it runs on, is a
 # problem named by the first Error: line of its output, not the advice after
 # it, or else by its last line.
