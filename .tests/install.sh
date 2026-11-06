@@ -73,6 +73,7 @@ env -u ZDOTDIR ENTRYPOINT="$repo/zsh/.zshenv" zsh -f -c '
   . "$ENTRYPOINT"
   [[ $ZDOTDIR == "$XDG_CONFIG_HOME/zsh" ]] &&
     [[ $CODEX_HOME == "$XDG_DATA_HOME/codex" ]] &&
+    [[ $DOCKER_CONFIG == "$XDG_CONFIG_HOME/docker" && $LIMA_HOME == "$XDG_DATA_HOME/lima" ]] &&
     (( ! ${+COPILOT_HOME} )) &&
     [[ $NPM_CONFIG_CACHE == "$XDG_CACHE_HOME/npm" ]]
 ' > "$test_root/env.log" 2>&1 || fail "the zsh entrypoint set up another environment: $(cat "$test_root/env.log")"

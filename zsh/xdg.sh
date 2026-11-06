@@ -19,6 +19,11 @@ export GOPATH="${GOPATH:-$XDG_DATA_HOME/go}"
 export GOMODCACHE="${GOMODCACHE:-$XDG_CACHE_HOME/go/mod}"
 export GOBIN="${GOBIN:-$HOME/.local/bin}"
 
+# Docker's CLI keeps its config, contexts, and plugin settings in one folder;
+# Lima keeps the VM disks of Colima, which finds its own config folder.
+export DOCKER_CONFIG="${DOCKER_CONFIG:-$XDG_CONFIG_HOME/docker}"
+export LIMA_HOME="${LIMA_HOME:-$XDG_DATA_HOME/lima}"
+
 # macOS defaults these to ~/Library; each value is the tool's own Linux
 # default and moves the whole category. Other ~/Library defaults stay.
 export GOCACHE="${GOCACHE:-$XDG_CACHE_HOME/go-build}"
