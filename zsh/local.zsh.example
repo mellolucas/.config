@@ -34,7 +34,6 @@
 # export OPENCODE_CLI_CONFIG_CONTENT='{"animations": false}'
 
 # export SOME_TOOL_HOME="$XDG_CONFIG_HOME/some-tool"
-# export AWS_CONFIG_FILE="$XDG_CONFIG_HOME/aws/config"
 
 # alias vpn-status='scutil --nc list'
 
