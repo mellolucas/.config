@@ -87,11 +87,12 @@ Changes since `v0.0.1`.
 - **GitHub Copilot app:** on macOS, `local.Brewfile` can add GitHub's desktop
   app for Copilot (automations, Projects, computer use), which updates itself
   and shares Copilot CLI's skills, instructions, and sessions in `~/.copilot`.
-- **Packages you can trust:** every cask needs a pinned checksum, so a
-  download matches what Homebrew reviewed; one whose vendor serves its latest
-  build installs only with `args: { require_sha: false }` on its own line.
-  Taps outside Homebrew's own load only what you trust. Projects' runtimes
-  (Go, Bun, Python) come from their dev containers, or from `local.Brewfile`.
+- **Packages you can trust:** a cask installs only with a pinned checksum, so
+  its download matches what Homebrew reviewed; one whose vendor serves its
+  latest build needs `args: { require_sha: false }` on its own line. Bundle
+  checks this on installs, not upgrades. Taps outside Homebrew's own load only
+  what you trust. Projects' runtimes (Go, Bun, Python) come from their dev
+  containers, or from `local.Brewfile`.
 - **Dev containers:** in a project with one (`.devcontainer`), `workspace`
   opens its shell pane inside the container, and `devshell` enters it from
   any shell (`devshell CMD` runs a command there, as agents do for builds and
@@ -125,12 +126,17 @@ Changes since `v0.0.1`.
 - The Brewfile no longer lists Go, gopls, Bun, Python, Claude Code, Copilot
   CLI, Codex, or the GitHub Copilot app. Nothing is uninstalled, but
   `dotfiles update` stops updating them: copy the lines you use from
-  `homebrew/local.Brewfile.example` into `local.Brewfile`. On macOS, Copilot
-  CLI and Codex come as casks: first run
-  `npm uninstall --global @github/copilot @openai/codex`, as each cask installs
-  a command of the same name; their homes and sessions stay. Instruction
-  links that earlier versions made for agents you don't use stay too: remove
-  them, with an empty `~/.copilot`, if you like.
+  `homebrew/local.Brewfile.example` into `local.Brewfile`. Copilot CLI's and
+  Codex's casks install commands of the names npm's do: fetch them first
+  (`brew fetch --cask copilot-cli codex`), then run
+  `npm uninstall --global @github/copilot @openai/codex` and
+  `dotfiles bundle`, and check `copilot --version` and `codex --version`.
+  Where macOS stops them (the README's Network access), switch their lines in
+  `local.Brewfile` to the npm ones, run
+  `brew uninstall --cask copilot-cli codex`, then `dotfiles bundle`. Their
+  homes and sessions stay either way. Instruction links that earlier versions
+  made for agents you don't use stay too: remove them, with an empty
+  `~/.copilot`, if you like.
 - `dotfiles status` is gone: `gg` in the checkout shows its state. So is
   `dotfiles cleanup`: `dotfiles doctor` notes what lies outside the XDG layout
   in `$HOME`.
@@ -178,8 +184,9 @@ Changes since `v0.0.1`.
   `claude`; Copilot keeps `~/.copilot`, which the GitHub Copilot app shares.
   On a machine set up earlier, quit the agents and move those two folders
   aside as backups (`codex` to `codex.backup`, say): `dotfiles link` creates
-  them for the shared instructions, and agents run since may have saved logins
-  or sessions there. Move `~/.codex` and `~/.claude` into their places, and
+  them for the shared instructions where those agents are installed, and
+  agents run since may have saved logins or sessions there. Move `~/.codex`
+  and `~/.claude` into their places, and
   `~/.claude.json` into `claude`; then run `dotfiles link` to link the
   instructions inside again. Claude Code may ask you to log in
   again. Links that already point there can simply be removed. Move Codex's
@@ -212,10 +219,10 @@ Changes since `v0.0.1`.
   `~/Library/Logs/Homebrew`, and `~/Library/Caches/go-build` only hold caches
   and logs and can be deleted, as can `~/go` once nothing you keep lives there
   (`GOMODCACHE=~/go/pkg/mod go clean -modcache` clears its read-only cache).
-- An existing plain `$(brew --prefix)/etc/npmrc` stays: add
-  `cache=${HOME}/.cache/npm` to it, or remove it so the installer links its
-  own. Registry or certificate settings that Brewfile npm entries need belong
-  in that file.
+- `dotfiles link` removes the link to `homebrew/npmrc` that earlier versions
+  made at `$(brew --prefix)/etc/npmrc`, as Bundle gives the npm it runs a
+  cache of its own. A plain file there stays: registry or certificate
+  settings that Brewfile npm entries need belong in it.
 - Git's global ignore now covers only operating-system clutter. Add
   dependencies, build output, and secrets (`node_modules`, `.venv`,
   `__pycache__`, `.env`) to each project's `.gitignore`, or to
@@ -243,6 +250,9 @@ Known limits:
 - Tables keep their natural width, so a narrower view wraps their rows, or
   cuts them with wrapping off. less before 621 (Ubuntu 24.04 and Debian 12
   ship 590) wraps in the middle of words.
+- On a network that inspects TLS, macOS can't confirm that a command-line
+  cask, such as Copilot CLI or Codex, is notarized, and stops it at its first
+  run; the README's Network access lists the choices.
 - The pickers need fzf 0.68 or later, as Homebrew installs: an older fzf found
   first on `PATH` rejects `fzf/fzfrc`'s wrapping options.
 - On Linux, Ghostty keeps its own pane keys, and Neovim's windows are
