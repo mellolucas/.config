@@ -460,26 +460,6 @@ bundle_dotfiles() {
     bundle_skipped="$bundle_skipped  Brewfile entries that failed, named in Homebrew's output above
 "
 
-  # Bundle installs npm packages but never upgrades them. Mirror its
-  # safeguards: no install scripts and a one-day release cooldown.
-  if [ -n "${HOMEBREW_BUNDLE_NO_UPGRADE-}" ]; then
-    :
-  elif ! npm_packages=$("$brew" bundle list --global --npm); then
-    bundle_skipped="$bundle_skipped  npm package updates: Homebrew couldn't list them
-"
-  elif [ -z "$npm_packages" ]; then
-    :
-  elif ! command -v npm >/dev/null 2>&1; then
-    bundle_skipped="$bundle_skipped  npm package updates: npm is not installed
-"
-  else
-    printf 'updating npm packages from the Brewfile\n'
-    # shellcheck disable=SC2086 # one package name per word
-    npm update --global --ignore-scripts --min-release-age=1 $npm_packages ||
-      bundle_skipped="$bundle_skipped  npm package updates, named in npm's output above
-"
-  fi
-
   if [ -n "$bundle_skipped" ]; then
     print_skipped bundle
     return 0
@@ -1109,7 +1089,7 @@ commands:
                  Codespaces and dev containers, make zsh the login shell too
   update         fetch upstream, fast-forward when clean, then relink and
                  apply the Brewfile
-  bundle         apply the Brewfile, then update its npm packages
+  bundle         apply the Brewfile, its npm packages included
   link           relink configs into XDG_CONFIG_HOME without touching packages
   doctor         check the setup and name fixes; exits 1 on problems
   uninstall      remove the symlinks this repository owns

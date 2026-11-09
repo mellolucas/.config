@@ -284,7 +284,7 @@ for path in "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin
 done
 rm "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin/edit" "$HOME/.zshenv" "$XDG_DATA_HOME/codex/AGENTS.md"
 
-# Exercise native dispatch without invoking real Homebrew or npm.
+# Exercise native dispatch without invoking real Homebrew.
 mkdir "$test_root/package-bin"
 cat > "$test_root/package-bin/brew" <<'EOF'
 #!/bin/sh
@@ -294,24 +294,13 @@ case "$*" in
     printf 'invoked\n' >> "$HOME/brew.log"
     [ -z "${FAIL_BUNDLE-}" ] || exit 1
     ;;
-  'bundle list --global --npm')
-    [ -z "${FAIL_NPM_LIST-}" ] || exit 1
-    printf '@scope/tool\nplain-tool\n'
-    ;;
   --prefix) printf '%s\n' "$HOME/prefix" ;;
   --repository) printf '%s\n' "${BREW_REPOSITORY:-$HOME/prefix}" ;;
   *) exit 1 ;;
 esac
 EOF
-cat > "$test_root/package-bin/npm" <<'EOF'
-#!/bin/sh
-printf '%s\n' "$*" >> "$HOME/npm.log"
-printf '%s\n' "${NPM_CONFIG_CACHE-unset}" >> "$HOME/npm-cache.log"
-[ -z "${FAIL_NPM_UPDATE-}" ] || exit 1
-EOF
 printf '#!/bin/sh\nprintf "Linux\\n"\n' > "$test_root/package-bin/uname"
-chmod +x "$test_root/package-bin/brew" "$test_root/package-bin/npm" "$test_root/package-bin/uname" "$installer"
-npm_update='update --global --ignore-scripts --min-release-age=1 @scope/tool plain-tool'
+chmod +x "$test_root/package-bin/brew" "$test_root/package-bin/uname" "$installer"
 for operation in bundle install link no-upgrade; do
   (
     export HOME="$test_root/package-$operation" PATH="$test_root/package-bin:$PATH"
@@ -338,14 +327,6 @@ for operation in bundle install link no-upgrade; do
 invoked"
       check test -f "$XDG_STATE_HOME/dotfiles/updated"
     fi
-    # npm upgrades follow Bundle runs unless upgrades are disabled.
-    if [ "$operation" = link ] || [ -n "${HOMEBREW_BUNDLE_NO_UPGRADE-}" ]; then
-      check test ! -e "$HOME/npm.log"
-    else
-      check test "$(cat "$HOME/npm.log")" = "$npm_update
-$npm_update"
-      check test "$(sort -u "$HOME/npm-cache.log")" = "$XDG_CACHE_HOME/npm"
-    fi
     if [ "$operation" = bundle ]; then
       check test ! -e "$XDG_CONFIG_HOME"
       check test ! -L "$HOME/.zshenv"
@@ -371,9 +352,8 @@ $npm_update"
   )
 done
 
-# A failed Brewfile step skips only itself: npm still updates, the step is
-# listed as skipped, and nothing stamps the reminder; bundle and install exit
-# 1, install after its closing steps.
+# A failed Brewfile step is listed as skipped, and nothing stamps the
+# reminder; bundle and install exit 1, install after its closing steps.
 for operation in bundle install; do
   (
     export HOME="$test_root/failed-$operation" PATH="$test_root/package-bin:$PATH" FAIL_BUNDLE=1
@@ -386,53 +366,13 @@ for operation in bundle install; do
     rc=0
     "$installer" "$operation" > "$HOME/dispatch.log" 2>&1 || rc=$?
     check test "$rc" = 1
-    check test "$(cat "$HOME/npm.log")" = "$npm_update"
     check grep -Fqx 'skipped:' "$HOME/dispatch.log"
     check grep -q '^  .*Brewfile' "$HOME/dispatch.log"
-    if grep -q '^  .*npm' "$HOME/dispatch.log"; then fail "$operation listed npm's update as skipped"; fi
     check test ! -e "$XDG_STATE_HOME/dotfiles/updated"
     if [ "$operation" = install ]; then
       check grep -q '^done, except' "$HOME/dispatch.log"
       check grep -Fq 'exec zsh -l' "$HOME/dispatch.log"
       check grep -Fq 'dotfiles doctor' "$HOME/dispatch.log"
-    fi
-  )
-done
-
-# npm's updates are listed as skipped, and bundle exits 1, when Homebrew can't
-# list them, when npm fails, or, without running npm, when it is neither beside
-# brew nor on PATH (a bundle that failed before Node arrived).
-mkdir "$test_root/no-npm-bin"
-ln -s "$test_root/package-bin/brew" "$test_root/no-npm-bin/brew"
-for failure in list update missing; do
-  (
-    export HOME="$test_root/npm-$failure" PATH="$test_root/package-bin:$PATH"
-    export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
-    export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
-    export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
-    unset HOMEBREW_BUNDLE_NO_UPGRADE
-    mkdir "$HOME" "$HOME/prefix"
-    printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
-    case "$failure" in
-      list) export FAIL_NPM_LIST=1 ;;
-      update) export FAIL_NPM_UPDATE=1 ;;
-      missing)
-        PATH="$test_root/no-npm-bin:/usr/bin:/bin"
-        if command -v npm >/dev/null 2>&1; then
-          printf 'SKIP: bundle without npm (the system has %s)\n' "$(command -v npm)"
-          exit 0
-        fi
-        ;;
-    esac
-    rc=0
-    "$installer" bundle > "$HOME/dispatch.log" 2>&1 || rc=$?
-    check test "$rc" = 1
-    check grep -Fqx 'skipped:' "$HOME/dispatch.log"
-    check grep -q '^  npm package updates' "$HOME/dispatch.log"
-    check test ! -e "$XDG_STATE_HOME/dotfiles/updated"
-    if [ "$failure" = missing ]; then
-      check grep -q '^  npm.*not installed' "$HOME/dispatch.log"
-      if grep -q 'not found' "$HOME/dispatch.log"; then fail 'bundle ran npm where none is installed'; fi
     fi
   )
 done
@@ -605,8 +545,8 @@ fi
 )
 
 # Fresh installs run brew from its prefix before Homebrew is on PATH; Bundle
-# and npm must still find npm next to brew, and npm's global config must be in
-# place before Bundle runs npm.
+# must still find npm next to brew, and npm's global config must be in place
+# before Bundle runs npm.
 mkdir "$test_root/brew-prefix" "$test_root/fresh-home" "$test_root/fresh-home/prefix"
 cat > "$test_root/brew-prefix/brew" <<'EOF'
 #!/bin/sh
@@ -616,13 +556,11 @@ case "$*" in
     printf '%s\n' "$PATH" > "$HOME/brew-path.log"
     if [ -L "$HOME/prefix/etc/npmrc" ]; then : > "$HOME/npmrc-linked"; fi
     ;;
-  'bundle list --global --npm') printf '@scope/tool\nplain-tool\n' ;;
   --prefix) printf '%s\n' "$HOME/prefix" ;;
   *) exit 1 ;;
 esac
 EOF
-cp "$test_root/package-bin/npm" "$test_root/brew-prefix/npm"
-chmod +x "$test_root/brew-prefix/brew" "$test_root/brew-prefix/npm"
+chmod +x "$test_root/brew-prefix/brew"
 (
   # shellcheck source=/dev/null
   . "$test_root/library.sh"
@@ -635,7 +573,6 @@ chmod +x "$test_root/brew-prefix/brew" "$test_root/brew-prefix/npm"
   bundle_dotfiles
 ) > "$test_root/fresh.log" 2>&1 || { cat "$test_root/fresh.log" >&2; fail 'bundle with Homebrew off PATH'; }
 check grep -q "^$test_root/brew-prefix:" "$test_root/fresh-home/brew-path.log"
-check test "$(cat "$test_root/fresh-home/npm.log")" = "$npm_update"
 check test -e "$test_root/fresh-home/npmrc-linked"
 
 printf 'older\n' > "$test_root/conflict.backup.20000101000000"
@@ -1323,7 +1260,6 @@ cat > "$test_root/get-bin/brew" <<'EOF'
 printf '%s\n' "$*" >> "$HOME/brew.log"
 case "$*" in
   'bundle --global') [ -z "${FAIL_BUNDLE-}" ] || exit 1 ;;
-  'bundle list --global --npm') ;;
   *) exit 1 ;;
 esac
 EOF
@@ -1339,7 +1275,6 @@ EOF
 chmod +x "$test_root/get-bin/curl" "$test_root/get-bin/xcode-select" \
   "$test_root/get-bin/git" "$test_root/get-bin/brew" "$test_root/get-bin/uname" \
   "$test_root/get-bin/id"
-ln -s "$test_root/package-bin/npm" "$test_root/get-bin/npm"
 mkdir -p "$test_root/get-clt/usr/bin"
 ln -s "$REAL_GIT" "$test_root/get-clt/usr/bin/git"
 
