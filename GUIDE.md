@@ -247,7 +247,7 @@ List what is here, then find a file by name or by content.
 | `rga TEXT` | Also **search** files that Git ignores |
 | `rgv TEXT` | **Browse** the matching lines file by file, each file's in the preview; Enter opens Neovim (in a workspace, its editor) at the first, with all of them in the quickfix list |
 
-In every picker with a preview (`fzfv`, `rgv`, `keys`, `Esc` then `c`): `Option+↓` / `Option+↑` scroll it by half a page and `Shift+↓` / `Shift+↑` by a line, Esc cancels. `fzfv` previews a file's first 500 lines, but renders a whole Markdown file.
+In every picker with a preview (`fzfv`, `rgv`, `keys`, `Esc` then `c`): `Option+↓` / `Option+↑` scroll it by half a page and `Shift+↓` / `Shift+↑` by a line, `Ctrl+/` turns its wrapping off and on, Esc cancels. `fzfv` previews a file's first 500 lines, but renders a whole Markdown file.
 
 - Not sure where to look? Narrow down first: `Esc` then `c` to the right directory, then `fzfv` or `Ctrl+T` from there.
 - Add eza flags as needed: `ll --sort=age`, `ll --inode`, `--icons=never`, `--no-git`.
@@ -283,18 +283,18 @@ Render Markdown and read long text comfortably.
 | Run or press | Result |
 | --- | --- |
 | `mdv FILE` | **Render** Markdown in the pager (`Tab` offers Markdown files) |
-| `mdv -w 120 FILE` | **Wrap** at 120 columns instead |
 | `glow` | **Browse** every Markdown file below here, hidden and ignored ones too |
 | `Space` / `b` (in less) | **Page** down / up |
 | `/` then `n` / `N` (in less) | **Search**, **next**, **previous** |
-| `-S` then Enter (in less) | **Toggle** folding and chopping long lines |
+| `-S` then Enter (in less) | **Toggle** wrapping long lines |
 | `←` / `→` (in less) | **Scroll** horizontally |
 | `q` (in less) | **Back** to the shell |
 | `Shift`+drag | **Select** text while less owns the mouse |
 | `Space t m` (in Neovim) | **Swap** Markdown source and rendered view (`q` also leaves the view) |
 
-- `b FILE` shows a file with syntax colors; `cat` is bat without decoration.
-- Previews render the saved file, not unsaved edits; very long renders can lose their beginning. Toggle again after resizing.
+- Text wraps at the pane's width, never at a fixed one; `-S` in less, `Ctrl+/` in a picker, and `Space t w` in Neovim (the rendered view too) turn that off and on. Tables keep their natural width, so a narrow pane wraps their rows.
+- `b FILE` shows a file with syntax colors, its long lines cut until `-S`; `cat` is bat without decoration.
+- Previews render the saved file, not unsaved edits.
 
 ## Maintain: Maintain the setup
 

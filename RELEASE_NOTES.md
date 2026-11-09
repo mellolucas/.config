@@ -64,12 +64,18 @@ Changes since `v0.0.1`.
   taking what `gd` takes; `Space t u` shows Neovim's undo tree, which brings
   back any earlier version of a file.
 - **Pickers:** in every fzf picker, `Option+↑`/`Option+↓` scroll the preview
-  (`Shift+↑`/`Shift+↓` by a line). `fzfv` picks a file with a preview.
+  (`Shift+↑`/`Shift+↓` by a line), and `Ctrl+/` turns its wrapping off and
+  on. `fzfv` picks a file with a preview.
 - **Git:** `gg` and `ggg` show a repository card, which also appears when you
   enter a repository; short diff and log aliases follow a small grammar
   (`keys git`); Delta shows unified diffs.
 - **Documents:** `mdv` renders Markdown in the pager, and `Space t m` in
   Neovim (`q` leaves the rendered view).
+- **Text that fits its pane:** nothing breaks lines at a fixed width. `keys`,
+  `mdv`, the pickers' previews, and Neovim's rendered Markdown wrap at the
+  pane's width, between words, and `-S` in less, `Ctrl+/` in a picker, or
+  `Space t w` in Neovim turns that off; `b` leaves long lines to less, which
+  cuts them until `-S`.
 - **Agents:** OpenCode is the default; Claude Code, Copilot CLI, and Codex
   are installed too, and all four read this setup's shared instructions,
   `agents/instructions.md`. Agents notify you when they finish or need you
@@ -219,6 +225,9 @@ Known limits:
   scales are connected.
 - Markdown previews render the saved file, with approximate positioning, and
   Delta can truncate long lines.
+- Tables keep their natural width, so a narrower view wraps their rows, or
+  cuts them with wrapping off. less before 621 (Ubuntu 24.04 and Debian 12
+  ship 590) wraps in the middle of words.
 - On Linux, Ghostty keeps its own pane keys, and Neovim's windows are
   `Ctrl+W h/j/k/l`.
 - In tmux, Command keys never arrive: its own keys follow its prefix,
