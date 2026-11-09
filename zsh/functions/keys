@@ -102,19 +102,20 @@ if [[ -z $topic && -t 0 && -t 1 ]] && (( ! plain )) && command -v fzf >/dev/null
     print -r -- "$intro" > "$shelf/all.md"
     print -rl -- "${menu[@]}" > "$shelf/pages"
     print -rl -- "${entries[@]}" > "$shelf/entries"
+    # glow breaks no lines, and its table rows lose their padding: fzf wraps
+    # them at the preview's width
     preview='cat "$KEYS_SHELF"/{1}.md'
     command -v glow >/dev/null 2>&1 &&
-      preview='glow --style "$KEYS_STYLE" --width "$FZF_PREVIEW_COLUMNS" "$KEYS_SHELF"/{1}.md'
-    # Only the repository's fzf options (colors and preview keys); personal ones could reshape the picker.
+      preview='glow --style "$KEYS_STYLE" --width 0 "$KEYS_SHELF"/{1}.md | sed "s/ *\$//"'
+    # Only the repository's fzf options (colors, preview and wrap keys); personal ones could reshape the picker.
     # The preview sits beside the list from 110 columns (its threshold measures
-    # the preview), and the wrap key shows beside the count once results do.
+    # the preview), and the wrap key shows beside the count.
     selection=$(KEYS_SHELF=$shelf KEYS_STYLE=$repo/glow/guide.json \
       FZF_DEFAULT_OPTS= FZF_DEFAULT_OPTS_FILE=$repo/fzf/fzfrc \
-      fzf --layout=reverse --no-multi --wrap --delimiter=$'\t' --with-nth=2.. $query_option \
+      fzf --layout=reverse --no-multi --wrap-word --delimiter=$'\t' --with-nth=2.. $query_option \
         --bind='change:reload:[ -z {q} ] && cat "$KEYS_SHELF/pages" || cat "$KEYS_SHELF/entries"' \
-        --bind='ctrl-/:toggle-wrap,alt-/:toggle-wrap' \
-        --info-command='echo "$FZF_INFO${FZF_QUERY:+ · Ctrl+/ toggles wrapping}"' \
-        --preview=$preview --preview-window='right,50%,wrap,<55(down,50%,wrap)' \
+        --info-command='echo "$FZF_INFO · Ctrl+/ toggles wrapping"' \
+        --preview=$preview --preview-window='right,50%,wrap-word,<55(down,50%,wrap-word)' \
         --prompt='Find a task > ' \
         --header=$'Pick a page, or type to search every line\nEnter reads the page. Esc returns to the shell.' \
         < "$shelf/$initial") || result=$?
@@ -151,13 +152,16 @@ content+=$'\n---\n`Cmd+D` is a chord (hold Command, press d); `Space t m` is typ
 local reader=0
 if (( ! plain )) && [[ -t 1 ]] && command -v glow >/dev/null 2>&1 && command -v less >/dev/null 2>&1; then
   reader=1
-  content+='; `q` leaves the reader'
+  content+='; `q` leaves the reader, and `-S` then `Enter` toggles wrapping'
 fi
 content+=$'.\n'
 
 if (( reader )); then
-  local width=$(( COLUMNS > 0 && COLUMNS < 80 ? COLUMNS : 80 ))
-  print -r -- "$content" | PAGER='less -R' LESS=-R glow --style "$repo/glow/guide.json" --width "$width" --pager -
+  # glow breaks no lines, and its table rows lose their padding: less wraps
+  # them at the pane's width, between words where it can (less 621 and later)
+  local options=-R
+  less --help 2>/dev/null | grep -q -e --wordwrap && options+=' --wordwrap'
+  print -r -- "$content" | glow --style "$repo/glow/guide.json" --width 0 - | sed 's/ *$//' | LESS=$options less
 else
   print -r -- "$content"
 fi
