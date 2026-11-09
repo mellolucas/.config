@@ -97,6 +97,10 @@ these waits.
   intended workflow. No config file is a valid outcome. Shared packages
   support the default environment or an explicitly approved general-use role;
   personal/project-specific choices remain local.
+- Text views never break lines themselves: renderers get no width
+  (`glow -w 0`, bat's `--wrap=never`), and the view wraps at its own width,
+  between words where it can, with its own toggle (`-S` in less, `Ctrl+/` in
+  fzf, `Space t w` in Neovim). Command help keeps its 80 columns.
 - `zsh/homebrew.sh` and `zsh/xdg.sh` are shared by shell startup and
   `install.sh`; keep them POSIX sh so both can source them.
 - `get.sh` is the one-command installer: standalone POSIX sh that runs before
