@@ -577,9 +577,306 @@ do
   fn.delete(dir, "rf")
 end
 
+-- In a project with a dev container, each language server runs there when
+-- the container has it, and here otherwise. Stand-in configs as
+-- nvim-lspconfig's: a program, a cmd function preferring the project's own,
+-- and gopls, whose own root rule asks this machine's go.
+do
+  local root, plain = fn.tempname(), fn.tempname()
+  fn.mkdir(root .. "/.git", "p")
+  fn.mkdir(root .. "/.devcontainer", "p")
+  fn.writefile({ "{}" }, root .. "/.devcontainer/devcontainer.json")
+  fn.mkdir(root .. "/node_modules/.bin", "p")
+  fn.writefile({ "#!/bin/sh" }, root .. "/node_modules/.bin/typescript-language-server")
+  fn.setfperm(root .. "/node_modules/.bin/typescript-language-server", "rwxr-xr-x")
+  fn.mkdir(plain .. "/.git", "p")
+  -- As Neovim names their files, through links (macOS's /var)
+  root, plain = vim.uv.fs_realpath(root), vim.uv.fs_realpath(plain)
+  vim.lsp.config("bashls", { cmd = { "bash-language-server", "start" }, filetypes = { "sh" }, root_markers = { ".git" } })
+  vim.lsp.config("ts_ls", {
+    cmd = function(dispatchers, config)
+      local cmd = "typescript-language-server"
+      local own = config.root_dir and config.root_dir .. "/node_modules/.bin/" .. cmd
+      if own and fn.executable(own) == 1 then
+        cmd = own
+      end
+      return vim.lsp.rpc.start({ cmd, "--stdio" }, dispatchers)
+    end,
+    filetypes = { "typescript" },
+  })
+  vim.lsp.config("gopls", { cmd = { "gopls" }, filetypes = { "go" }, root_dir = function() error("gopls's own rule ran") end })
+  -- This machine has bash-language-server, not gopls; devshell's container
+  -- has a program while $DEVSHELL_CHECK is 0, lacks it at 10 (by default),
+  -- and devshell fails at 1; the container holds /container/lib*.go, read
+  -- except from the folder $DEVSHELL_CAT_FAILS names; --no-start changes
+  -- nothing here
+  local real_path = vim.env.PATH
+  vim.env.PATH = bin .. ":/usr/bin:/bin"
+  stand_in("bash-language-server", 'echo "here $0 $*"')
+  local asked = fn.tempname()
+  stand_in("devshell",
+    'echo "$*" >> ' .. asked,
+    '[ "$1" != --no-start ] || shift',
+    'case "$1 $2" in',
+    "  'sh -c') cat > /dev/null; [ \"${DEVSHELL_CHECK:-10}\" != 1 ] || echo 'devshell: failed' >&2; exit \"${DEVSHELL_CHECK:-10}\" ;;",
+    "  'cat --') [ \"${DEVSHELL_CAT_FAILS-}\" != \"$(pwd -P)\" ] || { echo 'devshell: the container is down' >&2; exit 1; }",
+    "    case \"$3\" in /container/lib*.go) printf 'package lib\\n\\nfunc Lib() {}\\n' ;; *) exit 1 ;; esac ;;",
+    '  *) echo "container $*: $(cat)" ;;',
+    "esac")
+  local real_pack, real_config = vim.pack, vim.env.XDG_CONFIG_HOME
+  vim.pack, vim.env.XDG_CONFIG_HOME = { add = function() end }, fn.tempname()
+  dofile("nvim/lua/config/lsp.lua")
+  vim.pack, vim.env.XDG_CONFIG_HOME = real_pack, real_config
+  vim.lsp.enable({ "lua_ls", "biome", "yamlls", "bashls", "ts_ls", "basedpyright", "gopls" }, false)
+
+  -- The root each config finds for a buffer, or none: it starts no server. A
+  -- file read from a container gets its project's root, for the servers the
+  -- project ran then
+  local function root_of(name, file, devshell_root, servers)
+    local buf = fn.bufadd(file)
+    vim.b[buf].devshell_root = devshell_root
+    vim.b[buf].devshell_servers = servers
+    local found = false
+    vim.lsp.config[name].root_dir(buf, function(dir) found = dir or "(single file)" end)
+    api.nvim_buf_delete(buf, { force = true })
+    return found
+  end
+  assert(root_of("gopls", plain .. "/main.go") == false, "gopls started without a program or a dev container")
+  assert(root_of("gopls", root .. "/sub/main.go") == root, "gopls in a dev container project")
+  assert(root_of("bashls", plain .. "/run.sh") == plain, "bash-language-server here")
+  assert(root_of("bashls", "/container/lib.sh", root, { "bashls" }) == root, "a file read from a container")
+  assert(root_of("bashls", "/container/lib.sh", root, { "gopls" }) == false, "a server the project didn't run")
+
+  -- What each starts: the program here, or through devshell from the
+  -- project's folder, a cmd function's pick included
+  local real_start, started = vim.lsp.rpc.start, nil
+  local function record(argv, _, options)
+    started = { argv = argv, cwd = options and options.cwd }
+    return {}
+  end
+  vim.lsp.rpc.start = record
+  vim.lsp.config.bashls.cmd({}, { root_dir = plain })
+  assert(vim.deep_equal(started, { argv = { "bash-language-server", "start" } }), "here: " .. vim.inspect(started))
+  vim.lsp.config.bashls.cmd({}, { root_dir = root })
+  local bash = started.argv
+  assert(started.cwd == root and bash[1] == "sh" and vim.deep_equal({ unpack(bash, 4) }, { "devshell", "bash-language-server", "start" }),
+    "bridged: " .. vim.inspect(started))
+  vim.lsp.config.gopls.cmd({}, { root_dir = root })
+  local go = started.argv
+  vim.lsp.config.ts_ls.cmd({}, { root_dir = root })
+  assert(started.cwd == root and vim.deep_equal({ unpack(started.argv, 4) },
+    { "devshell", root .. "/node_modules/.bin/typescript-language-server", "--stdio" }), "a cmd function's pick: " .. vim.inspect(started))
+  assert(vim.lsp.rpc.start == record, "vim.lsp.rpc.start stays replaced after a cmd function")
+  vim.lsp.rpc.start = real_start
+
+  -- The bridge runs the program in the container when it has it, else here,
+  -- else not at all, quietly, as without a dev container; when devshell
+  -- fails, so does the server, with devshell's message and nothing run here.
+  -- The editor's first message reaches the program, as devshell passes what
+  -- it reads on
+  local function bridge_run(argv, check, input)
+    vim.env.DEVSHELL_CHECK = check
+    local run = vim.system(argv, { cwd = root, text = true, stdin = input }):wait()
+    vim.env.DEVSHELL_CHECK = nil
+    return run
+  end
+  local there = bridge_run(bash, "0", "initialize")
+  assert(there.code == 0 and there.stdout == "container bash-language-server start: initialize\n", "in the container: " .. vim.inspect(there))
+  local here = bridge_run(bash, "10")
+  assert(here.code == 0 and here.stdout:find("^here .*bash%-language%-server start\n$"), "here: " .. vim.inspect(here))
+  local nowhere = bridge_run(go, "10")
+  assert(nowhere.code == 0 and nowhere.stdout == "" and nowhere.stderr == "", "in neither place: " .. vim.inspect(nowhere))
+  local failed = bridge_run(bash, "1")
+  assert(failed.code == 1 and failed.stdout == "" and failed.stderr:find("devshell: failed", 1, true),
+    "devshell failing: " .. vim.inspect(failed))
+
+  -- Node servers watch for no editor process in a dev container project
+  local params = { processId = 42 }
+  vim.lsp.config.bashls.before_init(params, { root_dir = root })
+  local elsewhere = { processId = 42 }
+  vim.lsp.config.bashls.before_init(elsewhere, { root_dir = plain })
+  assert(params.processId == vim.NIL and elsewhere.processId == 42, "process ids: " .. vim.inspect({ params, elsewhere }))
+
+  -- With a server running for the project, a definition in a file only its
+  -- container has opens read-only from there, with no swap file, for the
+  -- project's servers, Ctrl+] reaching it as :edit does; :edit reads it anew,
+  -- and when it can't, keeps what it showed, saying why. A new file in the
+  -- project, in a folder or repository here, or one the container lacks too,
+  -- opens empty for writing, no container asked about a file here
+  local function server(name, dir, definition)
+    local id = vim.lsp.start({ name = name, root_dir = dir, cmd = function(dispatchers)
+      return {
+        request = function(method, _, callback)
+          if method == "initialize" then
+            callback(nil, { capabilities = { definitionProvider = definition ~= nil } })
+          elseif method == "textDocument/definition" then
+            local start = { line = 0, character = 0 }
+            callback(nil, { uri = vim.uri_from_fname(definition), range = { start = start, ["end"] = start } })
+          end
+          return true, 1
+        end,
+        notify = function() return true end,
+        is_closing = function() return false end,
+        terminate = function() dispatchers.on_exit(0, 15) end,
+      }
+    end }, { attach = false })
+    vim.wait(1000, function() return vim.lsp.get_client_by_id(id).initialized end)
+    return id
+  end
+  local function read_from(dir, what)
+    assert(vim.deep_equal(api.nvim_buf_get_lines(0, 0, -1, false), { "package lib", "", "func Lib() {}" })
+      and vim.bo.readonly and not vim.bo.modifiable and not vim.bo.modified and not vim.bo.swapfile
+      and fn.swapname(0) == "" and vim.b.devshell_root == dir,
+      what .. ": " .. vim.inspect({ api.nvim_buf_get_lines(0, 0, -1, false), vim.b.devshell_root }))
+  end
+  local function reads(file)
+    return #vim.tbl_filter(function(line) return line == "--no-start cat -- " .. file end, fn.readfile(asked))
+  end
+  local client = server("project", root, "/container/lib3.go")
+  vim.cmd.edit(root .. "/main.go")
+  local source = api.nvim_get_current_buf()
+  api.nvim_buf_set_lines(source, 0, -1, false, { "lib.Lib()" })
+  vim.lsp.buf_attach_client(source, client)
+  vim.cmd.normal(vim.keycode("<C-]>"))
+  assert(vim.wait(1000, function() return api.nvim_buf_get_name(0) == "/container/lib3.go" end),
+    "Ctrl+] stayed in " .. api.nvim_buf_get_name(0))
+  read_from(root, "Ctrl+]")
+  vim.cmd.normal(vim.keycode("<C-t>"))
+  assert(api.nvim_get_current_buf() == source, "Ctrl+T came back to " .. api.nvim_buf_get_name(0))
+  vim.cmd.edit("/container/lib.go")
+  local library = api.nvim_get_current_buf()
+  read_from(root, "a container's file")
+  assert(vim.deep_equal(vim.b.devshell_servers, { "project" }), "the project's servers: " .. vim.inspect(vim.b.devshell_servers))
+  local read_before = reads("/container/lib.go")
+  vim.cmd.edit()
+  read_from(root, ":edit")
+  assert(reads("/container/lib.go") == read_before + 1, ":edit didn't read the file anew")
+  local real_notify, warned = vim.notify, nil
+  vim.notify = function(message) warned = message end
+  vim.env.DEVSHELL_CAT_FAILS = root
+  vim.cmd.edit()
+  vim.env.DEVSHELL_CAT_FAILS = nil
+  vim.notify = real_notify
+  read_from(root, "an :edit the container failed")
+  assert(warned and warned:find("devshell: the container is down", 1, true), "the warning: " .. tostring(warned))
+  local new_files = { root .. "/new.go", "/container/missing.go", plain .. "/new.go", plain .. "/sub/new.go" }
+  for _, file in ipairs(new_files) do
+    vim.cmd.edit(file)
+    assert(api.nvim_buf_line_count(0) == 1 and vim.bo.modifiable and vim.b.devshell_root == nil, "a new file: " .. file)
+  end
+  for _, file in ipairs({ root .. "/new.go", plain .. "/new.go", plain .. "/sub/new.go" }) do
+    assert(reads(file) == 0, "a container was asked for a new file here: " .. file)
+  end
+  -- With two such projects open, the file comes from the container of the
+  -- one it was opened from
+  local other = fn.tempname()
+  fn.mkdir(other .. "/.git", "p")
+  fn.mkdir(other .. "/.devcontainer", "p")
+  fn.writefile({ "{}" }, other .. "/.devcontainer/devcontainer.json")
+  other = vim.uv.fs_realpath(other)
+  local second = server("other", other)
+  vim.cmd.edit(other .. "/main.go")
+  vim.lsp.buf_attach_client(0, second)
+  vim.cmd.edit("/container/lib2.go")
+  read_from(other, "from the other project")
+  assert(vim.deep_equal(vim.b.devshell_servers, { "other" }), "the other project's servers: " .. vim.inspect(vim.b.devshell_servers))
+  -- Read again, it comes from its own project's container alone: when that
+  -- one fails, it keeps what it showed rather than take the other project's
+  api.nvim_set_current_buf(library)
+  warned = nil
+  vim.notify = function(message) warned = message end
+  vim.env.DEVSHELL_CAT_FAILS = root
+  vim.cmd.edit()
+  vim.env.DEVSHELL_CAT_FAILS = nil
+  vim.notify = real_notify
+  read_from(root, "a failed :edit with another project open")
+  assert(warned and vim.deep_equal(vim.b.devshell_servers, { "project" }), "with another project open: " .. tostring(warned))
+  -- Once the servers stop, as when the container does, :edit still reads the
+  -- file from its project's container, for the same servers
+  vim.lsp.get_client_by_id(client):stop(true)
+  vim.lsp.get_client_by_id(second):stop(true)
+  assert(vim.wait(1000, function() return #vim.lsp.get_clients() == 0 end), "the servers kept running")
+  api.nvim_set_current_buf(library)
+  vim.cmd.edit()
+  read_from(root, ":edit with no server running")
+  assert(vim.deep_equal(vim.b.devshell_servers, { "project" }), "the servers after :edit: " .. vim.inspect(vim.b.devshell_servers))
+  -- A read that can't start, devshell missing, keeps the lines as well
+  vim.env.PATH, warned = "/usr/bin:/bin", nil
+  vim.notify = function(message) warned = message end
+  vim.cmd.edit()
+  vim.env.PATH, vim.notify = bin .. ":/usr/bin:/bin", real_notify
+  read_from(root, "an :edit that couldn't run devshell")
+  assert(warned and warned:find("devshell", 1, true), "the warning when devshell is missing: " .. tostring(warned))
+  -- With no server of the project left, Ctrl+] follows tags again
+  local tagged = plain .. "/tagged.txt"
+  fn.writefile({ "the tag's target" }, tagged)
+  fn.writefile({ "lib\t" .. tagged .. "\t1" }, plain .. "/tags")
+  local real_tags = vim.o.tags
+  vim.o.tags = plain .. "/tags"
+  api.nvim_set_current_buf(source)
+  api.nvim_win_set_cursor(0, { 1, 0 })
+  vim.cmd.normal(vim.keycode("<C-]>"))
+  assert(api.nvim_buf_get_name(0) == tagged, "Ctrl+] without a server went to " .. api.nvim_buf_get_name(0))
+  vim.o.tags = real_tags
+  -- Through file type detection, which Neovim loads after this config, the
+  -- project's running server attaches to such a file; once it stops, :edit
+  -- starts it anew, bridged, and it attaches again
+  vim.api.nvim_clear_autocmds({ group = "filetypedetect" })
+  vim.g.did_load_filetypes = nil
+  vim.cmd.runtime("filetype.lua")
+  local real_start, started = vim.lsp.rpc.start, nil
+  vim.lsp.rpc.start = function(argv, dispatchers, options)
+    started = { argv = argv, cwd = options and options.cwd }
+    return {
+      request = function(method, _, callback)
+        if method == "initialize" then
+          callback(nil, { capabilities = {} })
+        end
+        return true, 1
+      end,
+      notify = function() return true end,
+      is_closing = function() return false end,
+      terminate = function() dispatchers.on_exit(0, 15) end,
+    }
+  end
+  vim.lsp.enable("gopls")
+  local gopls = server("gopls", root)
+  api.nvim_set_current_buf(source)
+  vim.lsp.buf_attach_client(source, gopls)
+  vim.cmd.edit("/container/lib4.go")
+  local function attached()
+    local clients = vim.lsp.get_clients({ bufnr = 0, name = "gopls" })
+    return #clients == 1 and clients[1] or nil
+  end
+  assert(vim.wait(1000, function() return attached() and attached().id == gopls end),
+    "the running gopls didn't attach: " .. vim.inspect(vim.tbl_map(function(c) return c.id end, vim.lsp.get_clients({ bufnr = 0 }))))
+  vim.lsp.get_client_by_id(gopls):stop(true)
+  assert(vim.wait(1000, function() return vim.lsp.get_client_by_id(gopls) == nil end), "gopls kept running")
+  started = nil
+  vim.cmd.edit()
+  assert(vim.wait(1000, function() return attached() ~= nil end), "no gopls after :edit")
+  assert(attached().root_dir == root and started and started.cwd == root
+    and vim.deep_equal({ unpack(started.argv, 4) }, { "devshell", "gopls" }), "the gopls :edit started: " .. vim.inspect(started))
+  for _, running in ipairs(vim.lsp.get_clients()) do
+    running:stop(true)
+  end
+  vim.wait(1000, function() return #vim.lsp.get_clients() == 0 end)
+  vim.lsp.rpc.start = real_start
+  vim.lsp.enable("gopls", false)
+  vim.cmd.enew()
+  for _, file in ipairs(vim.list_extend({ "/container/lib.go", "/container/lib2.go", "/container/lib3.go", "/container/lib4.go",
+    root .. "/main.go", other .. "/main.go", tagged }, new_files)) do
+    api.nvim_buf_delete(fn.bufnr(file), { force = true })
+  end
+  vim.env.PATH = real_path
+  fn.delete(root, "rf")
+  fn.delete(plain, "rf")
+  fn.delete(other, "rf")
+end
+
 -- :grep runs grepprg through the shell: an unmatched zsh glob would silently
 -- empty the results, and nested repositories' .git folders must stay out.
-local passed = "Markdown preview, DiffSaved, GitDiff, and focus background query tests passed"
+local passed = "Markdown preview, DiffSaved, GitDiff, focus background query, and dev container language server tests passed"
 if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   vim.o.shell = "zsh"
   local cwd, tree = fn.getcwd(), fn.tempname()
@@ -605,7 +902,7 @@ if fn.executable("rg") == 1 and fn.executable("zsh") == 1 then
   assert(fn.bufname("%") == "second", ":find opened " .. fn.bufname("%"))
   vim.cmd.cd(cwd)
   fn.delete(tree, "rf")
-  passed = "Markdown preview, DiffSaved, GitDiff, focus background query, :grep, and :find tests passed"
+  passed = "Markdown preview, DiffSaved, GitDiff, focus background query, dev container language server, :grep, and :find tests passed"
 else
   print("SKIP: :grep and :find tests need rg and zsh")
 end
