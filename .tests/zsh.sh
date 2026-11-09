@@ -862,10 +862,14 @@ fzf() {
 
 # Each preview as fzf runs it: Markdown through glow, its padding trimmed (here
 # a stand-in that pads its render), other files through bat, and cat without
-# either, all for names that look like options.
+# either, all for names that look like options. Of the system's tools, the
+# previews get sed alone, so a glow or bat installed there can't stand in.
+for sed_path in /usr/bin/sed /bin/sed; do [[ ! -x $sed_path ]] || break; done
+/bin/mkdir -p "$test_root/sed-bin"
+/bin/ln -sf "$sed_path" "$test_root/sed-bin/sed"
 for has_glow bat_state selection in 1 present -file.MD 1 present -file 0 missing -file.MD; do
   (
-    path=(/usr/bin /bin)
+    path=("$test_root/sed-bin")
     if (( has_glow )); then
       glow() { record glow "$@"; print -r -- 'rendered   '; }
     else
