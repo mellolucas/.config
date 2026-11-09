@@ -36,9 +36,10 @@ these waits.
 - **XDG-first**: every file goes to the XDG home matching its nature (config,
   data, state, or cache), so its location is known in advance. Tools without
   native XDG support are pointed there through their own documented variables:
-  shared tools in the shared environment, machine-local tools in
-  `zsh/local.zsh`. A tool that keeps everything in one directory goes under
-  `$XDG_DATA_HOME`. `$HOME` stays nearly empty (only the `.zshenv` symlink).
+  shared tools, and the optional ones local.Brewfile.example offers, in the
+  shared environment; other machine-local tools in `zsh/local.zsh`. A tool
+  that keeps everything in one directory goes under `$XDG_DATA_HOME`. `$HOME`
+  stays nearly empty (only the `.zshenv` symlink).
   Paths a tool hardcodes are documented exceptions, never symlinked into place.
   macOS GUI apps keep Apple's `~/Library` layout, as do command-line tools
   that default there unless a documented variable moves the whole category to
