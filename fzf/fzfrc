@@ -4,3 +4,5 @@
 # Every picker's preview, leaving the typing keys alone: Option+Up/Down by half
 # a page (Shift+Up/Down, fzf's own, by a line)
 --bind=alt-up:preview-half-page-up,alt-down:preview-half-page-down
+# fzf's own wrap keys, Ctrl+/ and Option+/, wrap the preview too, between words
+--bind=ctrl-/:toggle-wrap-word+toggle-preview-wrap-word,alt-/:toggle-wrap-word+toggle-preview-wrap-word
