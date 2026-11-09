@@ -396,7 +396,26 @@ run darwin $mac pwd
 [[ $rc == 1 && $output == "devshell: the dev container has no /nonexistent$project/sub/dir"$'\n''hint: one made before devshell mounted projects at their path here goes with: devshell --remove .' ]] ||
   fail "a container without the project at its path: $output"
 rm $FAKE/no-mount
-print -r -- 'ok: first use, then a running container'
+# With --no-start, the command runs there while the container runs; with it
+# stopped, or Colima, devshell says so and starts nothing
+: > $FAKE/calls
+run darwin $mac --no-start true
+(( rc == 0 )) && [[ $calls == *" --container-id c0 "* ]] || fail "--no-start, running: $output"
+lacks 'devcontainer up'
+lacks 'colima'
+: > $FAKE/containers
+: > $FAKE/calls
+run darwin $mac --no-start true
+[[ $rc == 1 && $output == "devshell: the dev container of ~/code/owner/repo isn't running"$'\n''hint: devshell without --no-start starts it' ]] ||
+  fail "--no-start, the container stopped: $output"
+lacks 'devcontainer up'
+lacks 'devcontainer exec'
+reset $project/.git
+run darwin $mac --no-start true
+[[ $rc == 1 && $output == "devshell: the dev container of ~/code/owner/repo isn't running"* ]] || fail "--no-start, Colima stopped: $output"
+lacks 'colima'
+lacks 'devcontainer'
+print -r -- 'ok: first use, then a running container, and --no-start'
 
 # A setup that failed after making the container is recorded so. As the CLI
 # wouldn't run that setup again, the next use removes the container, keeping

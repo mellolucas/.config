@@ -6,7 +6,7 @@ zmodload -F zsh/system b:zsystem
 
 usage() {
   cat <<'EOF'
-usage: devshell [CMD [ARG]...]
+usage: devshell [--no-start] [CMD [ARG]...]
        devshell --remove DIR
 
 Open a login shell in this project's dev container, or run CMD there, in this
@@ -29,6 +29,9 @@ can misreport: devshell adds safe.directory=* to GIT_CONFIG_PARAMETERS for its
 commands, and sets GIT_CONFIG_PARAMETERS to it for the container's setup.
 
 Options:
+  --no-start     Only while the project's container runs: fail rather than
+                 start it, or Colima, as Neovim reads the files only the
+                 container has.
   --remove DIR   Remove the dev container devshell started for the project at
                  DIR, its compose services, and the image built for it, as
                  workspace --done does for a task; the next devshell there
@@ -251,6 +254,11 @@ case ${1-} in
     fi
     exit 0 ;;
 esac
+local -i no_start=0
+if [[ ${1-} == --no-start ]]; then
+  no_start=1
+  shift
+fi
 
 if [[ ${CODESPACES-} == true || ${REMOTE_CONTAINERS-} == true || -e /.dockerenv || -e /run/.containerenv ]]; then
   (( $# )) || { print -r -- 'devshell: this shell is in a dev container already'; exit 0; }
@@ -293,8 +301,8 @@ if ! grep -Fqx -- $repository $trusted 2> /dev/null; then
 fi
 
 # The context, as another devshell may have started Colima while this one
-# waited
-lock
+# waited; with --no-start, nothing starts or goes, so none waits
+(( no_start )) || lock
 find_context
 
 # On macOS, Colima runs Docker unless another engine already answers. Its
@@ -311,6 +319,7 @@ if (( colima )) && { ! reachable || [[ $context == colima ]]; }; then
     "move it under ~/code, or add it to mounts in $(tilde $(colima_config)), then: colima restart"
 fi
 if ! reachable; then
+  (( ! no_start )) || fail "the dev container of $(tilde $top) isn't running" 'devshell without --no-start starts it'
   (( colima )) || fail "$engine can't reach its engine" 'start Docker or Podman'
   start_colima
 fi
@@ -319,6 +328,7 @@ fi
 # worktrees say, go now, as do those --remove couldn't reach
 local record
 for record in $state/managed/$context/*(N); do
+  (( ! no_start )) || break
   noted=("${(@f)$(<$record)}")
   [[ $noted[3] == retired || ( -n $noted[1] && ! -e $noted[1] ) ]] || continue
   remove_recorded $noted[1] whole >&2 || :
@@ -348,6 +358,7 @@ local -a running=(${${(f)"$($engine ps -q --no-trunc --filter "label=devcontaine
 if recorded $top && [[ $noted[3] == ready ]] && (( ${running[(Ie)$noted[2]]} )); then
   container=$noted[2]
 else
+  (( ! no_start )) || fail "the dev container of $(tilde $top) isn't running" 'devshell without --no-start starts it'
   if [[ $noted[3] == retired ]]; then
     remove_recorded $top whole >&2 || exit 1
   elif (( $#noted )); then
