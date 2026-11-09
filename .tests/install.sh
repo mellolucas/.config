@@ -43,6 +43,14 @@ agent_path() {
     *) printf '%s\n' "$XDG_DATA_HOME/$1" ;;
   esac
 }
+# The agents, installed: stand-ins ahead of any on this machine, for the checks
+# that expect each agent's instructions; those without agents set PATH anew.
+mkdir -p "$test_root/agents-bin"
+for agent in codex claude copilot; do
+  printf '#!/bin/sh\n' > "$test_root/agents-bin/$agent"
+  chmod +x "$test_root/agents-bin/$agent"
+done
+PATH="$test_root/agents-bin:$PATH"
 
 # Load function definitions without the CLI dispatcher.
 test "$(grep -c '^# CLI dispatcher\.$' "$repo/install.sh")" = 1
@@ -284,7 +292,8 @@ for path in "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin
 done
 rm "$XDG_CONFIG_HOME/zsh" "$HOME/.local/bin/dotfiles" "$HOME/.local/bin/edit" "$HOME/.zshenv" "$XDG_DATA_HOME/codex/AGENTS.md"
 
-# Exercise native dispatch without invoking real Homebrew.
+# Exercise native dispatch without invoking real Homebrew. Its bundle can
+# install an agent: $INSTALL_AGENT, into $AGENT_BIN.
 mkdir "$test_root/package-bin"
 cat > "$test_root/package-bin/brew" <<'EOF'
 #!/bin/sh
@@ -292,6 +301,10 @@ set -eu
 case "$*" in
   'bundle --global')
     printf 'invoked\n' >> "$HOME/brew.log"
+    if [ -n "${INSTALL_AGENT-}" ]; then
+      printf '#!/bin/sh\n' > "$AGENT_BIN/$INSTALL_AGENT"
+      chmod +x "$AGENT_BIN/$INSTALL_AGENT"
+    fi
     [ -z "${FAIL_BUNDLE-}" ] || exit 1
     ;;
   --prefix) printf '%s\n' "$HOME/prefix" ;;
@@ -376,6 +389,44 @@ for operation in bundle install; do
     fi
   )
 done
+
+# Agents not installed get neither instructions nor homes, so no ~/.copilot in
+# the home folder, and the doctor names none; one the Brewfile installs gets
+# both once it's there, others still none.
+(
+  export HOME="$test_root/no-agents" AGENT_BIN="$test_root/no-agents-bin" INSTALL_AGENT=codex
+  export PATH="$test_root/package-bin:$AGENT_BIN:/usr/bin:/bin"
+  export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+  export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+  export HOMEBREW_BUNDLE_FILE_GLOBAL="$HOME/Brewfile"
+  mkdir -p "$HOME/prefix" "$AGENT_BIN"
+  printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
+  for agent in codex claude copilot; do
+    if command -v "$agent" >/dev/null 2>&1; then
+      fail "the system's own $agent stands in the way: $(command -v "$agent")"
+    fi
+  done
+  # A Copilot app in the shared Applications folder installs Copilot here too
+  copilot_app=0
+  if [ -d "/Applications/GitHub Copilot.app" ]; then
+    copilot_app=1
+    printf 'SKIP: no Copilot here (the system has /Applications/GitHub Copilot.app)\n'
+  fi
+  "$installer" link > "$HOME/dispatch.log" 2>&1
+  for file in codex/AGENTS.md claude/CLAUDE.md; do
+    check test ! -e "$(agent_path "$file")"
+  done
+  [ "$copilot_app" = 1 ] || check test ! -e "$HOME/.copilot"
+  check test ! -e "$XDG_DATA_HOME/codex"
+  check test ! -e "$XDG_STATE_HOME/codex"
+  "$installer" doctor > "$HOME/doctor.log" 2>&1 || :
+  if grep -E -q '(Codex|Claude) instructions' "$HOME/doctor.log"; then fail "the doctor named absent agents' instructions"; fi
+  "$installer" bundle >> "$HOME/dispatch.log" 2>&1
+  check test "$(readlink "$(agent_path codex/AGENTS.md)")" = "$repo_dir/agents/instructions.md"
+  check test -d "$XDG_STATE_HOME/codex"
+  check test ! -e "$(agent_path claude/CLAUDE.md)"
+  [ "$copilot_app" = 1 ] || check test ! -e "$HOME/.copilot"
+)
 
 # A bundle that can't record its time names the folder in one line and
 # finishes in any POSIX sh: bundle exits 0, and install prints its closing
@@ -570,7 +621,7 @@ chmod +x "$test_root/brew-prefix/brew"
   unset HOMEBREW_BUNDLE_NO_UPGRADE
   printf '# fixture\n' > "$HOMEBREW_BUNDLE_FILE_GLOBAL"
   PATH=/usr/bin:/bin
-  bundle_dotfiles
+  with_layout bundle_dotfiles
 ) > "$test_root/fresh.log" 2>&1 || { cat "$test_root/fresh.log" >&2; fail 'bundle with Homebrew off PATH'; }
 check grep -q "^$test_root/brew-prefix:" "$test_root/fresh-home/brew-path.log"
 check test -e "$test_root/fresh-home/npmrc-linked"
@@ -939,8 +990,8 @@ done
 repo_dir="$test_root/repo"
 run_doctor() (
   # Keep diagnostics offline and independent of host binaries: only the
-  # system's own tools, so no OpenCode.
-  PATH=/usr/bin:/bin
+  # system's own tools, so no OpenCode, and the stand-in agents.
+  PATH="$test_root/agents-bin:/usr/bin:/bin"
   gh() { return 1; }
   ghostty() { :; }
   nvim() { :; }

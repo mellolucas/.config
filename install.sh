@@ -279,18 +279,27 @@ docker_cli_config() {
 }
 
 # Where each agent reads its user-wide instructions: a file of the name it
-# expects in its home (zsh/xdg.sh), linked to the shared agents/instructions.md.
-# Copilot's home is ~/.copilot even where COPILOT_HOME says otherwise: its
-# desktop app reads that one. OpenCode reads the shared file through
-# opencode/opencode.jsonc instead.
+# expects in its home (zsh/xdg.sh), linked to the shared agents/instructions.md
+# where the agent is installed, as its command or app shows. Copilot's home is
+# ~/.copilot even where COPILOT_HOME says otherwise: its desktop app reads that
+# one. OpenCode reads the shared file through opencode/opencode.jsonc instead.
 agent_instructions() {
-  "$@" Codex "$CODEX_HOME/AGENTS.md"
-  "$@" Claude "$CLAUDE_CONFIG_DIR/CLAUDE.md"
-  "$@" Copilot "$HOME/.copilot/copilot-instructions.md"
+  "$@" Codex "$CODEX_HOME/AGENTS.md" codex
+  "$@" Claude "$CLAUDE_CONFIG_DIR/CLAUDE.md" claude
+  "$@" Copilot "$HOME/.copilot/copilot-instructions.md" copilot 'GitHub Copilot.app'
 }
 
-# A plain file there is the user's own; links are this repo's to manage.
+# Arguments: the agent's command, then its app, if it has one
+agent_installed() {
+  command -v "$1" >/dev/null 2>&1 ||
+    { [ -n "${2-}" ] && { [ -d "/Applications/$2" ] || [ -d "$HOME/Applications/$2" ]; }; }
+}
+
+# A plain file there is the user's own; links are this repo's to manage. Codex
+# will not start until its homes exist.
 link_agent_instructions() {
+  agent_installed "$3" "${4-}" || return 0
+  [ "$1" != Codex ] || mkdir -p "$CODEX_HOME" "$CODEX_SQLITE_HOME"
   if [ -e "$2" ] && [ ! -L "$2" ]; then
     printf 'kept %s: your own instructions\n' "$2"
     return 0
@@ -359,9 +368,7 @@ link_dotfiles() {
     "$xdg_cache_home" \
     "$user_bin_home" \
     "$xdg_state_home/zsh" \
-    "$xdg_cache_home/zsh" \
-    "$CODEX_HOME" \
-    "$CODEX_SQLITE_HOME"
+    "$xdg_cache_home/zsh"
 
   managed_dirs | while IFS= read -r src; do
     name=${src##*/}
@@ -459,6 +466,8 @@ bundle_dotfiles() {
   "$brew" bundle --global ||
     bundle_skipped="$bundle_skipped  Brewfile entries that failed, named in Homebrew's output above
 "
+  # Agents the Brewfile just installed read the shared instructions too
+  agent_instructions link_agent_instructions
 
   if [ -n "$bundle_skipped" ]; then
     print_skipped bundle
@@ -847,6 +856,7 @@ doctor_link_problem() {
 }
 
 doctor_agent_instructions() {
+  agent_installed "$3" "${4-}" || return 0
   if [ -e "$2" ] && [ ! -L "$2" ]; then
     doctor_ok "$1 instructions" "$(tilde "$2"), your own"
   else
