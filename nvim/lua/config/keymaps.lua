@@ -83,22 +83,31 @@ map("n", "<leader>tu", "<cmd>packadd nvim.undotree | Undotree<CR>", { desc = "To
 -- read-only render of the file on disk by glow (explicit --style: aliases don't
 -- reach Neovim's processes). glow breaks no lines: the window wraps them at
 -- its width, between words, and Space t w toggles that, as in any buffer.
--- glow's colors become highlights, as Neovim's terminal shows them.
+-- glow's colors become highlights, as the terminal draws them, Neovim's
+-- terminal passing them on: its 16 as Ghostty's Catppuccin Mocha or Latte,
+-- by 'background' (unless g:terminal_color_N says otherwise), then the
+-- xterm cube and grays.
 local preview_marks = vim.api.nvim_create_namespace("markdown_preview")
 local preview_groups = {}
--- libvterm's 16, which Neovim's terminal shows where g:terminal_color_N is unset
-local preview_ansi = { "#000000", "#e00000", "#00e000", "#e0e000", "#0000e0", "#e000e0", "#00e0e0", "#e0e0e0",
-  "#808080", "#ff4040", "#40ff40", "#ffff40", "#4040ff", "#ff40ff", "#40ffff", "#ffffff" }
+local preview_ansi = {
+  dark = { "#45475a", "#f38ba8", "#a6e3a1", "#f9e2af", "#89b4fa", "#f5c2e7", "#94e2d5", "#a6adc8",
+    "#585b70", "#f37799", "#89d88b", "#ebd391", "#74a8fc", "#f2aede", "#6bd7ca", "#bac2de" },
+  light = { "#5c5f77", "#d20f39", "#40a02b", "#df8e1d", "#1e66f5", "#ea76cb", "#179299", "#acb0be",
+    "#6c6f85", "#de293e", "#49af3d", "#eea02d", "#456eff", "#fe85d8", "#2d9fa8", "#bcc0cc" },
+}
 local function preview_color(value)
   if type(value) ~= "number" then
     return value, nil
   elseif value < 16 then
-    return vim.g["terminal_color_" .. value] or preview_ansi[value + 1], value
+    return vim.g["terminal_color_" .. value] or preview_ansi[vim.o.background][value + 1], value
   elseif value < 232 then
+    local function level(n)
+      return n == 0 and 0 or 55 + 40 * n
+    end
     local n = value - 16
-    return ("#%02x%02x%02x"):format(51 * math.floor(n / 36), 51 * (math.floor(n / 6) % 6), 51 * (n % 6)), value
+    return ("#%02x%02x%02x"):format(level(math.floor(n / 36)), level(math.floor(n / 6) % 6), level(n % 6)), value
   end
-  local gray = math.floor((value - 232) * 255 / 23)
+  local gray = 8 + 10 * (value - 232)
   return ("#%02x%02x%02x"):format(gray, gray, gray), value
 end
 local function preview_define(group)
@@ -117,7 +126,7 @@ local function preview_group(attr)
   end
   return preview_groups[key].name
 end
--- A colorscheme clears them, and a light or a dark one has its own terminal colors
+-- A colorscheme clears them, and a switch between light and dark changes them
 vim.api.nvim_create_autocmd("ColorScheme", {
   group = vim.api.nvim_create_augroup("markdown_preview", {}),
   callback = function()

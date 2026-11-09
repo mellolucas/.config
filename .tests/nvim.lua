@@ -317,10 +317,21 @@ do
   ]])
   assert(vim.deep_equal(shown.lines, text), "the render's lines: " .. vim.inspect(shown.lines))
   assert(shown.buftype == "nofile" and not shown.modifiable, "the render is a " .. shown.buftype .. " buffer")
-  assert(shown.bold and shown.fg == 0x0000e0, "the render's first line looks " .. vim.inspect({ shown.bold, shown.fg }))
+  -- Bold blue, as Ghostty's Catppuccin draws the terminal's blue: Mocha's on a
+  -- dark background, Latte's once it turns light
+  assert(shown.bold and shown.fg == 0x89b4fa, "the render's first line looks " .. vim.inspect({ shown.bold, shown.fg }))
+  local light = child_lua([[
+    vim.o.background = "light"
+    vim.api.nvim_exec_autocmds("ColorScheme", {})
+    local marks = vim.api.nvim_buf_get_extmarks(0, -1, { 0, 0 }, { 0, -1 }, { details = true })
+    return vim.api.nvim_get_hl(0, { name = marks[1][4].hl_group }).fg
+  ]])
+  assert(light == 0x1e66f5, "the render's first line on a light background: " .. tostring(light))
   assert(shown.wrap and shown.cursor == 30, "the render: wrap " .. tostring(shown.wrap) .. ", cursor on line " .. shown.cursor)
   fn.rpcrequest(child, "nvim_input", " tw")
   assert(child_lua("return vim.wo.wrap") == false, "Space t w left the render wrapping")
+  fn.rpcrequest(child, "nvim_input", " tw")
+  assert(child_lua("return vim.wo.wrap") == true, "a second Space t w left the render unwrapped")
   fn.rpcrequest(child, "nvim_input", "i")
   local mode = child_lua("return vim.api.nvim_get_mode().mode")
   assert(mode == "n" and child_lua("return vim.api.nvim_buf_get_lines(0, 0, 1, false)[1]") == "# Notes", "i in the preview: " .. mode)
@@ -332,6 +343,43 @@ do
   assert(wrap == false, "the source wraps after the preview")
   fn.jobstop(child)
   fn.delete(path)
+end
+
+-- With the real glow, where installed: a paragraph longer than any width glow
+-- would break at stays one line, for the window to wrap
+do
+  local clean = vim.env.PATH:gsub("^" .. vim.pesc(bin) .. ":", "")
+  if vim.system({ "sh", "-c", "command -v glow" }, { env = { PATH = clean } }):wait().code == 0 then
+    local path = fn.tempname() .. ".md"
+    local paragraph = ("alpha beta gamma delta "):rep(10) .. "end"
+    fn.writefile({ "# Notes", "", paragraph }, path)
+    local child = fn.jobstart({ vim.v.progpath, "--embed", "--headless", "-u", "NONE", "-i", "NONE", "-n" },
+      { rpc = true, env = { PATH = clean, XDG_CONFIG_HOME = fn.getcwd() } })
+    fn.rpcrequest(child, "nvim_exec_lua", [[
+      vim.g.mapleader = " "
+      dofile("nvim/lua/config/keymaps.lua")
+      vim.cmd.edit(vim.fn.fnameescape(...))
+      vim.bo.filetype = "markdown"
+    ]], { path })
+    fn.rpcrequest(child, "nvim_input", " tm")
+    local found
+    assert(vim.wait(10000, function()
+      found = fn.rpcrequest(child, "nvim_exec_lua", [[
+        if vim.bo.buftype ~= "nofile" then
+          return nil
+        end
+        for _, line in ipairs(vim.api.nvim_buf_get_lines(0, 0, -1, false)) do
+          if line:find("alpha beta", 1, true) then
+            return line
+          end
+        end
+      ]], {})
+      return found ~= nil and found ~= vim.NIL
+    end, 20), "Space t m with glow shows no render")
+    assert(vim.trim(found) == paragraph, "glow broke the paragraph: " .. found)
+    fn.jobstop(child)
+    fn.delete(path)
+  end
 end
 
 -- :DiffSaved reads the saved file as Neovim decodes it: UTF-8, plain and with
