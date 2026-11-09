@@ -2,6 +2,11 @@
 # this is the lean set for containers (GitHub Codespaces, dev containers, Docker,
 # Podman), which bring their own toolchains (zsh/homebrew.sh); the Brewfile adds
 # the workstation.
+# Casks, local.Brewfile's too, need a pinned checksum: one without installs only
+# with args: { require_sha: false } on its own line, as local.Brewfile.example
+# shows
+cask_args require_sha: true
+
 brew "git"
 brew "neovim"
 brew "ripgrep"

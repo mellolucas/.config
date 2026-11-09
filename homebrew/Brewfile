@@ -1,6 +1,8 @@
 # The workstation: GUI apps, dev containers, and language servers, then
 # core.Brewfile's essentials and local.Brewfile. Projects bring their own
 # runtimes and tools in their dev containers, or through local.Brewfile.
+# Casks need a pinned checksum, as core.Brewfile says for the lean set too
+cask_args require_sha: true
 
 brew "mas" if OS.mac? && system("defaults read MobileMeAccounts Accounts >/dev/null 2>&1")
 

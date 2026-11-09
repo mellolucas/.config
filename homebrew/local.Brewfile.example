@@ -29,10 +29,15 @@
 # Other tools published on npm
 # npm "@scope/tool"
 
-# Cloud and infrastructure projects
+# Cloud and infrastructure projects. A tap outside Homebrew's own loads only
+# what it's trusted for, here one formula
 # brew "awscli"
-# tap "hashicorp/tap"
+# tap "hashicorp/tap", trusted: { formulae: ["terraform"] }
 # brew "hashicorp/tap/terraform"
+
+# A cask without a pinned checksum, its vendor serving the latest build, taken
+# knowingly: macOS still checks its signature when it first opens
+# cask "google-chrome", args: { require_sha: false } if OS.mac?
 
 # Apple's container runtime, a VM per container (dev containers use Colima)
 # brew "container" if OS.mac? && Hardware::CPU.arm? && MacOS.version >= :tahoe
