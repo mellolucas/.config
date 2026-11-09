@@ -166,9 +166,9 @@
     }
   },
   "table": {
-    "center_separator": "┼",
+    "center_separator": "│",
     "column_separator": "│",
-    "row_separator": "─"
+    "row_separator": " "
   },
   "definition_list": {},
   "definition_term": {},
