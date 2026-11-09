@@ -110,7 +110,7 @@ Besides the XDG homes, `$HOME` holds only the `.zshenv` link; `dotfiles doctor` 
 - The operating system's own files, `~/.ssh` (OpenSSH), and the AWS CLI's caches in `~/.aws`, which those tools hardcode.
 - Copilot's home, `~/.copilot`, which Copilot CLI shares with the GitHub Copilot app (the app, started outside a shell, reads no `COPILOT_HOME`), and the app's local-model cache and logs in `~/.github-copilot-cli`.
 - macOS apps keep Apple's `~/Library` layout, and so do command-line tools that default there, unless a documented setting moves the whole category to the tool's Linux location: Homebrew's downloads and logs and Go's build cache move to `~/.cache`, while Go's settings and telemetry, gopls, Biome, and Copilot's cache stay in `~/Library`.
-- Homebrew runs npm for Brewfile entries with a cache of its own and hides npm's variables from it, so the only npm config those runs read is the global one in Homebrew's prefix, `$(brew --prefix)/etc/npmrc`: registry or certificate settings for Brewfile entries go there, not in `~/.config/npm/npmrc`.
+- Homebrew hides npm's variables from the npm it runs for Brewfile entries and gives a cache only to its installs, so the installer links `homebrew/npmrc` as npm's global config in Homebrew's prefix, which keeps the cache of the rest, such as listings and update checks, in `~/.cache/npm` (a fixed path, whatever `XDG_CACHE_HOME` says) rather than `~/.npm`. It is the only npm config those runs read, so registry or certificate settings for Brewfile entries go there, not in `~/.config/npm/npmrc`: replace the link with your own copy of `homebrew/npmrc`, and the installer keeps it.
 
 ## Make it local
 

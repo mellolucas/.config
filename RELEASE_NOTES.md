@@ -219,10 +219,10 @@ Changes since `v0.0.1`.
   `~/Library/Logs/Homebrew`, and `~/Library/Caches/go-build` only hold caches
   and logs and can be deleted, as can `~/go` once nothing you keep lives there
   (`GOMODCACHE=~/go/pkg/mod go clean -modcache` clears its read-only cache).
-- `dotfiles link` removes the link to `homebrew/npmrc` that earlier versions
-  made at `$(brew --prefix)/etc/npmrc`, as Bundle gives the npm it runs a
-  cache of its own. A plain file there stays: registry or certificate
-  settings that Brewfile npm entries need belong in it.
+- An existing plain `$(brew --prefix)/etc/npmrc` stays: add
+  `cache=${HOME}/.cache/npm` to it, or remove it so the installer links its
+  own. Registry or certificate settings that Brewfile npm entries need belong
+  in that file.
 - Git's global ignore now covers only operating-system clutter. Add
   dependencies, build output, and secrets (`node_modules`, `.venv`,
   `__pycache__`, `.env`) to each project's `.gitignore`, or to
