@@ -26,6 +26,10 @@
 # Install casks elsewhere; an explicit --appdir= wins over the non-admin default.
 # export HOMEBREW_CASK_OPTS='--appdir=/Applications'
 
+# Have Homebrew check that it built each bottle it installs; needs gh signed in
+# and GitHub's API reachable, or installs fail
+# export HOMEBREW_VERIFY_ATTESTATIONS=1
+
 # Machine-only OpenCode interface settings (JSON), kept out of opencode/cli.json.
 # export OPENCODE_CLI_CONFIG_CONTENT='{"animations": false}'
 
