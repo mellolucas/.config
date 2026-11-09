@@ -167,6 +167,7 @@ Agents run full screen and keep their own history; each scrolls, searches, and c
 | Codex | `PageUp` / `PageDown` / `Ctrl+Home` / `Ctrl+End` / `F3` / select with the mouse |
 
 - `Home` / `End` are `Fn+←` / `Fn+→` on Mac keyboards.
+- OpenCode comes with this setup and works with any model provider; Claude Code, Copilot CLI, and Codex come from your `local.Brewfile`, as `homebrew/local.Brewfile.example` shows.
 - Agents keep their homes under `~/.local/share` (for example `~/.local/share/codex`), but Copilot keeps `~/.copilot`, which the GitHub Copilot app shares; log in through each one's own flow.
 - When an agent finishes or needs you while you're in another pane or app, macOS notifies you (allow Ghostty's notifications when it first asks); Copilot CLI's start off, and the README shows how to turn them on. Shell commands of 10 s or more notify the same way when they finish, and their bell marks the pane with a border. Inside tmux, only panes in sight notify.
 - In OpenCode, `Ctrl+D` does not exit (as in the shell): leave with `Ctrl+C`.
@@ -302,8 +303,8 @@ Update this setup when the shell reminds you: a week after the last full update,
 
 | Run | Result |
 | --- | --- |
-| `dotfiles update` | **Update** the repository, relink, apply the Brewfile, and update its npm packages |
-| `dotfiles bundle` | **Apply** the Brewfile and `local.Brewfile`, then update their npm packages |
+| `dotfiles update` | **Update** the repository, relink, and apply the Brewfile |
+| `dotfiles bundle` | **Apply** the Brewfile and `local.Brewfile`, npm entries included |
 | `dotfiles link` | **Relink** configuration without touching packages |
 | `dotfiles doctor` | **Environment health**, with a fix for each problem |
 | `help COMMAND` | A command's **help**, even through an alias, whose expansion comes first; its manual when it has no `--help` |

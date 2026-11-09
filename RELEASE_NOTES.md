@@ -77,16 +77,21 @@ Changes since `v0.0.1`.
   `-S` in less, `Ctrl+/` in a picker, or `Space t w` in Neovim turns that off;
   `b` leaves long lines to less, which cuts them until `-S`. `rg` and `rgv`
   cut only lines past 1000 columns, as in minified files.
-- **Agents:** OpenCode is the default; Claude Code, Copilot CLI, and Codex
-  are installed too, and all four read this setup's shared instructions,
-  `agents/instructions.md`. Agents notify you when they finish or need you
-  while you're elsewhere, as do shell commands of 10 s or more; inside tmux,
-  only panes in sight notify. The guide lists each one's scroll, search, and
-  copy keys.
-- **GitHub Copilot app:** on macOS, the workstation Brewfile adds GitHub's
-  desktop app for Copilot (automations, Projects, computer use), which
-  updates itself and shares Copilot CLI's skills, instructions, and sessions
-  in `~/.copilot`.
+- **Agents:** OpenCode is the shared agent, for any model provider; Claude
+  Code, Copilot CLI, and Codex are offered in `local.Brewfile.example`, for the
+  subscriptions you have. Each reads this setup's shared instructions,
+  `agents/instructions.md`, once installed. Agents notify you when they finish
+  or need you while you're elsewhere, as do shell commands of 10 s or more;
+  inside tmux, only panes in sight notify. The guide lists each one's scroll,
+  search, and copy keys.
+- **GitHub Copilot app:** on macOS, `local.Brewfile` can add GitHub's desktop
+  app for Copilot (automations, Projects, computer use), which updates itself
+  and shares Copilot CLI's skills, instructions, and sessions in `~/.copilot`.
+- **Packages you can trust:** every cask needs a pinned checksum, so a
+  download matches what Homebrew reviewed; one whose vendor serves its latest
+  build installs only with `args: { require_sha: false }` on its own line.
+  Taps outside Homebrew's own load only what you trust. Projects' runtimes
+  (Go, Bun, Python) come from their dev containers, or from `local.Brewfile`.
 - **Dev containers:** in a project with one (`.devcontainer`), `workspace`
   opens its shell pane inside the container, and `devshell` enters it from
   any shell (`devshell CMD` runs a command there, as agents do for builds and
@@ -117,6 +122,15 @@ Changes since `v0.0.1`.
   links appear.
 - `dotfiles install` now links and installs packages, replacing `bootstrap`;
   `dotfiles link` is the former link-only `install`.
+- The Brewfile no longer lists Go, gopls, Bun, Python, Claude Code, Copilot
+  CLI, Codex, or the GitHub Copilot app. Nothing is uninstalled, but
+  `dotfiles update` stops updating them: copy the lines you use from
+  `homebrew/local.Brewfile.example` into `local.Brewfile`. On macOS, Copilot
+  CLI and Codex come as casks: first run
+  `npm uninstall --global @github/copilot @openai/codex`, as each cask installs
+  a command of the same name; their homes and sessions stay. Instruction
+  links that earlier versions made for agents you don't use stay too: remove
+  them, with an empty `~/.copilot`, if you like.
 - `dotfiles status` is gone: `gg` in the checkout shows its state. So is
   `dotfiles cleanup`: `dotfiles doctor` notes what lies outside the XDG layout
   in `$HOME`.
