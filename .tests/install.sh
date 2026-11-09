@@ -406,26 +406,75 @@ done
       fail "the system's own $agent stands in the way: $(command -v "$agent")"
     fi
   done
-  # A Copilot app in the shared Applications folder installs Copilot here too
-  copilot_app=0
-  if [ -d "/Applications/GitHub Copilot.app" ]; then
-    copilot_app=1
-    printf 'SKIP: no Copilot here (the system has /Applications/GitHub Copilot.app)\n'
-  fi
   "$installer" link > "$HOME/dispatch.log" 2>&1
-  for file in codex/AGENTS.md claude/CLAUDE.md; do
+  for file in $agent_files; do
     check test ! -e "$(agent_path "$file")"
   done
-  [ "$copilot_app" = 1 ] || check test ! -e "$HOME/.copilot"
+  check test ! -e "$HOME/.copilot"
   check test ! -e "$XDG_DATA_HOME/codex"
   check test ! -e "$XDG_STATE_HOME/codex"
   "$installer" doctor > "$HOME/doctor.log" 2>&1 || :
-  if grep -E -q '(Codex|Claude) instructions' "$HOME/doctor.log"; then fail "the doctor named absent agents' instructions"; fi
+  if grep -E -q '(Codex|Claude|Copilot) instructions' "$HOME/doctor.log"; then fail "the doctor named absent agents' instructions"; fi
   "$installer" bundle >> "$HOME/dispatch.log" 2>&1
   check test "$(readlink "$(agent_path codex/AGENTS.md)")" = "$repo_dir/agents/instructions.md"
   check test -d "$XDG_STATE_HOME/codex"
   check test ! -e "$(agent_path claude/CLAUDE.md)"
-  [ "$copilot_app" = 1 ] || check test ! -e "$HOME/.copilot"
+  check test ! -e "$HOME/.copilot"
+)
+
+# On macOS, the GitHub Copilot app in ~/Applications installs Copilot without
+# its command: its instructions are linked, checked, and removed on uninstall,
+# and the other agents get nothing. On Linux, an Applications folder counts for
+# nothing.
+(
+  export HOME="$test_root/app-only"
+  export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+  export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+  # shellcheck source=/dev/null
+  . "$test_root/library.sh"
+  repo_dir="$test_root/repo"
+  PATH=/usr/bin:/bin
+  brew_bin() { return 1; }
+  # shellcheck disable=SC2034 # the doctor's lines read them
+  mark_ok='✓' mark_problem='✗' mark_note='!'
+  mkdir -p "$HOME/Applications/GitHub Copilot.app"
+  is_darwin() { return 1; }
+  with_layout agent_instructions link_agent_instructions > "$HOME/link.log" 2>&1
+  check test ! -e "$HOME/.copilot"
+  is_darwin() { :; }
+  with_layout agent_instructions link_agent_instructions >> "$HOME/link.log" 2>&1
+  check test "$(readlink "$HOME/.copilot/copilot-instructions.md")" = "$repo_dir/agents/instructions.md"
+  check test ! -e "$XDG_DATA_HOME/codex"
+  check test ! -e "$XDG_DATA_HOME/claude"
+  with_layout agent_instructions doctor_agent_instructions > "$HOME/doctor.log" 2>&1
+  check grep -q '^✓ Copilot instructions' "$HOME/doctor.log"
+  if grep -E -q '(Codex|Claude) instructions' "$HOME/doctor.log"; then fail "the doctor named absent agents' instructions"; fi
+  with_layout agent_instructions unlink_agent_instructions >> "$HOME/link.log" 2>&1
+  check test ! -L "$HOME/.copilot/copilot-instructions.md"
+)
+
+# An agent in Homebrew's bin counts before the shell puts that on PATH, as on a
+# fresh install, or where another account's Homebrew holds the agents.
+(
+  export HOME="$test_root/brew-agents"
+  export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
+  export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
+  # shellcheck source=/dev/null
+  . "$test_root/library.sh"
+  repo_dir="$test_root/repo"
+  PATH=/usr/bin:/bin
+  is_darwin() { return 1; }
+  mkdir -p "$HOME/brew/bin"
+  for command in brew codex; do
+    printf '#!/bin/sh\n' > "$HOME/brew/bin/$command"
+    chmod +x "$HOME/brew/bin/$command"
+  done
+  brew_bin() { printf '%s\n' "$HOME/brew/bin/brew"; }
+  with_layout agent_instructions link_agent_instructions > "$HOME/link.log" 2>&1
+  check test "$(readlink "$XDG_DATA_HOME/codex/AGENTS.md")" = "$repo_dir/agents/instructions.md"
+  check test -d "$XDG_STATE_HOME/codex"
+  check test ! -e "$XDG_DATA_HOME/claude"
+  check test ! -e "$HOME/.copilot"
 )
 
 # A bundle that can't record its time names the folder in one line and

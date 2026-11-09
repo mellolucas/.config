@@ -289,10 +289,16 @@ agent_instructions() {
   "$@" Copilot "$HOME/.copilot/copilot-instructions.md" copilot 'GitHub Copilot.app'
 }
 
-# Arguments: the agent's command, then its app, if it has one
+# Arguments: the agent's command, then its app, if it has one. The command
+# counts beside Homebrew's brew too, before the shell puts it on PATH; the app,
+# on macOS, in /Applications or ~/Applications.
 agent_installed() {
-  command -v "$1" >/dev/null 2>&1 ||
-    { [ -n "${2-}" ] && { [ -d "/Applications/$2" ] || [ -d "$HOME/Applications/$2" ]; }; }
+  command -v "$1" >/dev/null 2>&1 && return 0
+  if agent_brew=$(brew_bin) && [ -x "${agent_brew%/*}/$1" ]; then
+    return 0
+  fi
+  [ -n "${2-}" ] && is_darwin &&
+    { [ -d "/Applications/$2" ] || [ -d "$HOME/Applications/$2" ]; }
 }
 
 # A plain file there is the user's own; links are this repo's to manage. Codex
