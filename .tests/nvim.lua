@@ -274,16 +274,20 @@ do
 end
 
 -- Space t m swaps the window for glow's render of the saved file (here a
--- stand-in that bolds each line, shown as text rather than escape codes); i
--- there stays in normal mode, as the render takes no input, and q brings back
--- the markdown source as it was. A second Neovim reads the keys, as its main
--- loop does in use: keys fed to this one never enter terminal mode.
+-- stand-in that colors each line bold blue and pads it, inside a link), as
+-- read-only text with glow's colors as highlights and no padding: a line glow
+-- writes stays whole, and the window wraps it, as Space t w toggles. The
+-- cursor goes to the spot matching the source's; i changes nothing, and q
+-- brings back the markdown source as it was, wrapping as before. A second
+-- Neovim reads the keys, as its main loop does in use.
 do
   stand_in("glow", "for file; do :; done # the last argument",
-    [[while IFS= read -r line; do printf '\033[1m%s\033[0m\n' "$line"; done < "$file"]])
+    [[printf '\033]8;id=1;https://example.com\007']],
+    [[while IFS= read -r line; do printf '\033[34;1m%s\033[0m   \n' "$line"; done < "$file"]],
+    [[printf '\033]8;;\007']])
   local path = fn.tempname() .. ".md"
-  local text = { "# Notes" }
-  for i = 2, 60 do
+  local text = { "# Notes", ("word "):rep(60) .. "end" }
+  for i = 3, 60 do
     text[i] = "line " .. i
   end
   fn.writefile(text, path)
@@ -293,6 +297,7 @@ do
   end
   local source, view = unpack(child_lua([[
     vim.g.mapleader = " "
+    vim.o.wrap = false
     dofile("nvim/lua/config/keymaps.lua")
     vim.cmd.edit(vim.fn.fnameescape(...))
     vim.bo.filetype = "markdown"
@@ -302,16 +307,29 @@ do
   ]], path))
   fn.rpcrequest(child, "nvim_input", " tm")
   assert(vim.wait(5000, function()
-    return child_lua("return vim.bo.buftype == 'terminal' and vim.tbl_contains(vim.api.nvim_buf_get_lines(0, 0, -1, false), '# Notes')")
+    return child_lua("return vim.bo.buftype == 'nofile' and vim.api.nvim_buf_line_count(0) > 1")
   end, 10), "Space t m shows no render")
+  local shown = child_lua([[
+    local marks = vim.api.nvim_buf_get_extmarks(0, -1, { 0, 0 }, { 0, -1 }, { details = true })
+    local look = marks[1] and vim.api.nvim_get_hl(0, { name = marks[1][4].hl_group }) or {}
+    return { lines = vim.api.nvim_buf_get_lines(0, 0, -1, false), buftype = vim.bo.buftype, modifiable = vim.bo.modifiable,
+      bold = look.bold, fg = look.fg, wrap = vim.wo.wrap, cursor = vim.api.nvim_win_get_cursor(0)[1] }
+  ]])
+  assert(vim.deep_equal(shown.lines, text), "the render's lines: " .. vim.inspect(shown.lines))
+  assert(shown.buftype == "nofile" and not shown.modifiable, "the render is a " .. shown.buftype .. " buffer")
+  assert(shown.bold and shown.fg == 0x0000e0, "the render's first line looks " .. vim.inspect({ shown.bold, shown.fg }))
+  assert(shown.wrap and shown.cursor == 30, "the render: wrap " .. tostring(shown.wrap) .. ", cursor on line " .. shown.cursor)
+  fn.rpcrequest(child, "nvim_input", " tw")
+  assert(child_lua("return vim.wo.wrap") == false, "Space t w left the render wrapping")
   fn.rpcrequest(child, "nvim_input", "i")
   local mode = child_lua("return vim.api.nvim_get_mode().mode")
-  assert(mode == "nt", "i in the preview: " .. mode)
+  assert(mode == "n" and child_lua("return vim.api.nvim_buf_get_lines(0, 0, 1, false)[1]") == "# Notes", "i in the preview: " .. mode)
   -- Esc ends the wait for a register that an unmapped q would start.
   fn.rpcrequest(child, "nvim_input", "q<Esc>")
-  local back, restored = unpack(child_lua("return { vim.api.nvim_get_current_buf(), vim.fn.winsaveview() }"))
+  local back, restored, wrap = unpack(child_lua("return { vim.api.nvim_get_current_buf(), vim.fn.winsaveview(), vim.wo.wrap }"))
   assert(back == source, "q in the preview did not bring back the source")
   assert(vim.deep_equal(restored, view), "q in the preview brought the source back at " .. vim.inspect(restored))
+  assert(wrap == false, "the source wraps after the preview")
   fn.jobstop(child)
   fn.delete(path)
 end

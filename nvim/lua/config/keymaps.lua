@@ -79,11 +79,130 @@ map("n", "<leader>td", function()
   vim.diagnostic.config({ virtual_text = not config.virtual_text })
 end, { desc = "Toggle inline diagnostics" })
 map("n", "<leader>tu", "<cmd>packadd nvim.undotree | Undotree<CR>", { desc = "Toggle undo tree" })
--- Markdown preview: swaps the current window between markdown source and a glow
--- render of the file on disk, shown in a terminal with no process behind it: it
--- displays glow's ANSI colors, and no "[Process exited]" line follows them.
--- Explicit --style (aliases don't reach Neovim's processes); --width = min(window,
--- 120), glow.yaml's width.
+-- Markdown preview: swaps the current window between markdown source and a
+-- read-only render of the file on disk by glow (explicit --style: aliases don't
+-- reach Neovim's processes). glow breaks no lines: the window wraps them at
+-- its width, between words, and Space t w toggles that, as in any buffer.
+-- glow's colors become highlights, as Neovim's terminal shows them.
+local preview_marks = vim.api.nvim_create_namespace("markdown_preview")
+local preview_groups = {}
+-- libvterm's 16, which Neovim's terminal shows where g:terminal_color_N is unset
+local preview_ansi = { "#000000", "#e00000", "#00e000", "#e0e000", "#0000e0", "#e000e0", "#00e0e0", "#e0e0e0",
+  "#808080", "#ff4040", "#40ff40", "#ffff40", "#4040ff", "#ff40ff", "#40ffff", "#ffffff" }
+local function preview_color(value)
+  if type(value) ~= "number" then
+    return value, nil
+  elseif value < 16 then
+    return vim.g["terminal_color_" .. value] or preview_ansi[value + 1], value
+  elseif value < 232 then
+    local n = value - 16
+    return ("#%02x%02x%02x"):format(51 * math.floor(n / 36), 51 * (math.floor(n / 6) % 6), 51 * (n % 6)), value
+  end
+  local gray = math.floor((value - 232) * 255 / 23)
+  return ("#%02x%02x%02x"):format(gray, gray, gray), value
+end
+local function preview_define(group)
+  local fg, ctermfg = preview_color(group.attr.fg)
+  local bg, ctermbg = preview_color(group.attr.bg)
+  vim.api.nvim_set_hl(0, group.name, {
+    fg = fg, ctermfg = ctermfg, bg = bg, ctermbg = ctermbg, bold = group.attr.bold, italic = group.attr.italic,
+    underline = group.attr.underline, strikethrough = group.attr.strikethrough, reverse = group.attr.reverse,
+  })
+end
+local function preview_group(attr)
+  local key = vim.inspect(attr)
+  if not preview_groups[key] then
+    preview_groups[key] = { name = "MarkdownPreview" .. vim.tbl_count(preview_groups) + 1, attr = attr }
+    preview_define(preview_groups[key])
+  end
+  return preview_groups[key].name
+end
+-- A colorscheme clears them, and a light or a dark one has its own terminal colors
+vim.api.nvim_create_autocmd("ColorScheme", {
+  group = vim.api.nvim_create_augroup("markdown_preview", {}),
+  callback = function()
+    for _, group in pairs(preview_groups) do
+      preview_define(group)
+    end
+  end,
+})
+-- The attributes an SGR sequence's parameters (1;34 in ESC[1;34m) leave
+local preview_flags = { [1] = "bold", [3] = "italic", [4] = "underline", [7] = "reverse", [9] = "strikethrough" }
+local function preview_sgr(attr, params)
+  attr = vim.deepcopy(attr)
+  local codes = vim.split(params, ";", { plain = true })
+  local i = 1
+  while i <= #codes do
+    local code = tonumber(codes[i]) or 0
+    if code == 0 then
+      attr = {}
+    elseif preview_flags[code] then
+      attr[preview_flags[code]] = true
+    elseif code == 22 then
+      attr.bold = nil
+    elseif code > 22 and preview_flags[code - 20] then
+      attr[preview_flags[code - 20]] = nil
+    elseif code >= 30 and code <= 37 or code >= 90 and code <= 97 then
+      attr.fg = code % 10 + (code >= 90 and 8 or 0)
+    elseif code >= 40 and code <= 47 or code >= 100 and code <= 107 then
+      attr.bg = code % 10 + (code >= 100 and 8 or 0)
+    elseif code == 39 or code == 49 then
+      attr[code == 39 and "fg" or "bg"] = nil
+    elseif (code == 38 or code == 48) and codes[i + 1] == "5" then
+      attr[code == 38 and "fg" or "bg"] = tonumber(codes[i + 2])
+      i = i + 2
+    elseif (code == 38 or code == 48) and codes[i + 1] == "2" then
+      local rgb = vim.tbl_map(function(part) return tonumber(part) or 0 end, { codes[i + 2], codes[i + 3], codes[i + 4] })
+      attr[code == 38 and "fg" or "bg"] = ("#%02x%02x%02x"):format(unpack(rgb))
+      i = i + 4
+    end
+    i = i + 1
+  end
+  return attr
+end
+-- glow's output as lines, and the spans its SGR sequences color; its other
+-- sequences (links, queries) go
+local function preview_parse(output)
+  local lines, spans, attr = {}, {}, {}
+  output = output:gsub("\27%][^\7\27]*\7", ""):gsub("\27%].-\27\\", ""):gsub("\27[^%[]", "")
+  for _, raw in ipairs(vim.split(output, "\n", { plain = true })) do
+    local line, from = "", 1
+    while true do
+      local start, stop, params, final = raw:find("\27%[([%d;?]*)(%a)", from)
+      local text = raw:sub(from, (start or 0) - 1)
+      if text ~= "" then
+        if next(attr) then
+          spans[#spans + 1] = { #lines, #line, #line + #text, attr }
+        end
+        line = line .. text
+      end
+      if not start then
+        break
+      end
+      if final == "m" then
+        attr = preview_sgr(attr, params)
+      end
+      from = stop + 1
+    end
+    -- Without the padding glow gives table rows, which would wrap as blank rows
+    local trimmed = line:gsub(" +$", "")
+    for i = #spans, 1, -1 do
+      local span = spans[i]
+      if span[1] < #lines then
+        break
+      elseif span[2] >= #trimmed then
+        table.remove(spans, i)
+      else
+        span[3] = math.min(span[3], #trimmed)
+      end
+    end
+    lines[#lines + 1] = trimmed
+  end
+  if lines[#lines] == "" then
+    table.remove(lines)
+  end
+  return lines, spans
+end
 local function markdown_preview()
   local paired = vim.b.tm_source
   if paired then
@@ -119,23 +238,19 @@ local function markdown_preview()
     vim.notify("Markdown preview: buffer modified, rendering saved state", vim.log.levels.INFO)
   end
   local theme = (vim.env.XDG_CONFIG_HOME or vim.env.HOME .. "/.config") .. "/glow/theme.json"
-  local width = tostring(math.min(vim.api.nvim_win_get_width(0), 120))
   local source = vim.api.nvim_get_current_buf()
   local win = vim.api.nvim_get_current_win()
   local view = vim.fn.winsaveview()
   local ratio = view.lnum / vim.api.nvim_buf_line_count(source)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.bo[buf].bufhidden = "wipe"
-  vim.bo[buf].scrollback = 1000000
+  vim.bo[buf].modifiable = false
   vim.b[buf].tm_source = source
   vim.b[buf].tm_view = view
   -- q leaves the preview, as it leaves the other readers
   map("n", "q", markdown_preview, { buffer = buf, desc = "Back to the markdown source" })
   vim.api.nvim_win_set_buf(0, buf)
-  -- Opened in the preview's window, the terminal takes its size and settings
-  local terminal = vim.api.nvim_open_term(buf, {})
-  -- The render takes no input: i and the like stay in normal mode
-  vim.api.nvim_create_autocmd("TermEnter", { buffer = buf, command = "stopinsert" })
+  vim.cmd.setlocal("wrap")
   local function showing()
     return vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf
       and vim.b[buf].tm_source == source
@@ -154,48 +269,30 @@ local function markdown_preview()
       vim.api.nvim_buf_delete(buf, { force = true })
     end
   end
-  -- The terminal takes in the whole render on its next refresh; the cursor goes
-  -- to the matching spot after it. Count screen rows too: warn conservatively
-  -- before scrollback can lose the prefix.
-  local saturated, placing = false, false
-  local function place()
-    if not showing() then
-      return
-    end
-    if saturated then
-      vim.notify("Markdown preview: output reached the scrollback limit; beginning may be truncated, "
-        .. "proportional positioning skipped", vim.log.levels.WARN)
-    else
-      local total = vim.api.nvim_buf_line_count(buf)
-      local target = math.max(1, math.min(total, math.floor(ratio * total + 0.5)))
-      vim.api.nvim_win_set_cursor(win, { target, 0 })
-    end
-  end
-  local function show(render)
-    vim.api.nvim_buf_attach(buf, false, {
-      on_lines = function()
-        saturated = saturated or vim.api.nvim_buf_line_count(buf) >= vim.bo[buf].scrollback
-        if not placing then
-          placing = true
-          vim.schedule(place)
-        end
-      end,
-    })
-    vim.api.nvim_chan_send(terminal, render)
-  end
-  local started, glow = pcall(vim.system, { "glow", "--style", theme, "--width", width, path },
+  -- The cursor goes to the spot matching the source's
+  local started, glow = pcall(vim.system, { "glow", "--style", theme, "--width", "0", path },
     { text = true, timeout = 5000 }, vim.schedule_wrap(function(result)
       if not vim.api.nvim_buf_is_valid(buf) then
         return
       end
       if result.code == 124 then
-        fail("glow timed out")
+        return fail("glow timed out")
       elseif result.signal ~= 0 then
-        fail("glow stopped by signal " .. result.signal)
+        return fail("glow stopped by signal " .. result.signal)
       elseif result.code ~= 0 then
-        fail("glow exited with code " .. result.code)
-      elseif result.stdout:find("%S") then -- an empty file renders blank: nothing to show or place
-        show(result.stdout)
+        return fail("glow exited with code " .. result.code)
+      end
+      local lines, spans = preview_parse(result.stdout)
+      vim.bo[buf].modifiable = true
+      vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+      vim.bo[buf].modifiable = false
+      vim.bo[buf].modified = false
+      for _, span in ipairs(spans) do
+        vim.api.nvim_buf_set_extmark(buf, preview_marks, span[1], span[2],
+          { end_col = span[3], hl_group = preview_group(span[4]) })
+      end
+      if showing() then
+        vim.api.nvim_win_set_cursor(win, { math.max(1, math.min(#lines, math.floor(ratio * #lines + 0.5))), 0 })
       end
     end))
   if not started then
