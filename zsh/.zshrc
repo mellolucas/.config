@@ -212,7 +212,8 @@ fi
 
 if command -v bat >/dev/null 2>&1; then
   alias cat='bat --paging=never --style=plain'
-  alias b='bat'
+  # bat breaks no lines: less cuts long ones, and -S wraps them
+  alias b='bat --wrap=never'
 fi
 
 if command -v eza >/dev/null 2>&1; then
