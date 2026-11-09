@@ -56,6 +56,9 @@ with 'opencode python3' 'opencode instructions' sh .tests/opencode.sh
 # Both package sets parse, and the workstation keeps every essential.
 # shellcheck disable=SC2016 # the inner shell expands these
 with brew 'brewfile' sh -c 'export HOMEBREW_NO_AUTO_UPDATE=1; full=$(brew bundle list --file=homebrew/Brewfile --all) && core=$(brew bundle list --file=homebrew/core.Brewfile --all) || exit 1; for entry in $core; do printf "%s\n" "$full" | grep -qxF "$entry" || { printf "core entry missing from the Brewfile: %s\n" "$entry"; exit 1; }; done'
+# Homebrew strips npm's variables, so homebrew/npmrc alone must yield the cache.
+# shellcheck disable=SC2016 # the inner shell expands these
+with npm 'npm global config' sh -c 'h=$(mktemp -d) || exit 1; c=$(env -i HOME="$h" PATH="$PATH" npm config get cache --globalconfig homebrew/npmrc --userconfig /dev/null); rm -rf "$h"; [ "$c" = "$h/.cache/npm" ] || { printf "cache resolved to %s\n" "$c"; exit 1; }'
 with 'zsh git' 'lifecycle' sh .tests/install.sh
 with git 'git helpers' sh .tests/git.sh
 with 'zsh git' 'zsh helpers' sh .tests/zsh.sh
