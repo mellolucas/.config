@@ -584,7 +584,7 @@ if (( $+commands[fzf] )); then
     title=${page_rows[-1]#*$'\t'}
     wait_for "Enter did not read the page $title" '[[ ${${(f)"$(screen)"}[1]} == *"$title"* ]]'
     # glow breaks no lines: the page's opening paragraph, longer than 80
-    # columns, shows on one row at 120; at 60, less wraps it between words
+    # columns, shows on one row at 120; narrowed, less wraps it between words
     # where it can (less 621 and later)
     (( ${#opening} > 80 && ${#opening} < 119 )) ||
       fail "GUIDE.md's last page opens with ${#opening} characters, not the 81 to 118 this check needs"
@@ -653,13 +653,15 @@ zsh -fc 'fpath=(\"\$FUNCTIONS\"); autoload -Uz rgv; rgv needle'"
   (( ! $#leftovers )) || fail "rgv left temporary files: ${leftovers:t}"
   # A matching line longer than the preview wraps there, and Ctrl+/ (from
   # fzf/fzfrc, as zsh/.zshrc points fzf to it) turns that off and on again.
+  # The line shows to its end, past 120 columns.
   mkdir -p "$HOME/rgv-wide"
-  print -r -- "needle ${(l:200::word :)}" > "$HOME/rgv-wide/wide.txt"
+  print -r -- "needle ${(l:200::word :)} tailend" > "$HOME/rgv-wide/wide.txt"
   tmux new-session -d -s rgv -x 120 -y 24 -c "$HOME/rgv-wide" \
     "FUNCTIONS=${(q)repo}/zsh/functions FZF_DEFAULT_OPTS_FILE=${(q)repo}/fzf/fzfrc TMPDIR=${(q)HOME}/tmp EDITOR=nvim \
 zsh -fc 'fpath=(\"\$FUNCTIONS\"); autoload -Uz rgv; rgv needle'"
   tmux resize-window -t '=rgv:' -x 120 -y 24
   wait_for 'rgv did not wrap a long matching line' 'wraps rgv'
+  [[ $(preview_rows rgv) == *tailend* ]] || fail 'rgv cut a long matching line short'
   tmux send-keys -t '=rgv:' C-_
   wait_for 'Ctrl+/ did not stop the rgv preview wrapping' '! wraps rgv'
   tmux send-keys -t '=rgv:' C-_
@@ -671,6 +673,21 @@ else
   print -r -- 'SKIP: rgv through real ripgrep and fzf (fzf or rg missing)'
 fi
 
+# fzf with fzf/fzfrc's options alone, as Esc then c and Ctrl+T run it, wraps a
+# long preview line from the start.
+if (( $+commands[fzf] )); then
+  print -r -- "${(l:300::word :)}" > "$HOME/long.txt"
+  tmux new-session -d -s fzf -x 120 -y 24 -c "$HOME" \
+    "FZF_DEFAULT_OPTS_FILE=${(q)repo}/fzf/fzfrc zsh -fc 'print -rl -- one two | fzf --preview \"cat long.txt\"'"
+  tmux resize-window -t '=fzf:' -x 120 -y 24
+  wait_for 'fzf with fzf/fzfrc did not wrap its preview' 'wraps fzf'
+  tmux send-keys -t '=fzf:' Escape
+  wait_for 'Esc did not close fzf' '! tmux has-session -t "=fzf" 2>/dev/null'
+  print -r -- "ok: fzf wraps previews with fzf/fzfrc's options alone"
+else
+  print -r -- 'SKIP: fzf with fzf/fzfrc alone (fzf missing)'
+fi
+
 # One `if command -v TOOL` block of zsh/.zshrc, loaded alone: $1 the
 # repository, $2 TOOL
 cat > "$HOME/zshrc-block" <<'EOF'
@@ -679,15 +696,15 @@ block=${config#*$'\n'"if command -v $2 "}
 eval "if command -v $2 ${block%%$'\n'fi*}"$'\nfi'
 EOF
 
-# mdv through the real glow and less, with the LESS zsh/.zshenv exports: glow
-# breaks no lines, and less wraps them between words where it can (less 621
-# and later).
+# mdv through the real glow and less, with the LESS zsh/.zshenv exports and
+# zsh/.zshrc adds to: glow breaks no lines, and less wraps them between words
+# where it can (less 621 and later).
 if (( $+commands[glow] && $+commands[less] )) && less --help 2>/dev/null | grep -q -e --wordwrap; then
   text='alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho sigma tau'
   print -rl -- '# Notes' '' $text > "$HOME/notes.md"
   tmux new-session -d -s mdv -x 40 -y 20 -c "$HOME" \
     "REPO=${(q)repo} XDG_CONFIG_HOME=${(q)repo} LESS='-FRX --mouse' \
-zsh -fc 'source ~/zshrc-block \"\$REPO\" glow; mdv notes.md; read -r'"
+zsh -fc 'source ~/zshrc-block \"\$REPO\" less; source ~/zshrc-block \"\$REPO\" glow; mdv notes.md; read -r'"
   tmux resize-window -t '=mdv:' -x 40 -y 20
   wait_for 'mdv did not wrap a paragraph between its words' 'reads mdv "$text"'
   tmux kill-session -t '=mdv'
@@ -696,18 +713,26 @@ else
   print -r -- 'SKIP: mdv through real glow and less (glow, or less with --wordwrap, missing)'
 fi
 
-# b through the real bat and less: bat breaks no lines, and less shows a long
-# one on a row of its own, cut at the pane's edge.
+# b through the real bat and less: bat breaks no lines, so less shows a long
+# one on a row of its own, cut at the pane's edge, and after -S wraps it
+# between words where it can (less 621 and later).
 if (( $+commands[bat] && $+commands[less] )); then
-  print -r -- "${(l:150::x:)}" > "$HOME/wide.txt"
+  text="${(l:150::word :)} tailend"
+  print -r -- $text > "$HOME/wide.txt"
   tmux new-session -d -s b -x 40 -y 20 -c "$HOME" \
-    "REPO=${(q)repo} LESS='-FRX --mouse' zsh -fc 'source ~/zshrc-block \"\$REPO\" bat; eval b wide.txt; read -r'"
+    "REPO=${(q)repo} LESS='-FRX --mouse' \
+zsh -fc 'source ~/zshrc-block \"\$REPO\" less; source ~/zshrc-block \"\$REPO\" bat; eval b --style=plain wide.txt; read -r'"
   tmux resize-window -t '=b:' -x 40 -y 20
-  wait_for 'b showed no long line' '[[ $(tmux capture-pane -p -t "=b:") == *xxxxxxxxxx* ]]'
-  local -a cut=("${(@M)${(@f)$(tmux capture-pane -p -t '=b:')}:#*xxxxxxxxxx*}")
+  wait_for 'b showed no long line' '[[ $(tmux capture-pane -p -t "=b:") == *"word word"* ]]'
+  local -a cut=("${(@M)${(@f)$(tmux capture-pane -p -t '=b:')}:#*word*}")
   (( $#cut == 1 )) || fail "b broke a long line over $#cut rows"
+  if less --help 2>/dev/null | grep -q -e --wordwrap; then
+    tmux send-keys -t '=b:' -l -- -S
+    tmux send-keys -t '=b:' Enter
+    wait_for 'after -S, less did not wrap the long line between words' 'reads b "$text"'
+  fi
   tmux kill-session -t '=b'
-  print -r -- 'ok: b leaves long lines whole, for less to cut'
+  print -r -- 'ok: b leaves long lines whole, for less to cut, or wrap between words after -S'
 else
   print -r -- 'SKIP: b through real bat and less (bat missing)'
 fi

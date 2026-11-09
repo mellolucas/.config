@@ -36,7 +36,7 @@ zf_mkdir -m 700 "$shelf" || return
   # The rg alias's defaults (zsh/.zshrc), then the caller's arguments. Sorted
   # by path, and grouped by file with context: each file's preview is a range
   # of these lines.
-  rg --hidden --follow --smart-case --glob='!.git' --max-columns=120 --max-columns-preview \
+  rg --hidden --follow --smart-case --glob='!.git' --max-columns=1000 --max-columns-preview \
     --sort=path --heading --with-filename --line-number --context=2 --color=always "$@" > "$shelf/matches" ||
     result=$?
   # rg exits 2 after matches too when some path failed, which it reports

@@ -821,28 +821,56 @@ fzf() {
 )
 
 # mdv FILE renders the file through glow (here a stand-in on PATH that prints
-# what it got, then a padded line), with the theme and -w 0, into the pager:
-# lines lose their padding, and less, which here wraps between words, is told
-# to.
+# what it got, then a padded line), with the theme and -w 0, into the pager
+# with the LESS it has: lines lose their padding. A render that fails returns
+# its error, and no pager opens.
 (
   unfunction glow less
   /bin/mkdir -p "$test_root/mdv-bin"
-  print -rl -- '#!/bin/sh' 'printf "%s\n" rendered "$@" "padded   "' > "$test_root/mdv-bin/glow"
-  print -rl -- '#!/bin/sh' '[ "$1" != --help ] || { echo "  --wordwrap"; exit; }' 'echo "LESS=$LESS"' '/bin/cat' \
-    > "$test_root/mdv-bin/less"
+  print -rl -- '#!/bin/sh' 'case "$*" in *missing.md*) echo "Error: no such file" >&2; exit 3 ;; esac' \
+    'printf "%s\n" rendered "$@" "padded   "' > "$test_root/mdv-bin/glow"
+  print -rl -- '#!/bin/sh' 'echo "LESS=$LESS"' '/bin/cat' > "$test_root/mdv-bin/less"
   /bin/chmod +x "$test_root/mdv-bin/glow" "$test_root/mdv-bin/less"
   path=("$test_root/mdv-bin" /usr/bin /bin)
   source /dev/stdin <<< "$alias_block"
   output=$(PAGER= LESS=-FRX mdv 'notes file.md') || fail 'mdv status'
-  expect $'LESS=-FRX --wordwrap\nrendered\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-w\n0\nnotes file.md\npadded' \
+  expect $'LESS=-FRX\nrendered\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-w\n0\nnotes file.md\npadded' \
     "$output" 'mdv FILE'
+  if output=$(PAGER= mdv missing.md 2>&1); then fail 'mdv succeeded on a render that failed'; fi
+  expect 'Error: no such file' "$output" 'mdv on a render that failed'
 )
 
-# Each preview as fzf runs it: Markdown through glow, other files through bat,
-# and cat without either, all for names that look like options.
+# zsh/.zshrc adds --wordwrap to LESS, once, where less lists it in its help,
+# and leaves LESS alone for an older less, which would stop at the option
+(
+  config=$(<"$repo/zsh/.zshrc")
+  [[ $config == *$'\n''if command -v less '*$'\n''fi'$'\n'* ]] || fail 'less block boundaries'
+  block=${config#*$'\n''if command -v less '}
+  block="if command -v less ${block%%$'\n'fi*}"$'\nfi'
+  unfunction less
+  /bin/mkdir -p "$test_root/less-bin"
+  path=("$test_root/less-bin" /usr/bin /bin)
+  for help result in '  --wordwrap' '-FRX --mouse --wordwrap' '  --chop-long-lines' '-FRX --mouse'; do
+    print -rl -- '#!/bin/sh' "echo '$help'" > "$test_root/less-bin/less"
+    /bin/chmod +x "$test_root/less-bin/less"
+    LESS='-FRX --mouse'
+    eval "$block"
+    eval "$block"
+    expect "$result" "$LESS" "LESS where less's help lists ${help## }"
+  done
+)
+
+# Each preview as fzf runs it: Markdown through glow, its padding trimmed (here
+# a stand-in that pads its render), other files through bat, and cat without
+# either, all for names that look like options.
 for has_glow bat_state selection in 1 present -file.MD 1 present -file 0 missing -file.MD; do
   (
-    (( has_glow )) || unfunction glow
+    path=(/usr/bin /bin)
+    if (( has_glow )); then
+      glow() { record glow "$@"; print -r -- 'rendered   '; }
+    else
+      unfunction glow
+    fi
     fzf() {
       local preview=${4//'{}'/${(q)selection}}
       eval "$preview"
@@ -850,9 +878,10 @@ for has_glow bat_state selection in 1 present -file.MD 1 present -file 0 missing
     cat() { record cat "$@"; }
     bat() { record bat "$@"; }
     [[ $bat_state != missing ]] || unfunction bat
-    fzfv
+    output=$(fzfv) || fail "fzfv's preview failed: glow=$has_glow / bat=$bat_state / $selection"
     if (( has_glow )) && [[ $selection == *.MD ]]; then
       expected=$'glow\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n--width\n0\n--\n'"$selection"
+      expect rendered "$output" "the Markdown preview's render: $selection"
     elif [[ $bat_state == present ]]; then
       expected=$'bat\n--color=always\n--wrap=never\n--style=numbers\n--line-range=:500\n--\n'"$selection"
     else

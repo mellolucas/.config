@@ -158,10 +158,12 @@ content+=$'.\n'
 
 if (( reader )); then
   # glow breaks no lines, and its table rows lose their padding: less wraps
-  # them at the pane's width, between words where it can (less 621 and later)
-  local options=-R
+  # them at the pane's width, between words where it can (less 621 and later).
+  # A render that fails returns its error
+  local options=-R render
   less --help 2>/dev/null | grep -q -e --wordwrap && options+=' --wordwrap'
-  print -r -- "$content" | glow --style "$repo/glow/guide.json" --width 0 - | sed 's/ *$//' | LESS=$options less
+  render=$(print -r -- "$content" | glow --style "$repo/glow/guide.json" --width 0 -) || return
+  print -r -- "$render" | sed 's/ *$//' | LESS=$options less
 else
   print -r -- "$content"
 fi

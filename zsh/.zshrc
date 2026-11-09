@@ -12,6 +12,12 @@
 if [[ $TERM == xterm-ghostty && -z $TERMINFO ]] && ! infocmp xterm-ghostty &> /dev/null; then
   export TERM=xterm-256color
 fi
+# less wraps long lines between words where it can (less 621 and later); an
+# option it doesn't know stops it at "Press RETURN", so it's asked first
+if command -v less >/dev/null 2>&1 && [[ " ${LESS-} " != *' --wordwrap '* ]] &&
+    less --help 2>/dev/null | grep -q -e --wordwrap; then
+  export LESS="${LESS:+$LESS }--wordwrap"
+fi
 
 fpath=("$ZDOTDIR/functions" $fpath)
 fns=("$ZDOTDIR/functions"/*(.N:t))
@@ -198,14 +204,16 @@ if command -v glow >/dev/null 2>&1; then
       print -r -- "Render Markdown in the pager; glow's options pass through (glow --help lists them)."
       return 0
     fi
-    # glow reads a pipe without a file, but would open its browser at a terminal
-    [[ $# -gt 0 || ! -t 0 ]] || { print -u2 'usage: mdv FILE...'; return 1 }
+    # glow alone at a terminal opens its browser, which wraps for itself
+    if [[ $# -eq 0 && -t 0 ]]; then
+      \glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json"
+      return
+    fi
     # glow breaks no lines, and its table rows lose their padding: the pager
-    # wraps them, less between words where it can (less 621 and later)
-    local options=${LESS-}
-    less --help 2>/dev/null | grep -q -e --wordwrap && options+=' --wordwrap'
-    \glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" -w 0 "$@" | sed 's/ *$//' |
-      LESS=$options "${(@Q)${(z)PAGER:-less}}"
+    # wraps them. A render that fails returns its error
+    local render
+    render=$(\glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" -w 0 "$@") || return
+    print -r -- "$render" | sed 's/ *$//' | "${(@Q)${(z)PAGER:-less}}"
   }
   (( ! $+functions[compdef] )) || compdef '_files -g "*.(md|markdown|mdown|mkd|mdx)(-.)"' mdv
 fi
@@ -225,7 +233,8 @@ if command -v eza >/dev/null 2>&1; then
   alias lc='eza --code=both'
 fi
 
-alias rg='rg --hidden --follow --smart-case --glob="!.git" --max-columns=120 --max-columns-preview'
+# Lines past 1000 columns, as in minified files, show their start alone
+alias rg='rg --hidden --follow --smart-case --glob="!.git" --max-columns=1000 --max-columns-preview'
 alias rga='rg --no-ignore --glob="!.git"'
 
 alias cmdv='command -v'
