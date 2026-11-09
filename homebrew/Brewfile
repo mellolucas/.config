@@ -1,5 +1,7 @@
-# The workstation: GUI apps, language servers, runtimes, and the other agents,
-# then core.Brewfile's essentials and local.Brewfile.
+# The workstation: GUI apps, dev containers, and language servers, then
+# core.Brewfile's essentials and local.Brewfile. Projects bring their own
+# runtimes and tools in their dev containers, or through local.Brewfile.
+
 brew "mas" if OS.mac? && system("defaults read MobileMeAccounts Accounts >/dev/null 2>&1")
 
 cask "ghostty" if OS.mac?
@@ -21,20 +23,8 @@ brew "bash-language-server"
 brew "shellcheck" # bash-language-server's linter; .tests/run lints with it too
 brew "typescript-language-server"
 brew "basedpyright"
-brew "go"
-brew "gopls"
-
+# Runs the language servers above, and local.Brewfile's npm entries
 brew "node"
-brew "bun"
-brew "python"
-
-cask "claude-code" if OS.mac?
-# Their casks are unnotarized, so macOS blocks them; npm installs are not quarantined
-npm "@github/copilot"
-npm "@openai/codex"
-# Copilot outside the terminal (automations, Projects, computer use), sharing
-# Copilot CLI's ~/.copilot; it updates itself
-cask "github-copilot-app" if OS.mac?
 
 cask "obsidian" if OS.mac?
 

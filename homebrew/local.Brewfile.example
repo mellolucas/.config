@@ -1,9 +1,31 @@
 # Optional machine/project tools. Copy to local.Brewfile and enable what you use.
-# Editor tools, Go, Node, Bun, Python, OpenCode, Claude Code, Copilot CLI,
-# Codex, and the GitHub Copilot app are shared.
+# Editor tools, Node, and OpenCode are shared; projects with a dev container get
+# their runtimes and tools there.
 
+# Coding agents beside OpenCode, for the subscriptions you have. Each reads the
+# shared agents/instructions.md, linked once it's installed. Copilot CLI updates
+# itself unless greedy, which leaves its updates to dotfiles update.
+# cask "claude-code" if OS.mac?
+# cask "copilot-cli", greedy: true if OS.mac?
+# cask "codex" if OS.mac?
+# npm "@github/copilot" unless OS.mac?
+# npm "@openai/codex" unless OS.mac?
+# Copilot outside the terminal (automations, Projects, computer use), sharing
+# Copilot CLI's ~/.copilot; it updates itself
+# cask "github-copilot-app" if OS.mac?
+# The other agents' desktop apps: they update themselves, and may keep files in
+# ~/.claude and ~/.codex rather than the agents' XDG homes
+# cask "claude" if OS.mac?
+# cask "chatgpt" if OS.mac?
 # Alternative workspace agents (workspace --agent 'kiro-cli chat')
 # cask "kiro-cli" if OS.mac?
+
+# Runtimes for projects without a dev container; zsh/xdg.sh keeps Go's files in
+# the XDG homes
+# brew "go"
+# brew "gopls"
+# brew "bun"
+# brew "python"
 # Other tools published on npm
 # npm "@scope/tool"
 
@@ -27,8 +49,3 @@
 # `mas search NAME` finds an app's id. Apps on both stay casks, updated on your
 # schedule.
 # mas "Xcode", id: 497799835
-
-# The other agents' desktop apps: they update themselves, and may keep files in
-# ~/.claude and ~/.codex rather than the agents' XDG homes
-# cask "claude" if OS.mac?
-# cask "chatgpt" if OS.mac?
