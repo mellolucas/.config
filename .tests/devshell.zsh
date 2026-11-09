@@ -100,9 +100,12 @@ EOF
 # markers have it, a container's setup runs once, even when it fails:
 # $FAKE/setup-ID notes one that finished. up-fails fails before a container,
 # up-fails-after after making one, and up-slow takes a second. exec runs the
-# command, in the container --container-id names, which must run, in
-# $FAKE/workspaces/NAME, a link to the folder (or to the one $FAKE/workspace
-# names), with the --remote-env settings
+# command in the container --container-id names, which must run, with the
+# --remote-env settings; no-mount makes that a container made before devshell
+# mounted projects at their path. read-configuration shows the config with
+# the folder put in, and the workspace as the CLI works it out: a Compose
+# config's folder alone, else the folder and its mount, both by default at
+# /workspaces/NAME (read-fails makes it fail).
 cat > $temporary/devcontainer <<'EOF'
 #!/bin/sh
 printf 'devcontainer %s\n' "$*" >> "$FAKE/calls"
@@ -150,11 +153,26 @@ case $command in
     case "$*" in
       *'getent passwd'*) echo 'a login shell'; exit 0 ;;
     esac
-    dir=$folder
-    [ ! -e "$FAKE/workspace" ] || dir=$(cat "$FAKE/workspace")
-    mkdir -p "$FAKE/workspaces"
-    ln -sfn "$dir" "$FAKE/workspaces/${folder##*/}"
-    cd "$FAKE/workspaces/${folder##*/}" && exec "$@" ;;
+    # A container made before devshell mounted projects at their path: the
+    # folder devshell enters isn't there
+    if [ -e "$FAKE/no-mount" ]; then
+      a=$1 b=$2 c=$3 d=$4 e=$5
+      shift 5
+      exec "$a" "$b" "$c" "$d" "/nonexistent$e" "$@"
+    fi
+    exec "$@" ;;
+  read-configuration)
+    [ ! -e "$FAKE/read-fails" ] || exit 1
+    # Compact, as the CLI prints it
+    configuration=$(sed "s#\${localWorkspaceFolder}#$folder#g" "$config" | tr -d ' \n')
+    default=/workspaces/${folder##*/}
+    inside=$(printf '%s' "$configuration" | sed -n 's#.*"workspaceFolder":"\([^"]*\)".*#\1#p')
+    mount=$(printf '%s' "$configuration" | sed -n 's#.*"workspaceMount":"\([^"]*\)".*#\1#p')
+    case $configuration in
+      *'"dockerComposeFile"'*) workspace="{\"workspaceFolder\":\"${inside:-/}\"}" ;;
+      *) workspace="{\"workspaceFolder\":\"${inside:-$default}\",\"workspaceMount\":\"${mount:-type=bind,source=$folder,target=$default,consistency=consistent}\"}" ;;
+    esac
+    printf '{"configuration":%s,"workspace":%s}\n' "$configuration" "$workspace" ;;
 esac
 EOF
 cat > $temporary/colima <<'EOF'
@@ -238,6 +256,8 @@ mac=$(make_path docker)
 project=$HOME/code/owner/repo
 make_project $project
 up_line="devcontainer up --workspace-folder $project --remote-env GIT_CONFIG_PARAMETERS='safe.directory=*'"
+# The second mount, of the project at its path
+same=" --mount type=bind,source=$project,target=$project"
 
 # Help, and a project without a dev container
 reset
@@ -340,19 +360,19 @@ print -r -- 'ok: trust'
 
 # On macOS, a first use starts a new Colima sharing ~/code alone, then the
 # container, without a lockfile the project doesn't track, with Git trusting
-# its folders, and with a compose project of the folder's own; the command
-# runs in the folder matching this one, where Git trusts them too, after the
-# settings already there; the container is recorded as set up, under the
-# context Colima's start makes current
+# its folders, the project mounted at its path too, and a compose project of
+# the folder's own; the command runs in this folder, at the same path, where
+# Git trusts them too, after the settings already there; the container is
+# recorded as set up, under the context Colima's start makes current
 builtin cd -- $project/sub/dir
 reset $project/.git
 GIT_CONFIG_PARAMETERS="'core.example=1'" run darwin $mac \
   sh -c 'echo "$PWD|$(git config --get core.example)|$(git config --get-all safe.directory)|$TERM"'
 (( rc == 0 )) || fail "first use: $output"
 has_call "colima start --memory 4 --mount $HOME/code:w --mount-inotify"
-has_call "$up_line --no-lockfile"
+has_call "$up_line --no-lockfile$same"
 has_call "compose project repo-$(key_of $project)"
-[[ ${${(f)output}[-1]} == "$FAKE/workspaces/repo/sub/dir|1|*|xterm-256color" ]] || fail "first use ran: $output"
+[[ ${${(f)output}[-1]} == "$project/sub/dir|1|*|xterm-256color" ]] || fail "first use ran: $output"
 [[ $output == *'devshell: starting Colima, the VM Docker runs in'*'devshell: starting the dev container of ~/code/owner/repo'* ]] ||
   fail "first use said: $output"
 record $project
@@ -360,8 +380,8 @@ record $project
 [[ $calls == *"devcontainer exec --workspace-folder $project --container-id c0 "* ]] || fail "first use's container: $calls"
 # Set up and running, it goes straight to the command in that container, even
 # beside another of the same folder and config; a plain devshell opens the
-# login shell; the exit status is the command's; a subfolder the container
-# lacks fails instead of running elsewhere
+# login shell; the exit status is the command's; a container made before
+# devshell mounted projects at their path says how to make it anew
 print -r -- "c9|$project|1|vsc-repo||$project/.devcontainer/devcontainer.json" >> $FAKE/containers
 : > $FAKE/calls
 run darwin $mac
@@ -371,11 +391,11 @@ lacks 'colima'
 [[ $calls == *" --container-id c0 "* ]] || fail "a running container's id: $calls"
 run darwin $mac sh -c 'exit 7'
 (( rc == 7 )) || fail "exit status $rc"
-mkdir -p $temporary/empty-workspace
-print -r -- $temporary/empty-workspace > $FAKE/workspace
+touch $FAKE/no-mount
 run darwin $mac pwd
-(( rc != 0 )) || fail "a subfolder the container lacks ran: $output"
-rm $FAKE/workspace
+[[ $rc == 1 && $output == "devshell: the dev container has no /nonexistent$project/sub/dir"$'\n''hint: one made before devshell mounted projects at their path here goes with: devshell --remove .' ]] ||
+  fail "a container without the project at its path: $output"
+rm $FAKE/no-mount
 print -r -- 'ok: first use, then a running container'
 
 # A setup that failed after making the container is recorded so. As the CLI
@@ -395,7 +415,7 @@ output=$(PATH=$mac $zsh_path -f -c 'OSTYPE=darwin; . "$0" echo clean' $repo/zsh/
 calls=$(<$FAKE/calls)
 has_call 'docker rm -f c0'
 lacks 'image rm'
-has_call "$up_line --no-lockfile"
+has_call "$up_line --no-lockfile$same"
 record $project
 [[ $REPLY == *$'\n'"c1"$'\n'"ready" && -e $FAKE/setup-c1 ]] || fail "set up anew: $REPLY"
 # A container for another config of the folder goes too, with its compose
@@ -409,7 +429,7 @@ run darwin $mac true
 has_call 'docker compose --project-name repo-1 down --remove-orphans'
 has_call 'docker image rm vsc-repo'
 [[ $(<$FAKE/containers) != *'db|'* ]] || fail "another config's services stayed: $(<$FAKE/containers)"
-has_call "$up_line --no-lockfile"
+has_call "$up_line --no-lockfile$same"
 record $project
 [[ $REPLY == *$'\n'"c0"$'\n'"ready" ]] || fail "another config's record: $REPLY"
 # So does one whose setup failed, once the config changed
@@ -510,20 +530,56 @@ run darwin $mac true
 lacks colima
 print -r -- "ok: Colima's shared folders"
 
-# A task's worktree gets the main checkout's Git data at the same path; a
-# project tracking the CLI's lockfile keeps it
+# A task's worktree gets the main checkout's Git data at the same path, and
+# its own folder; a project tracking the CLI's lockfile keeps it; a project
+# whose config mounts it at its path already gets no second mount, nor one
+# where its config can't be read
 builtin cd -- $project.worktrees/fix
 reset $project/.git
 run darwin $mac true
 (( rc == 0 )) || fail "a worktree: $output"
-has_call "devcontainer up --workspace-folder $project.worktrees/fix --remote-env GIT_CONFIG_PARAMETERS='safe.directory=*' --no-lockfile --mount type=bind,source=$project/.git,target=$project/.git"
+has_call "devcontainer up --workspace-folder $project.worktrees/fix --remote-env GIT_CONFIG_PARAMETERS='safe.directory=*' --no-lockfile --mount type=bind,source=$project/.git,target=$project/.git --mount type=bind,source=$project.worktrees/fix,target=$project.worktrees/fix"
 print -r -- '{}' > $project/.devcontainer/devcontainer-lock.json
 git -C $project add .devcontainer/devcontainer-lock.json
 git -C $project commit -q -m lockfile
 builtin cd -- $project
 reset $project/.git
 run darwin $mac true
-has_call $up_line
+has_call "$up_line$same"
+for mounted in '"dockerComposeFile": "compose.yaml", "service": "app", "workspaceFolder": "${localWorkspaceFolder}"' \
+    '"workspaceFolder": "${localWorkspaceFolder}", "workspaceMount": "source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind"' \
+    '"mounts": ["source=${localWorkspaceFolder},target=${localWorkspaceFolder},type=bind"]' \
+    '"mounts": ["src=${localWorkspaceFolder},dst=${localWorkspaceFolder},type=bind"]' \
+    '"mounts": ["type=bind,source=${localWorkspaceFolder},destination=${localWorkspaceFolder}"]' \
+    '"mounts": [{ "source": "${localWorkspaceFolder}", "target": "${localWorkspaceFolder}", "type": "bind" }]'; do
+  make_project $temporary/mounted
+  print -r -- "{ $mounted }" > $temporary/mounted/.devcontainer/devcontainer.json
+  builtin cd -- $temporary/mounted
+  reset $temporary/mounted/.git
+  touch $FAKE/running
+  print -r -- desktop-linux > $FAKE/context
+  run darwin $mac true
+  (( rc == 0 )) && lacks "--mount type=bind,source=$temporary/mounted,target=$temporary/mounted" ||
+    fail "a project mounted at its path by its config ($mounted): $calls"
+  rm -rf $temporary/mounted
+done
+# An image's or a Dockerfile's config naming the folder alone keeps the
+# mount at /workspaces/NAME, so the project needs one at its path
+make_project $temporary/folder
+print -r -- '{ "image": "ubuntu", "workspaceFolder": "${localWorkspaceFolder}" }' > $temporary/folder/.devcontainer/devcontainer.json
+builtin cd -- $temporary/folder
+reset $temporary/folder/.git
+touch $FAKE/running
+print -r -- desktop-linux > $FAKE/context
+run darwin $mac true
+(( rc == 0 )) && [[ $calls == *"--mount type=bind,source=$temporary/folder,target=$temporary/folder"* ]] ||
+  fail "a config naming the folder alone: $calls"
+rm -rf $temporary/folder
+builtin cd -- $project
+reset $project/.git
+touch $FAKE/read-fails
+run darwin $mac true
+has_call "$up_line$same"
 print -r -- 'ok: worktrees and lockfiles'
 
 # Two repositories' tasks of the same name get compose projects apart

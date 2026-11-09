@@ -138,11 +138,15 @@ if (( finish )); then
   # The task's editor socket, named as below
   local socket=$run/ws-${"$(print -rn -- ${top:A} | cksum)"%% *}.sock
   local -a ignored worktrees
-  # The main checkout is the first worktree Git lists. Git keeps the task where
-  # it made it: a dev container mounts it elsewhere, without the main checkout
+  # The main checkout is the first worktree Git lists. From inside a dev
+  # container --done would delete the task's files through its mount, so it
+  # refuses there: where the container mounts the task elsewhere, Git lists no
+  # worktree at its path; at the same path, as devshell mounts it, the
+  # container's markers tell (as below). A codespace is the task's own host
   worktrees=(${${(M)${(0)"$(git worktree list --porcelain -z)"}:#worktree *}#worktree })
   checkout=$worktrees[1]
-  if (( ! ${${worktrees:A}[(Ie)$top]} )); then
+  if (( ! ${${worktrees:A}[(Ie)$top]} )) ||
+      [[ ${CODESPACES-} != true && ( ${REMOTE_CONTAINERS-} == true || -e /.dockerenv || -e /run/.containerenv ) ]]; then
     print -u2 -- 'workspace: leave the dev container first (exit), then run: workspace --done'
     return 1
   fi

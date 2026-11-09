@@ -9,13 +9,14 @@ usage() {
 usage: devshell [CMD [ARG]...]
        devshell --remove DIR
 
-Open a login shell in this project's dev container, or run CMD there, in the
-folder matching this one. The project is the Git repository or worktree around
-this folder, with .devcontainer/devcontainer.json or .devcontainer.json at its
-top. Its container starts first when needed, and on macOS so does Colima, the
-VM Docker runs in: a new one shares ~/code alone, with 4 GiB of memory. A
-container whose setup failed is made anew. In a dev container or a codespace
-already, CMD runs right here.
+Open a login shell in this project's dev container, or run CMD there, in this
+folder: devshell mounts the project at the same path in the container, so file
+names mean the same on both sides. The project is the Git repository or
+worktree around this folder, with .devcontainer/devcontainer.json or
+.devcontainer.json at its top. Its container starts first when needed, and on
+macOS so does Colima, the VM Docker runs in: a new one shares ~/code alone,
+with 4 GiB of memory. A container whose setup failed is made anew. In a dev
+container or a codespace already, CMD runs right here.
 
 A dev container runs commands its repository chose, some on this Mac
 (initializeCommand), and reaches the folders Colima shares: devshell asks once,
@@ -369,6 +370,15 @@ else
   local git_dir
   { read -r git_dir; read -r common } <<< "$(git -C $top rev-parse --absolute-git-dir --path-format=absolute --git-common-dir 2> /dev/null)"
   [[ -z $common || $git_dir == $common ]] || flags+=(--mount "type=bind,source=$common,target=$common")
+  # So is the project itself, a second time, unless its config mounts it there
+  # already, by a mount's target or as a Compose config's folder, which its
+  # Compose file mounts (the CLI shows no mount of its own then): file names
+  # in what tools print, and in what language servers and the editor say to
+  # each other, mean the same on both sides
+  local layout
+  layout=$(devcontainer read-configuration $cli --workspace-folder $top 2> /dev/null) || layout=''
+  [[ $layout == *(\"workspace\":\{\"workspaceFolder\":\"$top\"\}|(target|dst|destination)=${top}[,\"]|\"target\":\"$top\")* ]] ||
+    flags+=(--mount "type=bind,source=$top,target=$top")
   local log=$state/$key.log result
   local -i rc=0
   print -r -u2 -- "devshell: starting the dev container of $(tilde $top)"
@@ -393,16 +403,20 @@ else
 fi
 unlock
 
-# The command runs in that container, from the folder matching this one, which
-# must be there; the terminal's settings are those the container understands,
-# as Ghostty's SSH integration sends
-local here=${PWD:A} relative=.
-[[ $here != $top/* ]] || relative=${here#$top/}
+# The command runs in that container, from this folder at the same path; the
+# terminal's settings are those the container understands, as Ghostty's SSH
+# integration sends
+local here=${PWD:A}
 local -a run=(devcontainer exec $cli --workspace-folder $top --container-id $container
   --remote-env TERM=xterm-256color --remote-env COLORTERM=truecolor)
-local prelude=$'export GIT_CONFIG_PARAMETERS="${GIT_CONFIG_PARAMETERS:+$GIT_CONFIG_PARAMETERS }\'safe.directory=*\'"\ncd -- "$1" || exit\nshift'
+local prelude=$'export GIT_CONFIG_PARAMETERS="${GIT_CONFIG_PARAMETERS:+$GIT_CONFIG_PARAMETERS }\'safe.directory=*\'"
+cd -- "$1" 2> /dev/null || {
+  printf \'devshell: the dev container has no %s\\nhint: one made before devshell mounted projects at their path here goes with: devshell --remove .\\n\' "$1" >&2
+  exit 1
+}
+shift'
 if (( $# )); then
-  exec $run sh -c "$prelude"$'\nexec "$@"' devshell $relative "$@"
+  exec $run sh -c "$prelude"$'\nexec "$@"' devshell $here "$@"
 fi
 exec $run sh -c "$prelude"$'\nshell=$(getent passwd "$(id -un)" 2> /dev/null | cut -d: -f7)\nexec "${shell:-${SHELL:-/bin/sh}}" -l' \
-  devshell $relative
+  devshell $here

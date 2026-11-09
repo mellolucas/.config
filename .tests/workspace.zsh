@@ -306,6 +306,13 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   print -rl -- '#!/bin/sh' "printf '%s\\n' \"\$*\" >> '$temporary/devshell.log'" > "$temporary/container-bin/devshell"
   chmod +x "$temporary/container-bin/devshell"
   PATH=$temporary/container-bin:$PATH
+  # Containers are known by their marker files, which this copy of workspace
+  # looks for under the test's folder instead of /
+  [[ $code == *' /.dockerenv '*' /run/.containerenv '* ]] || fail 'container marker fixture'
+  code=${code// \/.dockerenv / $temporary/markers/.dockerenv }
+  code=${code// \/run\/.containerenv / $temporary/markers/run/.containerenv }
+  functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
+  mkdir -p "$temporary/markers/run"
   mkdir -p "$temporary/outside"
   checkout=$temporary/code/owner/repo tasks=$temporary/code/owner/repo.worktrees
   git init -q -b main "$checkout"
@@ -531,21 +538,34 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   git show-ref -q --verify refs/heads/task/pushed || fail 'the pushed, unmerged branch went'
   # Each task's dev container goes too, after the worktree: workspace --done
   # asks devshell to remove any it made, its config there or not, and fails as
-  # devshell does, once the branch is done. Where Git keeps the task elsewhere,
-  # as a dev container mounts it, --done says to leave the container first; in
-  # a codespace, where Git's paths hold, it ends the task.
+  # devshell does, once the branch is done. Inside a dev container --done says
+  # to leave it first, the task untouched: where Git keeps the task elsewhere,
+  # as one mounts it, and where the container's variable or marker files say
+  # so, as at the path devshell mounts it. In a codespace, a container too but
+  # the task's host, it ends the task.
+  inside() {
+    if workspace --done > "$temporary/output" 2>&1; then fail "--done ran $1"; fi
+    [[ $(<"$temporary/output") == 'workspace: leave the dev container first (exit), then run: workspace --done' &&
+      -d $tasks/box ]] || fail "--done $1: $(<"$temporary/output")"
+  }
   laid_out "$tasks/box" ocode --task box
   builtin cd -- "$tasks/box"
   known=$(state)
   recorded_path=$(<"$checkout/.git/worktrees/box/gitdir")
   print -r -- "$temporary/elsewhere/box/.git" > "$checkout/.git/worktrees/box/gitdir"
-  if workspace --done > "$temporary/output" 2>&1; then fail '--done ran where Git keeps the task elsewhere'; fi
-  [[ $(<"$temporary/output") == 'workspace: leave the dev container first (exit), then run: workspace --done' ]] ||
-    fail "--done in a container: $(<"$temporary/output")"
+  inside 'where Git keeps the task elsewhere'
   print -r -- $recorded_path > "$checkout/.git/worktrees/box/gitdir"
+  REMOTE_CONTAINERS=true inside 'in a dev container, by its variable'
+  for marker in .dockerenv run/.containerenv; do
+    : > "$temporary/markers/$marker"
+    inside "in a container with $marker"
+    rm -- "$temporary/markers/$marker"
+  done
   [[ $(state) == $known ]] || fail "--done in a container changed Git's state: $(state)"
   : > "$temporary/devshell.log"
+  : > "$temporary/markers/.dockerenv"
   CODESPACES=true workspace --done > "$temporary/output" 2>&1 || fail "removing a task: $(<"$temporary/output")"
+  rm -- "$temporary/markers/.dockerenv"
   [[ ! -e $tasks/box && $(<"$temporary/devshell.log") == "--remove $tasks/box" ]] ||
     fail "removing a task, devshell was asked: $(<"$temporary/devshell.log" 2>/dev/null)"
   laid_out "$tasks/stuck" ocode --task stuck
