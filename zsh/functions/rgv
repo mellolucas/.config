@@ -83,7 +83,7 @@ zf_mkdir -m 700 "$shelf" || return
   result=0
   selection=$(print -rl -- $menu | RGV_SHELF=$shelf fzf --layout=reverse --no-multi \
       --delimiter=$'\t' --with-nth=3.. --prompt='Matches > ' --header=${(F)header} \
-      --preview='sed -n {1}p "$RGV_SHELF/matches"' --preview-window='right,60%,wrap,<66(down,60%,wrap)') ||
+      --preview='sed -n {1}p "$RGV_SHELF/matches"' --preview-window='right,60%,wrap-word,<66(down,60%,wrap-word)') ||
     result=$?
   case $result in
     0) ;;

@@ -18,9 +18,9 @@ local file_preview='command -v bat >/dev/null && bat --color=always --wrap=never
 local preview=$file_preview
 
 if command -v glow >/dev/null 2>&1; then
-  local md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 -- {}'
+  local md_preview='glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" --width 0 -- {} | sed "s/ *\$//"'
   preview="case {} in *.[mM][dD]) $md_preview;; *) $file_preview;; esac"
 fi
 
 # Enter runs v's command (zsh/bin/edit) on the pick; fzf quotes {} for its shell
-fzf --bind 'enter:become(edit -- {})' --preview "$preview" --preview-window=wrap "$@"
+fzf --bind 'enter:become(edit -- {})' --preview "$preview" --preview-window=wrap-word "$@"
