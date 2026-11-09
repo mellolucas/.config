@@ -3,13 +3,15 @@
 # their runtimes and tools there.
 
 # Coding agents beside OpenCode, for the subscriptions you have. Each reads the
-# shared agents/instructions.md, linked once it's installed. Copilot CLI updates
-# itself unless greedy, which leaves its updates to dotfiles update.
-# cask "claude-code" if OS.mac?
-# cask "copilot-cli", greedy: true if OS.mac?
-# cask "codex" if OS.mac?
-# npm "@github/copilot" unless OS.mac?
-# npm "@openai/codex" unless OS.mac?
+# shared agents/instructions.md, linked once it's installed. Copilot CLI's own
+# updater is off (zsh/.zshenv), so greedy lets dotfiles update upgrade it.
+# cask "claude-code"
+# cask "copilot-cli", greedy: true
+# cask "codex"
+# Copilot CLI and Codex from npm instead, where macOS can't verify the casks
+# (README: Network access)
+# npm "@github/copilot"
+# npm "@openai/codex"
 # Copilot outside the terminal (automations, Projects, computer use), sharing
 # Copilot CLI's ~/.copilot; it updates itself
 # cask "github-copilot-app" if OS.mac?
@@ -45,7 +47,8 @@
 # Personal applications
 # cask "discord" if OS.mac?
 # cask "steam" if OS.mac?
-# cask "battle-net" if OS.mac?
+# Its vendor serves its latest build, so it has no checksum to pin
+# cask "battle-net", args: { require_sha: false } if OS.mac?
 
 # App Store apps, for those sold only there or needing its build (bought there,
 # iCloud sync), on a Mac signed in to an Apple account, where the Brewfile
