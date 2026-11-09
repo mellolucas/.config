@@ -3,7 +3,6 @@
 style: "auto"
 mouse: true
 pager: false
-width: 120
 all: true # TUI browser lists hidden and gitignored markdown too
 showLineNumbers: false
 preserveNewLines: false
