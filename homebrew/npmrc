@@ -1,4 +1,0 @@
-# npm's global config for Homebrew's Node; the installer links it into
-# $(brew --prefix)/etc/npmrc. Homebrew hides NPM_CONFIG_CACHE from the npm it
-# runs for Brewfile entries; shells still set it, and it wins over this file.
-cache=${HOME}/.cache/npm

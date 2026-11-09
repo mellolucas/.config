@@ -220,10 +220,10 @@ brew_bin() {
   return 1
 }
 
-# npm reads its global config even when Homebrew hides the shell's
-# NPM_CONFIG_CACHE from the npm it runs for Brewfile entries. A Homebrew this
-# user cannot write belongs to another account and is left alone, even where a
-# shared group can write its etc.
+# npm's global config in Homebrew's prefix is the machine's own: Bundle gives
+# the npm it runs a cache of its own. A Homebrew this user cannot write belongs
+# to another account and is left alone, even where a shared group can write its
+# etc.
 npm_global_config() {
   ! homebrew_owner > /dev/null || return 1
   brew=$(brew_bin) || return 1
@@ -252,15 +252,11 @@ homebrew_owner() {
   printf '%s\n' "$owner"
 }
 
-# A plain file there is this machine's own npm config, the only one
-# Homebrew-run npm reads; links are this repo's to manage.
-link_npm_global_config() {
+# The link to this repository's npm config that its earlier versions made there
+remove_npm_global_config_link() {
   npmrc=$(npm_global_config) || return 0
-  if [ -e "$npmrc" ] && [ ! -L "$npmrc" ]; then
-    printf 'kept %s: this machine'\''s own npm config\n' "$npmrc"
-    return 0
-  fi
-  link_path "$repo_dir/homebrew/npmrc" "$npmrc"
+  [ -L "$npmrc" ] || return 0
+  remove_owned_link "$npmrc" "$repo_dir/homebrew/npmrc"
 }
 
 # Docker's CLI finds compose and buildx in Homebrew's prefix only through its
@@ -393,7 +389,7 @@ link_dotfiles() {
   link_path "$repo_dir/zsh/bin/devshell" "$user_bin_home/devshell"
   agent_instructions link_agent_instructions
   docker_cli_config
-  link_npm_global_config
+  remove_npm_global_config_link
 }
 
 # Links land first so a brew-phase failure leaves a partially-usable setup.
@@ -461,9 +457,6 @@ bundle_dotfiles() {
     printf 'error: no Brewfile found at %s\n' "$brewfile" >&2
     exit 1
   }
-
-  # Fresh installs link before Homebrew exists; Bundle may run npm right away.
-  link_npm_global_config
 
   # A failed step doesn't stop the others; callers exit 1 when bundle_skipped
   # names any
@@ -960,14 +953,6 @@ doctor_dotfiles() {
     doctor_problem Brewfile "missing at $(tilde "$brewfile"); run: dotfiles link"
   fi
 
-  if npmrc=$(npm_global_config); then
-    if [ -e "$npmrc" ] && [ ! -L "$npmrc" ]; then
-      doctor_ok 'npm global config' "$(tilde "$npmrc"), this machine's own"
-    else
-      doctor_link 'npm global config' "$repo_dir/homebrew/npmrc" "$npmrc"
-    fi
-  fi
-
   if command -v ghostty >/dev/null 2>&1; then
     doctor_version ghostty "$(ghostty +version 2>/dev/null | awk 'NR == 1 { print $2 }' || true)" 1 3 "${package_fix:-run: brew upgrade ghostty}"
   elif is_darwin; then
@@ -1089,9 +1074,7 @@ uninstall_dotfiles() {
   remove_owned_link "$user_bin_home/edit" "$repo_dir/zsh/bin/edit"
   remove_owned_link "$user_bin_home/devshell" "$repo_dir/zsh/bin/devshell"
   agent_instructions unlink_agent_instructions
-  if npmrc=$(npm_global_config); then
-    remove_owned_link "$npmrc" "$repo_dir/homebrew/npmrc"
-  fi
+  remove_npm_global_config_link
 
   printf '\ndone.\n'
 }

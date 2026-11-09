@@ -31,7 +31,6 @@ mkdir -p "$HOME" "$test_root/repo/zsh" "$test_root/bin"
 cp "$repo/install.sh" "$test_root/repo/install.sh"
 cp "$repo/zsh/.zshenv" "$repo/zsh/homebrew.sh" "$repo/zsh/xdg.sh" "$test_root/repo/zsh/"
 mkdir -p "$test_root/repo/homebrew" "$test_root/repo/zsh/bin" "$test_root/repo/agents"
-cp "$repo/homebrew/npmrc" "$test_root/repo/homebrew/npmrc"
 cp "$repo/zsh/bin/edit" "$repo/zsh/bin/devshell" "$test_root/repo/zsh/bin/"
 cp "$repo/agents/instructions.md" "$test_root/repo/agents/instructions.md"
 # Where each agent reads its user-wide instructions: under XDG_DATA_HOME, but
@@ -329,7 +328,7 @@ for operation in bundle install link no-upgrade; do
     fi
     "$installer" "$operation" > "$HOME/dispatch.log" 2>&1
     "$installer" "$operation" >> "$HOME/dispatch.log" 2>&1
-    check test "$(readlink "$HOME/prefix/etc/npmrc")" = "$repo_dir/homebrew/npmrc"
+    check test ! -L "$HOME/prefix/etc/npmrc"
     if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail "repeated $operation made backups"; fi
     # A bundle stamps the time the shell's weekly update reminder counts from.
     if [ "$operation" = link ]; then
@@ -357,10 +356,6 @@ invoked"
         check test "$(readlink "$(agent_path "$file")")" = "$repo_dir/agents/instructions.md"
         check grep -Fqx "ok: $(agent_path "$file") already linked" "$HOME/dispatch.log"
       done
-    fi
-    if [ "$operation" = link ]; then
-      "$installer" uninstall >> "$HOME/dispatch.log" 2>&1
-      check test ! -L "$HOME/prefix/etc/npmrc"
     fi
   )
 done
@@ -514,31 +509,39 @@ else
   done
 fi
 
-# A machine's own global npm config stays; another account's Homebrew, which
-# this user can't write, gets none, and linking still succeeds.
+# npm's global config in Homebrew's prefix is the machine's: link and uninstall
+# remove the link to this repository's that earlier versions made there, and
+# leave a file of the machine's own, and another account's Homebrew, which this
+# user can't write, where linking still succeeds.
 (
   export HOME="$test_root/own-npmrc" PATH="$test_root/package-bin:$PATH"
   export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
   export XDG_CACHE_HOME="$HOME/cache" XDG_STATE_HOME="$HOME/state"
   mkdir -p "$HOME/prefix/etc"
+  for operation in link uninstall; do
+    ln -s "$repo_dir/homebrew/npmrc" "$HOME/prefix/etc/npmrc"
+    "$installer" "$operation" > "$HOME/dispatch.log" 2>&1
+    check test ! -L "$HOME/prefix/etc/npmrc"
+    check grep -Fqx "removed $HOME/prefix/etc/npmrc" "$HOME/dispatch.log"
+  done
   printf 'registry=https://registry.example.invalid/\n' > "$HOME/prefix/etc/npmrc"
   "$installer" link > "$HOME/dispatch.log" 2>&1
+  "$installer" uninstall >> "$HOME/dispatch.log" 2>&1
   check test ! -L "$HOME/prefix/etc/npmrc"
   check test "$(cat "$HOME/prefix/etc/npmrc")" = 'registry=https://registry.example.invalid/'
-  check grep -Fq "kept $HOME/prefix/etc/npmrc" "$HOME/dispatch.log"
   if grep -Fq 'backed up' "$HOME/dispatch.log"; then fail 'own npm config was backed up'; fi
   if [ "$(id -u)" -eq 0 ]; then
     printf "SKIP: another account's Homebrew (root writes anywhere)\n"
   else
     rm "$HOME/prefix/etc/npmrc"
+    ln -s "$repo_dir/homebrew/npmrc" "$HOME/prefix/etc/npmrc"
     chmod a-w "$HOME/prefix/etc" "$HOME/prefix"
     rc=0
     "$installer" link > "$HOME/dispatch.log" 2>&1 || rc=$?
     # Writable again before any check can fail, so the test root can be removed.
     chmod u+w "$HOME/prefix" "$HOME/prefix/etc"
     [ "$rc" = 0 ] || fail "link with another account's Homebrew: $(cat "$HOME/dispatch.log")"
-    check test ! -e "$HOME/prefix/etc/npmrc"
-    check test ! -L "$HOME/prefix/etc/npmrc"
+    check test -L "$HOME/prefix/etc/npmrc"
   fi
 )
 
@@ -575,8 +578,8 @@ else
     check test "$(grep -c '^invoked$' "$HOME/brew.log")" = 1
     if grep -Fq 'belongs to' "$HOME/own.log"; then fail "this account's own Homebrew was called another's"; fi
   )
-  # Another account's Homebrew gets no npm config of this one's, even where a
-  # shared group, such as admin, can write its etc.
+  # Another account's Homebrew keeps its npm config, even a link to this
+  # repository's, even where a shared group, such as admin, can write its etc.
   (
     export HOME="$test_root/group-etc" PATH="$test_root/package-bin:$PATH"
     export XDG_CONFIG_HOME="$HOME/config" XDG_DATA_HOME="$HOME/data"
@@ -587,11 +590,11 @@ else
     brew_bin() { printf '%s\n' "$test_root/package-bin/brew"; }
     path_owner() { printf 'admin1\n'; }
     mkdir -p "$HOME/prefix/etc"
+    ln -s "$repo_dir/homebrew/npmrc" "$HOME/prefix/etc/npmrc"
     chmod a-w "$HOME/prefix"
-    (link_npm_global_config) > "$HOME/link.log" 2>&1 || :
+    (remove_npm_global_config_link) > "$HOME/link.log" 2>&1 || :
     chmod u+w "$HOME/prefix"
-    check test ! -e "$HOME/prefix/etc/npmrc"
-    check test ! -L "$HOME/prefix/etc/npmrc"
+    check test -L "$HOME/prefix/etc/npmrc"
   )
   # Intel's layout: root owns the prefix, /usr/local, and this account owns
   # the repository within it, so the Homebrew is this account's.
@@ -645,17 +648,13 @@ fi
 )
 
 # Fresh installs run brew from its prefix before Homebrew is on PATH; Bundle
-# must still find npm next to brew, and npm's global config must be in place
-# before Bundle runs npm.
+# must still find npm next to brew.
 mkdir "$test_root/brew-prefix" "$test_root/fresh-home" "$test_root/fresh-home/prefix"
 cat > "$test_root/brew-prefix/brew" <<'EOF'
 #!/bin/sh
 set -eu
 case "$*" in
-  'bundle --global')
-    printf '%s\n' "$PATH" > "$HOME/brew-path.log"
-    if [ -L "$HOME/prefix/etc/npmrc" ]; then : > "$HOME/npmrc-linked"; fi
-    ;;
+  'bundle --global') printf '%s\n' "$PATH" > "$HOME/brew-path.log" ;;
   --prefix) printf '%s\n' "$HOME/prefix" ;;
   *) exit 1 ;;
 esac
@@ -673,7 +672,6 @@ chmod +x "$test_root/brew-prefix/brew"
   with_layout bundle_dotfiles
 ) > "$test_root/fresh.log" 2>&1 || { cat "$test_root/fresh.log" >&2; fail 'bundle with Homebrew off PATH'; }
 check grep -q "^$test_root/brew-prefix:" "$test_root/fresh-home/brew-path.log"
-check test -e "$test_root/fresh-home/npmrc-linked"
 
 printf 'older\n' > "$test_root/conflict.backup.20000101000000"
 printf 'newer\n' > "$test_root/conflict"
