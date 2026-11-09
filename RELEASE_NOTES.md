@@ -84,9 +84,11 @@ Changes since `v0.0.1`.
   opens its shell pane inside the container, and `devshell` enters it from
   any shell (`devshell CMD` runs a command there, as agents do for builds and
   tests), once you trust the repository, as its dev container runs commands
-  it chose. On macOS, Colima runs Docker in a VM started on demand, a new one
-  sharing `~/code` alone, and stops once `workspace --done` leaves no
-  container running.
+  it chose. The project sits at the same path there, and Neovim's language
+  servers run in the container when it has them, a definition in the
+  container's own files opening read-only. On macOS, Colima runs Docker in a
+  VM started on demand, a new one sharing `~/code` alone, and stops once
+  `workspace --done` leaves no container running.
 - **Colors:** Catppuccin Mocha in dark mode and Latte in light, following the
   system's appearance in Ghostty, Neovim (even while running), OpenCode, fzf,
   bat, Delta, Glow (its code blocks keep Latte), and the prompt.
@@ -233,3 +235,14 @@ Known limits:
 - devshell knows engines by their Docker context, so pointing `DOCKER_HOST`
   at another engine under the same context can strand a container it
   started; `docker ps` there still lists it.
+- Values a project sets in its dev container's `remoteEnv` show in the Mac's
+  process list while a command runs there: secrets belong elsewhere.
+- What a dev container's config mounts inside its workspace (a `node_modules`
+  volume, say) stays at `/workspaces/NAME`: devshell's commands and Neovim's
+  language servers work at the project's path, where it's missing. Mounted
+  at the project's path instead, it's there for devshell's commands but not
+  for Neovim, which finds no language server or definition in it.
+- Two projects whose containers hold a file at the same path (a language's
+  runtime, say) share one Neovim buffer for it, read from the container that
+  opened it first. A definition that arrives after you've moved to another
+  buffer is read through that buffer's project.
