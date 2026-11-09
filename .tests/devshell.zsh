@@ -170,6 +170,16 @@ esac
 EOF
 chmod +x $temporary/engine $temporary/devcontainer $temporary/colima
 
+# The system's tools, but none of the container tools a machine may keep
+# among them (GitHub's Ubuntu runners have Docker's and Podman's CLIs in
+# /usr/bin): which engine devshell finds is the stand-ins' to say
+system_bin=$temporary/system-bin
+mkdir -p $system_bin
+for tool in /usr/bin/*(N-*) /bin/*(N-*); do
+  [[ ${tool:t} == (docker|podman|colima|devcontainer|limactl) || -e $system_bin/${tool:t} ]] ||
+    ln -s $tool $system_bin/${tool:t}
+done
+
 # A PATH of these stand-ins, the system's tools, and Git: $1 names the engine
 # (docker, podman, or none), then the other stand-ins to leave out
 make_path() {
@@ -182,7 +192,7 @@ make_path() {
     (( ${@[(I)$tool]} )) || ln -s $temporary/$tool $bin/$tool
   done
   ln -s $git_path $bin/git
-  print -r -- $bin:/usr/bin:/bin
+  print -r -- $bin:$system_bin
 }
 
 # devshell, as on macOS (darwin) or Linux, from this folder; its output in
