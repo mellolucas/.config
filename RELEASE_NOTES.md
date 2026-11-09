@@ -72,10 +72,11 @@ Changes since `v0.0.1`.
 - **Documents:** `mdv` renders Markdown in the pager, and `Space t m` in
   Neovim (`q` leaves the rendered view).
 - **Text that fits its pane:** nothing breaks lines at a fixed width. `keys`,
-  `mdv`, the pickers' previews, and Neovim's rendered Markdown wrap at the
-  pane's width, between words, and `-S` in less, `Ctrl+/` in a picker, or
-  `Space t w` in Neovim turns that off; `b` leaves long lines to less, which
-  cuts them until `-S`.
+  `mdv`, the pickers' lists and previews, Neovim's rendered Markdown, and
+  every less view wrap at the pane's width, between words where they can, and
+  `-S` in less, `Ctrl+/` in a picker, or `Space t w` in Neovim turns that off;
+  `b` leaves long lines to less, which cuts them until `-S`. `rg` and `rgv`
+  cut only lines past 1000 columns, as in minified files.
 - **Agents:** OpenCode is the default; Claude Code, Copilot CLI, and Codex
   are installed too, and all four read this setup's shared instructions,
   `agents/instructions.md`. Agents notify you when they finish or need you
@@ -228,6 +229,8 @@ Known limits:
 - Tables keep their natural width, so a narrower view wraps their rows, or
   cuts them with wrapping off. less before 621 (Ubuntu 24.04 and Debian 12
   ship 590) wraps in the middle of words.
+- The pickers need fzf 0.68 or later, as Homebrew installs: an older fzf found
+  first on `PATH` rejects `fzf/fzfrc`'s wrapping options.
 - On Linux, Ghostty keeps its own pane keys, and Neovim's windows are
   `Ctrl+W h/j/k/l`.
 - In tmux, Command keys never arrive: its own keys follow its prefix,
