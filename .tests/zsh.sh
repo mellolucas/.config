@@ -820,17 +820,22 @@ fzf() {
   [[ ! -e $test_root/call ]] || fail "usage ran: $(recorded)"
 )
 
-# mdv FILE renders the file in glow's pager (here a stand-in on PATH that prints
-# what it got), with the theme and -w 0, and the render reaches the screen.
+# mdv FILE renders the file through glow (here a stand-in on PATH that prints
+# what it got, then a padded line), with the theme and -w 0, into the pager:
+# lines lose their padding, and less, which here wraps between words, is told
+# to.
 (
-  unfunction glow
+  unfunction glow less
   /bin/mkdir -p "$test_root/mdv-bin"
-  print -rl -- '#!/bin/sh' 'printf "%s\n" rendered "$@"' > "$test_root/mdv-bin/glow"
-  /bin/chmod +x "$test_root/mdv-bin/glow"
-  path=("$test_root/mdv-bin")
+  print -rl -- '#!/bin/sh' 'printf "%s\n" rendered "$@" "padded   "' > "$test_root/mdv-bin/glow"
+  print -rl -- '#!/bin/sh' '[ "$1" != --help ] || { echo "  --wordwrap"; exit; }' 'echo "LESS=$LESS"' '/bin/cat' \
+    > "$test_root/mdv-bin/less"
+  /bin/chmod +x "$test_root/mdv-bin/glow" "$test_root/mdv-bin/less"
+  path=("$test_root/mdv-bin" /usr/bin /bin)
   source /dev/stdin <<< "$alias_block"
-  output=$(mdv 'notes file.md') || fail 'mdv status'
-  expect $'rendered\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-p\n-w\n0\nnotes file.md' "$output" 'mdv FILE'
+  output=$(PAGER= LESS=-FRX mdv 'notes file.md') || fail 'mdv status'
+  expect $'LESS=-FRX --wordwrap\nrendered\n--style\n'"$XDG_CONFIG_HOME/glow/theme.json"$'\n-w\n0\nnotes file.md\npadded' \
+    "$output" 'mdv FILE'
 )
 
 # Each preview as fzf runs it: Markdown through glow, other files through bat,

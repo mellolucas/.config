@@ -198,7 +198,14 @@ if command -v glow >/dev/null 2>&1; then
       print -r -- "Render Markdown in the pager; glow's options pass through (glow --help lists them)."
       return 0
     fi
-    \glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" -p -w 0 "$@"
+    # glow reads a pipe without a file, but would open its browser at a terminal
+    [[ $# -gt 0 || ! -t 0 ]] || { print -u2 'usage: mdv FILE...'; return 1 }
+    # glow breaks no lines, and its table rows lose their padding: the pager
+    # wraps them, less between words where it can (less 621 and later)
+    local options=${LESS-}
+    less --help 2>/dev/null | grep -q -e --wordwrap && options+=' --wordwrap'
+    \glow --style "${XDG_CONFIG_HOME:-$HOME/.config}/glow/theme.json" -w 0 "$@" | sed 's/ *$//' |
+      LESS=$options "${(@Q)${(z)PAGER:-less}}"
   }
   (( ! $+functions[compdef] )) || compdef '_files -g "*.(md|markdown|mdown|mkd|mdx)(-.)"' mdv
 fi
