@@ -233,6 +233,10 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   # Not when the shell has a command of its own, this is a container already,
   # or devshell or the Dev Containers CLI is missing.
   (
+    if [[ -e /.dockerenv || -e /run/.containerenv ]]; then
+      print -r -- 'SKIP: devshell in the shell pane (these checks run in a container, where workspace leaves it out)'
+      exit 0
+    fi
     unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
       DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD
     stubs=$temporary/container-bin project=${temporary:A}/project

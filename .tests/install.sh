@@ -1325,6 +1325,8 @@ mkdir "$seed/zsh" "$seed/homebrew"
 cp "$repo/install.sh" "$seed/install.sh"
 cp "$repo/zsh/.zshenv" "$repo/zsh/xdg.sh" "$repo/zsh/homebrew.sh" "$seed/zsh/"
 printf '# fixture\n' > "$seed/homebrew/Brewfile"
+# Inside a container, where these checks may run, the installer takes the lean set
+printf '# fixture\n' > "$seed/homebrew/core.Brewfile"
 first_commit=$(fixture_commit trunk)
 printf 'second\n' > "$seed/history"
 second_commit=$(fixture_commit trunk -p "$first_commit")
