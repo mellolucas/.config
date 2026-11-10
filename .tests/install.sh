@@ -1311,7 +1311,7 @@ done
 
 # get.sh runs as its one-liner does, from zsh, bash, or sh, and from dash,
 # Debian's sh. Git's own URL rewriting points its clone at a local seed, and
-# stand-ins answer for curl (serving Homebrew's installer), brew, npm,
+# stand-ins answer for curl (serving Homebrew's installer), brew,
 # xcode-select, uname (Darwin unless a check says Linux), id (an
 # administrator's groups unless a check says otherwise), and git, which asks
 # for the Command Line Tools until they are there, as macOS's /usr/bin/git does.
