@@ -293,7 +293,9 @@ mkdir -p "$HOME/solo" "$HOME/elsewhere"
 tmux new-session -d -s solo -x 120 -y 40 -c "$HOME/elsewhere" 'zsh -f'
 solo=$(tmux display -p -t '=solo:' '#{pane_id}')
 type_line() { tmux send-keys -t "$1" -l -- "$2"; tmux send-keys -t "$1" Enter; }
-type_line $solo "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace \
+# What a pane's shell runs to load the workspace under test, the copy first
+load_workspace="fpath=(${(q)HOME}/functions ${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace"
+type_line $solo "$load_workspace; workspace \
 --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status 'echo T''OP' --shell 'echo BOT''TOM' ${(q)HOME}/solo; \
 read -t 1 -r reply; echo READ:\$reply:; [[ \$PWD == ${(q)HOME}/solo ]] && echo MO''VED; \
 [[ \$DOTFILES_EDITOR_SOCKET == ${(q)$(socket_for $HOME/solo)} ]] && echo SOCK''ET"
@@ -335,7 +337,7 @@ print -r -- 'ok: workspace builds around a shell alone in its window, else opens
 # opens from the window the attached client shows.
 roles sockets
 mkdir -p "$HOME/second"
-type_line $pane[shell] "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; \
+type_line $pane[shell] "$load_workspace; \
 workspace --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status '' ${(q)HOME}/second"
 wait_for 'the second workspace opened no window' '[[ $(tmux list-windows -t "=sockets" -F "#{window_name}") == *second* ]]'
 client=$(tmux list-clients -t '=test' -F '#{client_name}')
@@ -386,7 +388,7 @@ output=$(workspace $HOME/second < /dev/null)
   $(tmux display -p -t '=sockets:' '#{window_id}') == $second ]] ||
   fail "outside tmux, workspace for a folder whose editor runs: $output, at $(tmux display -p -t '=sockets:' '#{window_id}')"
 inside=$(tmux new-window -P -F '#{pane_id}' -t '=test' 'zsh -f')
-type_line $inside "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; \
+type_line $inside "$load_workspace; \
 workspace --editor 'echo ED''ITOR' --agent 'echo AG''ENT' --status '' ${(q)HOME}/second"
 wait_for 'inside tmux, workspace did not switch to the window keeping the served socket' \
   '[[ $(tmux display -p -c "$client" "#{window_id}") == $second ]]'
@@ -435,7 +437,7 @@ print -r -- "ok: workspace --task lays out the task's worktree"
 # workspace --done, from the task's shell, leaves nothing in tmux tied to the
 # task: a pane tmux's keys open in its window takes no socket, and the task
 # made anew gets a session of its own.
-type_line $pane[shell] "fpath=(${(q)HOME}/functions ${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace --done && echo FIN''ISHED"
+type_line $pane[shell] "$load_workspace; workspace --done && echo FIN''ISHED"
 wait_for 'workspace --done did not finish the task' "printed $pane[shell] FINISHED"
 opened $(tmux display -p -t $pane[shell] '#{window_id}') % none
 tmux switch-client -c "$client" -t '=test:'
