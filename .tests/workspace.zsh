@@ -307,7 +307,6 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   code=$(<"$repo/zsh/functions/workspace")
   local executable_check='[[ -x /usr/bin/osascript ]]'
   code=${code/$executable_check/'[[ 1 == 1 ]]'}
-  functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
   local temporary
   temporary=$(mktemp -d "${TMPDIR:-/tmp}/workspace-tasks.XXXXXXXX")
   temporary=${temporary:A}
