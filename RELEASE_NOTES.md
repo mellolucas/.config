@@ -237,10 +237,10 @@ and runs Homebrew's installer; where the network cut Homebrew's own Ruby, it
 said what it skipped and where to look, running it again resumed, and
 `dotfiles doctor` named each fix. The suite's checks whose tools are there
 pass in those containers too, apart from the one that needs a working
-Homebrew (that partial install left `brew` without its Ruby); devshell's
-skip, as inside a container it runs commands in place. With Debian's own
-shellcheck, fzf, and tmux, the suite fails only the checks their older
-versions fail. Full installs are not yet validated on Linux. On macOS, the
+Homebrew (that partial install left `brew` without its Ruby). With Debian's
+own shellcheck, fzf, and tmux, the suite fails only the checks their older
+versions fail. Full installs are not yet validated on Linux, and nothing is
+validated yet on a real WSL or GitHub Codespaces instance. On macOS, the
 GitHub Copilot app installs and runs sessions on a standard account; its
 computer use and voice dictation are not yet validated. Dev containers run on
 macOS 27 on Apple silicon with Colima 0.10.3 and Docker 29, from a checkout
