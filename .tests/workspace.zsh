@@ -50,8 +50,9 @@ fi
 zmodload zsh/zpty
 typeset -F SECONDS=0
 # The editor's socket and the id beside it stay here, apart from Neovim's own
-# folder, and no workspace this runs in is the one under test
-unset XDG_RUNTIME_DIR DOTFILES_EDITOR_SOCKET DOTFILES_EDITOR_SERVE
+# folder, and neither a workspace nor a container this runs in is the one under
+# test
+unset XDG_RUNTIME_DIR DOTFILES_EDITOR_SOCKET DOTFILES_EDITOR_SERVE CODESPACES REMOTE_CONTAINERS
 export TMPDIR=$(mktemp -d "${${TMPDIR:-/tmp}%/}/ws.XXXXXX")
 run_folder=$TMPDIR
 trap 'zpty -d 2>/dev/null || true; command rm -rf -- "$run_folder"' EXIT
@@ -233,14 +234,16 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
   # Not when the shell has a command of its own, this is a container already,
   # or devshell or the Dev Containers CLI is missing.
   (
-    if [[ -e /.dockerenv || -e /run/.containerenv ]]; then
-      print -r -- 'SKIP: devshell in the shell pane (these checks run in a container, where workspace leaves it out)'
-      exit 0
-    fi
     unset DOTFILES_WORKSPACE_EDITOR_CMD DOTFILES_WORKSPACE_AGENT_CMD \
       DOTFILES_WORKSPACE_STATUS_CMD DOTFILES_WORKSPACE_SHELL_CMD
     stubs=$temporary/container-bin project=${temporary:A}/project
-    mkdir -p $stubs $project/.devcontainer $project/sub
+    # Containers are known by their marker files, which this copy of workspace
+    # looks for under the test's folder instead of /
+    [[ $code == *' /.dockerenv '*' /run/.containerenv '* ]] || fail 'container marker fixture'
+    code=${code// \/.dockerenv / $temporary/markers/.dockerenv }
+    code=${code// \/run\/.containerenv / $temporary/markers/run/.containerenv }
+    functions[workspace]=${code//\/usr\/bin\/osascript/workspace_osascript}
+    mkdir -p $stubs $project/.devcontainer $project/sub $temporary/markers/run
     print -r -- '{}' > $project/.devcontainer/devcontainer.json
     for tool in devshell devcontainer; do
       print -r -- '#!/bin/sh' > $stubs/$tool
@@ -262,6 +265,12 @@ accepted() { zsocket -a -t $1 && exec {REPLY}>&-; }
     dispatch sub
     expected[2]=$project expected[5]=gg expected[9]=$(socket_for $project)
     REMOTE_CONTAINERS=true dispatch
+    CODESPACES=true dispatch
+    for marker in .dockerenv run/.containerenv; do
+      : > $temporary/markers/$marker
+      dispatch
+      rm $temporary/markers/$marker
+    done
     rm $stubs/devcontainer
     rehash
     dispatch

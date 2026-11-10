@@ -16,7 +16,13 @@ if [[ ${1:-} != --fixture ]]; then
   temporary=$(mktemp -d "${TMPDIR:-/tmp}/tmux-test.XXXXXXXX")
   temporary=${temporary:A}
   trap 'command rm -rf -- "$temporary"' EXIT
-  mkdir -p "$temporary"/{config,data,state,cache,zsh,run,bin}
+  mkdir -p "$temporary"/{config,data,state,cache,zsh,run,bin,functions}
+  # Containers are known by their marker files, which this copy of workspace
+  # looks for under the test's folder instead of /, wherever these checks run
+  code=$(<"$repo/zsh/functions/workspace")
+  [[ $code == *' /.dockerenv '*' /run/.containerenv '* ]] || fail 'container marker fixture'
+  code=${code// \/.dockerenv / $temporary/markers/.dockerenv }
+  print -r -- "${code// \/run\/.containerenv / $temporary/markers/run/.containerenv }" > "$temporary/functions/workspace"
   # A devshell that does nothing, ahead of any real one: workspace --done
   # never reaches this machine's containers
   print -rl -- '#!/bin/sh' 'exit 0' > "$temporary/bin/devshell"
@@ -186,7 +192,7 @@ print -r -- 'ok: agent notifications reach the terminal through tmux from panes 
 
 # workspace: a session per directory, reattached on rerun, with its commands
 # run in the right panes (harmless ones: never an editor or an agent).
-fpath=("$repo/zsh/functions" $fpath)
+fpath=("$HOME/functions" "$repo/zsh/functions" $fpath)
 autoload -Uz workspace
 export DOTFILES_WORKSPACE_EDITOR_CMD="echo ED''ITOR" DOTFILES_WORKSPACE_AGENT_CMD="echo AG''ENT" \
   DOTFILES_WORKSPACE_STATUS_CMD="echo T''OP" DOTFILES_WORKSPACE_SHELL_CMD="echo BOT''TOM"
@@ -429,7 +435,7 @@ print -r -- "ok: workspace --task lays out the task's worktree"
 # workspace --done, from the task's shell, leaves nothing in tmux tied to the
 # task: a pane tmux's keys open in its window takes no socket, and the task
 # made anew gets a session of its own.
-type_line $pane[shell] "fpath=(${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace --done && echo FIN''ISHED"
+type_line $pane[shell] "fpath=(${(q)HOME}/functions ${(q)repo}/zsh/functions \$fpath); autoload -Uz workspace; workspace --done && echo FIN''ISHED"
 wait_for 'workspace --done did not finish the task' "printed $pane[shell] FINISHED"
 opened $(tmux display -p -t $pane[shell] '#{window_id}') % none
 tmux switch-client -c "$client" -t '=test:'
