@@ -232,11 +232,14 @@ Changes since `v0.0.1`.
 
 `sh .tests/run` passes on macOS, and CI runs it on macOS and Ubuntu with
 Homebrew's tools. In fresh Ubuntu 24.04 and Debian 13 containers set up as
-the README says, `get.sh` links the home and runs Homebrew's installer; where
-the network cut Homebrew's own Ruby, it said what it skipped and where to
-look, running it again resumed, and `dotfiles doctor` named each fix. There
-the suite passes apart from the check that needs a working Homebrew, and with
-Debian's own shellcheck, fzf, and tmux, apart from the checks their older
+the README says, `get.sh`, over a checkout already in place, links the home
+and runs Homebrew's installer; where the network cut Homebrew's own Ruby, it
+said what it skipped and where to look, running it again resumed, and
+`dotfiles doctor` named each fix. The suite's checks whose tools are there
+pass in those containers too, apart from the one that needs a working
+Homebrew (that partial install left `brew` without its Ruby); devshell's
+skip, as inside a container it runs commands in place. With Debian's own
+shellcheck, fzf, and tmux, the suite fails only the checks their older
 versions fail. Full installs are not yet validated on Linux. On macOS, the
 GitHub Copilot app installs and runs sessions on a standard account; its
 computer use and voice dictation are not yet validated. Dev containers run on
