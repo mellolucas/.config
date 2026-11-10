@@ -1333,6 +1333,7 @@ for marker in .dockerenv run/.containerenv; do
   grep -Fq "$test_root/markers/$marker" "$seed/zsh/homebrew.sh" || fail 'container marker fixture'
 done
 printf '# fixture\n' > "$seed/homebrew/Brewfile"
+printf '# fixture\n' > "$seed/homebrew/core.Brewfile"
 first_commit=$(fixture_commit trunk)
 printf 'second\n' > "$seed/history"
 second_commit=$(fixture_commit trunk -p "$first_commit")
@@ -1367,7 +1368,11 @@ cat > "$test_root/get-bin/brew" <<'EOF'
 #!/bin/sh
 printf '%s\n' "$*" >> "$HOME/brew.log"
 case "$*" in
-  'bundle --global') [ -z "${FAIL_BUNDLE-}" ] || exit 1 ;;
+  'bundle --global')
+    # Notes the Brewfile bundle --global reads, as Homebrew finds it
+    printf '%s\n' "${HOMEBREW_BUNDLE_FILE_GLOBAL:-$XDG_CONFIG_HOME/homebrew/Brewfile}" > "$HOME/brewfile.log"
+    [ -z "${FAIL_BUNDLE-}" ] || exit 1
+    ;;
   *) exit 1 ;;
 esac
 EOF
@@ -1421,7 +1426,8 @@ bundles() {
 
 # A fresh Mac: Homebrew's installer, reading the terminal for its prompts,
 # adds the Command Line Tools before anything runs git; the clone takes the
-# default branch with its history, tracking origin; install runs from it.
+# default branch with its history, tracking origin; install runs from it and
+# applies homebrew/Brewfile.
 home="$test_root/get-mac"
 checkout="$home/code/mellolucas/.config"
 run_get HOME="$home" CLT="$home.clt" zsh > "$home.log" 2>&1 || fail "get.sh on a fresh Mac: $(cat "$home.log")"
@@ -1432,6 +1438,7 @@ check test "$(git -C "$checkout" config --get remote.origin.url)" = "$get_url"
 check test "$(git -C "$checkout" rev-list --count HEAD)" = 2
 check test "$(readlink "$home/.local/bin/dotfiles")" = "$checkout/install.sh"
 check test "$(bundles "$home")" = 1
+check test "$(cat "$home/brewfile.log")" = "$home/.config/homebrew/Brewfile"
 
 # A failed install keeps its exit status and says that rerunning the same
 # command resumes; the rerun reuses the checkout, neither cloning nor
@@ -1460,6 +1467,15 @@ for origin in "$get_url" "$get_url.git" git@github.com:mellolucas/.config.git \
   fi
 done
 check test "$(bundles "$home")" = 8
+
+# A Docker container, known by its marker file, gets the lean set: install
+# loads the Homebrew policy it shares with the shell.
+home="$test_root/get-container"
+mkdir "$test_root/markers"
+: > "$test_root/markers/.dockerenv"
+run_get HOME="$home" UNAME=Linux bash > "$home.log" 2>&1 || fail "get.sh in a container: $(cat "$home.log")"
+rm "$test_root/markers/.dockerenv"
+check test "$(cat "$home/brewfile.log")" = "$home/.config/homebrew/core.Brewfile"
 
 # DOTFILES_DIR chooses the folder; later runs find it through the dotfiles
 # link, also when DOTFILES_DIR names it again, a trailing slash included.
