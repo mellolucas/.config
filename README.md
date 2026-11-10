@@ -14,7 +14,7 @@ On a Mac, these install the setup, start a shell that has it, and show the essen
 
 ## Get started
 
-macOS is the primary platform; Linux, WSL, and GitHub Codespaces get best-effort support for the essentials, with tmux where Ghostty is absent ([Without Ghostty](#without-ghostty)); fresh installs there aren't validated yet.
+macOS is the primary platform; Linux, WSL, and GitHub Codespaces get best-effort support for the essentials, with tmux where Ghostty is absent ([Without Ghostty](#without-ghostty)). Full installs on Linux, and anything on a real WSL or GitHub Codespaces instance, aren't validated yet.
 
 `get.sh` clones this repository to `~/code/mellolucas/.config` and runs its installer; on a Mac without the Command Line Tools, Homebrew's installer adds them, Git included, first, when your account is an administrator ([Standard accounts](#standard-accounts) covers the others). If something fails, run the same command again: it reuses the checkout. Keep the `sh -c` form, which leaves Homebrew's installer a terminal to ask for your password.
 
