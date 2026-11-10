@@ -231,9 +231,13 @@ Changes since `v0.0.1`.
 ### Validation
 
 `sh .tests/run` passes on macOS, and CI runs it on macOS and Ubuntu with
-Homebrew's tools. In a Debian 13 container, `get.sh -- link` sets up a fresh
-home, and the suite fails only the checks that use Debian's older shellcheck,
-fzf, and tmux. Full installs are not yet validated on Linux. On macOS, the
+Homebrew's tools. In fresh Ubuntu 24.04 and Debian 13 containers set up as
+the README says, `get.sh` links the home and runs Homebrew's installer; where
+the network cut Homebrew's own Ruby, it said what it skipped and where to
+look, running it again resumed, and `dotfiles doctor` named each fix. There
+the suite passes apart from the check that needs a working Homebrew, and with
+Debian's own shellcheck, fzf, and tmux, apart from the checks their older
+versions fail. Full installs are not yet validated on Linux. On macOS, the
 GitHub Copilot app installs and runs sessions on a standard account; its
 computer use and voice dictation are not yet validated. Dev containers run on
 macOS 27 on Apple silicon with Colima 0.10.3 and Docker 29, from a checkout
