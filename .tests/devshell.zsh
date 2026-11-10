@@ -9,10 +9,6 @@ setopt errexit pipefail
 self=${0:A}
 repo=${self:h:h}
 fail() { print -r -u2 -- "FAIL: $*"; exit 1; }
-if [[ -e /.dockerenv || -e /run/.containerenv ]]; then
-  print -r -- 'SKIP: devshell runs commands in place inside a container'
-  exit 0
-fi
 
 temporary=$(mktemp -d "${TMPDIR:-/tmp}/devshell-test.XXXXXXXX")
 temporary=${temporary:A}
@@ -27,6 +23,14 @@ export GIT_COMMITTER_NAME=Tester GIT_COMMITTER_EMAIL=tester@example.com
 zsh_path=$commands[zsh] git_path=$commands[git]
 export FAKE=$temporary/fake
 mkdir -p $HOME/code/owner $FAKE
+# Containers are known by their marker files, which this copy of devshell
+# looks for under the test's folder instead of /, wherever these checks run
+devshell=$temporary/devshell
+code=$(<$repo/zsh/bin/devshell)
+[[ $code == *' /.dockerenv '*' /run/.containerenv '* ]] || fail 'container marker fixture'
+code=${code// \/.dockerenv / $temporary/markers/.dockerenv }
+print -r -- "${code// \/run\/.containerenv / $temporary/markers/run/.containerenv }" > $devshell
+mkdir -p $temporary/markers/run
 
 # The engine. Containers, one per line: id|folder|running|image|project|config.
 # The VM runs while $FAKE/running exists. The context is the one
@@ -220,7 +224,7 @@ run() {
   shift 2
   rc=0
   output=$(PATH=$path_value $zsh_path -f -c 'OSTYPE=$1; shift; . "$0" "$@"' \
-    $repo/zsh/bin/devshell $os "$@" 2>&1) || rc=$?
+    $devshell $os "$@" 2>&1) || rc=$?
   calls=$(<$FAKE/calls 2> /dev/null || :)
 }
 # Fresh stand-ins and state, trusting the repositories whose Git folders are
@@ -276,6 +280,12 @@ REMOTE_CONTAINERS=true run darwin $mac /bin/echo in place
 [[ $rc == 0 && $output == 'in place' && -z $calls ]] || fail "inside a container: $output; $calls"
 CODESPACES=true run darwin $mac
 [[ $rc == 0 && $output == 'devshell: this shell is in a dev container already' ]] || fail "a shell in a codespace: $output"
+for marker in .dockerenv run/.containerenv; do
+  : > $temporary/markers/$marker
+  run darwin $mac /bin/echo in place
+  [[ $rc == 0 && $output == 'in place' && -z $calls ]] || fail "inside a container with $marker: $output; $calls"
+  rm $temporary/markers/$marker
+done
 print -r -- 'ok: inside a container'
 
 # What's missing names its fix
@@ -307,7 +317,7 @@ zmodload zsh/zpty
 asked() {
   local answer=$1 transcript='' chunk
   local -F deadline=$(( SECONDS + 10 ))
-  zpty -b asking "env PATH=${(q)mac} ${(q)zsh_path} -f -c ${(q):-OSTYPE=darwin; . \"\$0\" true} ${(q)repo}/zsh/bin/devshell"
+  zpty -b asking "env PATH=${(q)mac} ${(q)zsh_path} -f -c ${(q):-OSTYPE=darwin; . \"\$0\" true} ${(q)devshell}"
   until [[ $transcript == *'[y/N] '* ]]; do
     if zpty -r -t asking chunk; then
       transcript+=$chunk
@@ -429,7 +439,7 @@ record $project
 [[ $REPLY == *$'\n'"c0"$'\n'"failed" ]] || fail "a failed setup's record: $REPLY"
 rm $FAKE/up-fails-after
 : > $FAKE/calls
-output=$(PATH=$mac $zsh_path -f -c 'OSTYPE=darwin; . "$0" echo clean' $repo/zsh/bin/devshell 2> /dev/null) || fail "after a failed setup: $output"
+output=$(PATH=$mac $zsh_path -f -c 'OSTYPE=darwin; . "$0" echo clean' $devshell 2> /dev/null) || fail "after a failed setup: $output"
 [[ $output == clean ]] || fail "after a failed setup, its output: $output"
 calls=$(<$FAKE/calls)
 has_call 'docker rm -f c0'
@@ -660,9 +670,9 @@ print -r -- 'ok: a failed start'
 # then finds both, and its record where Colima's start put the first's
 reset $project/.git
 touch $FAKE/colima-slow $FAKE/up-slow
-PATH=$mac $zsh_path -f -c 'OSTYPE=darwin; . "$0" true' $repo/zsh/bin/devshell > /dev/null 2>&1 &
+PATH=$mac $zsh_path -f -c 'OSTYPE=darwin; . "$0" true' $devshell > /dev/null 2>&1 &
 first=$!
-PATH=$mac $zsh_path -f -c 'OSTYPE=darwin; . "$0" true' $repo/zsh/bin/devshell > /dev/null 2>&1 &
+PATH=$mac $zsh_path -f -c 'OSTYPE=darwin; . "$0" true' $devshell > /dev/null 2>&1 &
 second=$!
 wait $first $second
 calls=$(<$FAKE/calls)
@@ -676,7 +686,7 @@ reset $project/.git
 touch $FAKE/colima-slow
 print -r -- "r1|$project.worktrees/fix|1|vsc-fix||$project.worktrees/fix/.devcontainer/devcontainer.json" > $FAKE/containers
 note $project.worktrees/fix colima r1 ready
-PATH=$mac $zsh_path -f -c 'OSTYPE=darwin; . "$0" true' $repo/zsh/bin/devshell > /dev/null 2>&1 &
+PATH=$mac $zsh_path -f -c 'OSTYPE=darwin; . "$0" true' $devshell > /dev/null 2>&1 &
 first=$!
 sleep 0.3
 run darwin $mac --remove $project.worktrees/fix
