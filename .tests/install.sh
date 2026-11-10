@@ -1324,12 +1324,14 @@ git -C "$seed" symbolic-ref HEAD refs/heads/trunk
 mkdir "$seed/zsh" "$seed/homebrew"
 cp "$repo/install.sh" "$seed/install.sh"
 cp "$repo/zsh/.zshenv" "$repo/zsh/xdg.sh" "$seed/zsh/"
-# A Mac has no container's marker files, so this copy of the policy looks for
-# them under the test root instead of /, wherever these checks run
+# Containers are known by their marker files, which this copy of the policy
+# looks for under the test root instead of /, wherever these checks run
 sed -e "s| /\.dockerenv | $test_root/markers/.dockerenv |g" \
   -e "s| /run/\.containerenv | $test_root/markers/run/.containerenv |g" \
   "$repo/zsh/homebrew.sh" > "$seed/zsh/homebrew.sh"
-grep -Fq "$test_root/markers/run/.containerenv" "$seed/zsh/homebrew.sh" || fail 'container marker fixture'
+for marker in .dockerenv run/.containerenv; do
+  grep -Fq "$test_root/markers/$marker" "$seed/zsh/homebrew.sh" || fail 'container marker fixture'
+done
 printf '# fixture\n' > "$seed/homebrew/Brewfile"
 first_commit=$(fixture_commit trunk)
 printf 'second\n' > "$seed/history"
