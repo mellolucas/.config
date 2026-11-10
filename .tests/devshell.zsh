@@ -274,10 +274,11 @@ run darwin $mac true
   fail "without a dev container: $output"
 print -r -- 'ok: help, and a project without a dev container'
 
-# Inside a container already, a command runs right here
+# Inside a container already, a command runs right here, and its exit status
+# is devshell's
 reset
-REMOTE_CONTAINERS=true run darwin $mac /bin/echo in place
-[[ $rc == 0 && $output == 'in place' && -z $calls ]] || fail "inside a container: $output; $calls"
+REMOTE_CONTAINERS=true run darwin $mac /bin/sh -c 'echo in place; exit 7'
+[[ $rc == 7 && $output == 'in place' && -z $calls ]] || fail "inside a container: $rc, $output; $calls"
 CODESPACES=true run darwin $mac
 [[ $rc == 0 && $output == 'devshell: this shell is in a dev container already' ]] || fail "a shell in a codespace: $output"
 for marker in .dockerenv run/.containerenv; do
